@@ -1,0 +1,3 @@
+[submodule "synaplan"]
+	path = synaplan
+	url = https://github.com/metadist/synaplan.git

@@ -141,3 +141,45 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# ──────────────────────────────────────────────────────────────────────────
+# Capacitor / native build artifacts (Epic 1)
+# ──────────────────────────────────────────────────────────────────────────
+
+# iOS
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/App/App/public/
+ios/DerivedData/
+ios/capacitor-cordova-ios-plugins/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/.idea/
+android/local.properties
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/capacitor-cordova-android-plugins/
+
+# ──────────────────────────────────────────────────────────────────────────
+# Secrets & signing (NEVER commit — see docs/SECRETS.md)
+# ──────────────────────────────────────────────────────────────────────────
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+**/google-services.json
+**/GoogleService-Info.plist
+*-service-account*.json
+fastlane/.env*
+keystore.properties

@@ -1,0 +1,31 @@
+{
+  "name": "synaplan-app",
+  "version": "4.0.0",
+  "private": true,
+  "description": "Native iOS + Android shell for the Synaplan platform (Capacitor 8, bundled Vue SPA).",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "scripts": {
+    "build": "./build.sh",
+    "build:web": "./build.sh --web-only",
+    "cap:sync": "cap sync",
+    "cap:copy": "cap copy",
+    "cap:ios": "cap run ios",
+    "cap:android": "cap run android",
+    "cap:open:ios": "cap open ios",
+    "cap:open:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1",
+    "@capacitor/keyboard": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
+    "typescript": "^6.0.3"
+  }
+}
