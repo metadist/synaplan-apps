@@ -57,6 +57,9 @@
 	<string>Synaplan needs access to your photos so you can attach images and documents to your messages.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Synaplan needs permission to save generated images and files to your photo library.</string>
+	<!-- Epic 7.2: optional biometric app lock. Required or Face ID access crashes. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Synaplan uses Face ID to unlock the app.</string>
 	<!-- OAuth deep link (Epic 3): com.synaplan.app://oauth/callback -->
 	<key>CFBundleURLTypes</key>
 	<array>
