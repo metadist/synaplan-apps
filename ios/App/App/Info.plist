@@ -47,6 +47,16 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Epic 7.1: WKWebView getUserMedia + file picker require these purpose strings.
+	     A MISSING string causes a hard crash/App Store reject on first access. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Synaplan uses the microphone so you can dictate messages and use voice features.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Synaplan uses the camera so you can capture photos to attach to your messages.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Synaplan needs access to your photos so you can attach images and documents to your messages.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Synaplan needs permission to save generated images and files to your photo library.</string>
 	<!-- OAuth deep link (Epic 3): com.synaplan.app://oauth/callback -->
 	<key>CFBundleURLTypes</key>
 	<array>

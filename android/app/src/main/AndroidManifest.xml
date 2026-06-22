@@ -46,4 +46,15 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Epic 7.1: voice dictation (getUserMedia/MediaRecorder) + camera capture for
+         RAG uploads. Capacitor's WebView requests these at runtime on getUserMedia;
+         they MUST be declared here or the request is auto-denied. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Camera/mic are optional so devices without them (e.g. some tablets) can still install. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 </manifest>
