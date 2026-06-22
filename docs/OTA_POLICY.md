@@ -55,29 +55,44 @@ top of and the pinned `synaplan` submodule tag it was built from. The bundle ver
 implies a new *behavior* contract — if behavior must change, ship a store build and (if needed)
 raise the forced-update minimum version.
 
-## Status & setup (Capgo) — ASK-FIRST follow-up
+## Status & setup (Capgo)
 
-The **policy and the forced-update gate (8.2) are implemented**. The actual Capgo wiring is a
-deliberate, separate step because it requires owner decisions and external resources:
+Decisions taken: **auto-update** behavior, **production-only** channel for now, **signature/E2E
+encryption enabled**, hosting **= Capgo Cloud for the v4.0 launch** with **self-hosted Capgo kept as
+a documented migration path** (switching is just an `updateUrl`/`channelUrl` override in
+`capacitor.config.ts` — no app code change).
 
-- **New dependency** (`@capgo/capacitor-updater`) — adding npm/native deps is an "ask-first" action.
-- **External account/service** — a Capgo account (or self-hosted update server), an API key, and a
-  signing key (record in `docs/SECRETS.md`, Epic 10).
-- **Channel strategy** — prod vs. beta channels and rollout percentages (open question, below).
+### Done (code-first — inert until an account/bundle exists)
 
-### Setup checklist (to do together once approved)
+- ✅ `@capgo/capacitor-updater` added to `package.json` (native plugin) **and** the shared frontend
+  `synaplan/frontend/package.json` (so the SPA can call `notifyAppReady()`).
+- ✅ `CapacitorUpdater` configured in `capacitor.config.ts`: `autoUpdate`, `resetWhenUpdate`,
+  `directUpdate: false`, `appReadyTimeout`, auto-delete failed/previous.
+- ✅ The SPA confirms each launch via `notifyAppReady()` (`src/services/otaUpdates.ts`, native-only)
+  so Capgo auto-reverts a bad bundle.
+- ✅ npm scripts: `ota:key:create` (signing key) and `ota:upload` (publish a bundle).
+- ✅ Secrets documented (`docs/SECRETS.md`); `.capgo_key_v2` gitignored.
 
-1. Decide hosting: Capgo cloud vs. self-hosted update server.
-2. Add `@capgo/capacitor-updater`, configure the plugin + channel(s).
-3. Provision the signing key + API key; store as secrets (never commit).
-4. Enable signature verification + a rollback/auto-revert policy on bad bundles.
-5. Add a CI step that builds, signs, and uploads the bundle, then records it in
-   `docs/COMPATIBILITY.md`.
-6. Verify the round-trip on a test device: deliver a bundle, restart, confirm the new web version
-   loads, then test rollback.
+Until the app is registered and a bundle is published, the update check finds nothing and the
+builtin `dist/` bundle is always used — i.e. the wiring is a safe no-op.
+
+### Remaining (needs the Capgo Cloud account — ASK-FIRST follow-up)
+
+1. **Create/connect the Capgo Cloud account** and register the app:
+   `npx @capgo/cli@latest login <CAPGO_TOKEN>` then `npx @capgo/cli@latest app add com.synaplan.app`.
+2. **Generate the signing key** (writes `publicKey` into `capacitor.config.ts`, keeps the private
+   key as `.capgo_key_v2`): `npm run ota:key:create`. Back up the private key (see `SECRETS.md`).
+3. **Store `CAPGO_TOKEN`** in the CI secret store / local `.env` (never commit).
+4. **Publish a bundle** (conforming changes only): `./build.sh --web-only` then
+   `npm run ota:upload` (uploads `synaplan/frontend/dist` to the `production` channel at the current
+   app version), and record it in `docs/COMPATIBILITY.md`.
+5. **Verify the round-trip** on a device: publish a bundle → reopen the app → new web version loads
+   on next cold start; then test rollback by publishing a deliberately-broken bundle (must
+   auto-revert via `appReadyTimeout`).
 
 ## Open questions
 
-- OTA channel strategy (prod vs. beta) and rollout percentages?
+- Rollout percentages / staged rollout policy on the production channel?
 - Minimum-version bump policy: who decides, and when does a change require a store build + a
   forced-update bump instead of an OTA?
+- When (if ever) to introduce a `beta` channel for internal testers.

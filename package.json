@@ -13,7 +13,9 @@
     "cap:ios": "cap run ios",
     "cap:android": "cap run android",
     "cap:open:ios": "cap open ios",
-    "cap:open:android": "cap open android"
+    "cap:open:android": "cap open android",
+    "ota:upload": "npx @capgo/cli@latest bundle upload --channel production --path synaplan/frontend/dist --bundle \"$npm_package_version\"",
+    "ota:key:create": "npx @capgo/cli@latest key create"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
@@ -28,7 +30,8 @@
     "@capacitor/network": "^8.0.1",
     "@capacitor/share": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.0",
-    "@capacitor/status-bar": "^8.0.0"
+    "@capacitor/status-bar": "^8.0.0",
+    "@capgo/capacitor-updater": "^8.49.7"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",

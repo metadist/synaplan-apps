@@ -26,7 +26,8 @@ This is part of **Epic 0 — Preparation & Foundations**. It is read/extended by
 | Android upload keystore (`.keystore`/`.jks`) + key alias + passwords | Android signing (Epic 10) | Generated once, **back up safely** | CI secret store / local (never git) | TODO |
 | Google Play service-account JSON | Play Developer API, Play upload (Epic 5/10) | Google Cloud → IAM service account w/ Play access | CI secret store; backend env for server validation | TODO |
 | Google Cloud Pub/Sub topic + push endpoint auth | Real-time Developer Notifications (Epic 5) | Google Cloud project | Backend env / infra config | TODO |
-| Capgo API key / app key | OTA live updates (Epic 8) | Capgo account | CI secret store / `.env` | TODO |
+| Capgo API token (`CAPGO_TOKEN`) | OTA bundle upload (Epic 8, `npm run ota:upload`) | Capgo Cloud account → Account → API keys (upload scope) | CI secret store / `.env` (never git) | TODO |
+| Capgo OTA signing private key (`.capgo_key_v2`) | Signing/E2E-encrypting OTA bundles at upload (Epic 8) | Generated locally via `npm run ota:key:create` | Local + CI secret store (gitignored); **back up safely** — public key is committed in `capacitor.config.ts` | TODO |
 | Crash-reporting DSN (e.g. Sentry) | Native crash reporting (Epic 10) | Sentry project | App config / `.env` | TODO |
 | Submodule access token or SSH deploy key | `git submodule update` in CI (Epic 0/10) | Git host | CI secret store | TODO (public repo → may be unnecessary) |
 
@@ -35,6 +36,9 @@ This is part of **Epic 0 — Preparation & Foundations**. It is read/extended by
 - **Android upload keystore** — if lost, you cannot ship updates to the same Play listing
   without Google Play App Signing key reset. Store an encrypted backup off-machine.
 - **Apple App Store Connect API key (`.p8`)** — downloadable only once at creation.
+- **Capgo OTA signing private key (`.capgo_key_v2`)** — if lost, you cannot publish bundles that
+  the already-installed apps will accept (they verify against the embedded public key). Store an
+  encrypted backup off-machine.
 
 ## Checklist (fill during Epic 0.1 / 10)
 

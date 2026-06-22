@@ -62,6 +62,34 @@ const config: CapacitorConfig = {
       resize: 'native',
       resizeOnFullScreen: true,
     },
+    // ── OTA live updates (Epic 8.1, Capgo) ─────────────────────────────────────
+    // Ships CONFORMING web-asset fixes without a store review. Behavior/payment
+    // logic must NEVER be OTA'd — see docs/OTA_POLICY.md.
+    //
+    // Code-first: this block is inert until the app is registered with the update
+    // server and a bundle is published (no bundle ⇒ the builtin dist/ is used).
+    // Hosting for v4.0 = Capgo Cloud (default updateUrl); migrating to a
+    // self-hosted server later is just an updateUrl/channelUrl override here —
+    // no app code change.
+    CapacitorUpdater: {
+      // Chosen behavior: download in the background, apply on the next cold start.
+      autoUpdate: true,
+      // On a native store update, discard any OTA bundle and fall back to the
+      // freshly shipped builtin bundle so an old OTA bundle never shadows new
+      // native code.
+      resetWhenUpdate: true,
+      // Apply downloaded bundles on the next app start, not mid-session.
+      directUpdate: false,
+      // Safety: if a freshly applied bundle does not call notifyAppReady() within
+      // this window, Capgo auto-reverts to the previous good bundle.
+      appReadyTimeout: 10000,
+      autoDeleteFailed: true,
+      autoDeletePrevious: true,
+      // Signature / E2E encryption (enabled per decision): run
+      // `npm run ota:key:create` to inject `publicKey` here and keep the private
+      // key as a release secret (docs/SECRETS.md). Bundles are then verified on
+      // device and rejected if tampered.
+    },
   },
 }
 
