@@ -8,7 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| _(unreleased)_ 4.0.0 | _TBD — v4.0 baseline tag_ | v4.0 runtime config (`client`, `branding`, `minAppVersion`) | — | 4.0.0 | First mobile release |
+| _(unreleased)_ 4.0.0 | _TBD — v4.0 baseline tag_ | v4.0 runtime config (`client`, `branding`, `mobile`) | — | _empty (gate off)_ | First mobile release |
 
 ## How to read / maintain
 
@@ -21,7 +21,25 @@
 - **OTA bundle** is the latest Capgo web-asset bundle shipped on top of this store build
   (conforming changes only — see `OTA_POLICY.md`, Epic 8).
 - **Min. supported app version** is the value the backend emits in runtime config; apps below it
-  get the blocking "please update" screen.
+  get the blocking "please update" screen. _Empty = gate disabled_ (the default), so no install is
+  ever blocked until an operator sets a value.
+
+## Forced-update gate — implementation reference (Epic 8.2)
+
+The gate is fully server-driven. There is **nothing to build into the app per release** beyond the
+version it already advertises in the User-Agent.
+
+- **Config source:** BCONFIG group `MOBILE` (ownerId `0`), editable in Admin → System Config →
+  *Mobile App*:
+  - `MIN_APP_VERSION` — minimum supported version (e.g. `4.0` or `4.1.2`); empty disables the gate.
+  - `IOS_APP_URL` / `ANDROID_APP_URL` — store links for the update button.
+- **Backend:** `App\Service\Client\MobileVersionService` compares the parsed UA version
+  (`ClientContext`, Epic 2) against `MIN_APP_VERSION` with PHP `version_compare`.
+- **Runtime config:** `GET /api/config/runtime-config` returns a `mobile` block:
+  `{ minVersion, updateRequired, iosAppUrl, androidAppUrl }`. `updateRequired` is computed
+  server-side (only ever `true` for a mobile client below the minimum).
+- **Frontend:** `ForceUpdateScreen.vue` shows a blocking overlay when `isNativeApp()` **and**
+  `config.mobile.updateRequired`; the CTA deep-links to the platform store URL.
 
 ## Update procedure (per release)
 
