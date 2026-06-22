@@ -47,5 +47,17 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- OAuth deep link (Epic 3): com.synaplan.app://oauth/callback -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.synaplan.app.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.synaplan.app</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
