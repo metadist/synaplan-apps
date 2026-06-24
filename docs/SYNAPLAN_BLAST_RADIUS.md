@@ -76,6 +76,10 @@ These hold the actual logic so shared files stay thin. None of them change exist
 | 4 | `frontend/src/i18n/{en,de,es,tr}.json`, `i18n/index.ts` | Parameterized "powered by" + new keys | Default strings == today |
 | 7 | `frontend/src/views/ProfileView.vue` | Biometric-lock opt-in toggle | Native-guarded; hidden on web |
 | 8 | `frontend/src/api/usageApi.ts` | (dep/typing reconcile) | No behavior change |
+| 6 | `frontend/public/site.webmanifest` | Fix `theme_color` `#0003c7` → canonical `#003fc7` | Pure asset/metadata; aligns with `index.html` + `--brand` |
+| 6 | `frontend/package.json` | Add `icons:generate` script (wrap existing `generate-icons.mjs`) | Additive script; no new dependency, no-op unless run |
+| 6 | `frontend/scripts/generate-icons.mjs` | Doc-only header (regen command + cross-link `docs/ASSETS.md`) | Comment-only; behavior unchanged |
+| 6 | `frontend/public/{synaplan.svg,groq.svg}`, `frontend/src/assets/vue.svg` | **Delete** unreferenced orphan assets | Verified zero references (incl. dynamic `.svg` paths); reversible via git |
 
 ## How to verify (release gate)
 

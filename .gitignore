@@ -146,6 +146,13 @@ vite.config.ts.timestamp-*
 # Capacitor / native build artifacts (Epic 1)
 # ──────────────────────────────────────────────────────────────────────────
 
+# @capacitor/assets byproducts we don't use (Epic 6): the apps-root PWA icon
+# set + www/ are generator leftovers — our PWA icons live in the submodule.
+# The committed deliverable is the native ios/ + android/ icon/splash sets and
+# the source masters in assets/.
+icons/
+www/
+
 # iOS
 ios/App/Pods/
 ios/App/build/
