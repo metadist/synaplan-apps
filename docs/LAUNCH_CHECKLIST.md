@@ -56,7 +56,8 @@ ever in git). This is the quick "what must exist before go-live" list.
 | Production **server URL** confirmed | the app's default is `https://web.synaplan.com` (in `app/synaplan-native.js`); confirm or change | 👤 | ☐ |
 | OAuth credentials (GitHub + Google client id/secret) | native + web login (Epic 3) already wired; values are server-side | 👤 | ☐ |
 | reCAPTCHA keys (runtime config) | login/register must work under the `capacitor://` origin (Epic 7.3) | 👤 | ☐ |
-| Apple private key + Google service-account on backend | server-side IAP receipt validation (Epic 5.4/5.6) | 👤 | ☐ |
+| `IAP_APPLE_BUNDLE_ID`, `IAP_APPLE_APP_APPLE_ID`, `IAP_APPLE_ENVIRONMENT`, `IAP_APPLE_ROOT_CERTS_DIR` | Apple server-side IAP validation (Epic 5.4 — **code done**, just unset until keys exist → `/iap/*` returns 503) | 👤 | ☐ |
+| `IAP_GOOGLE_PACKAGE_NAME`, `IAP_GOOGLE_SERVICE_ACCOUNT_JSON` | Google server-side IAP validation (Epic 5.4 — **code done**, unset = disabled) | 👤 | ☐ |
 | Google Cloud Pub/Sub topic + push endpoint auth | Play RTDN for IAP renew/cancel/refund (Epic 5.6) | 👤 | ☐ |
 | `BRAND_*` config (per server) | white-label branding is DB/BCONFIG-driven, not env — set per deployment if white-labeling | 👤 | ☐ |
 
