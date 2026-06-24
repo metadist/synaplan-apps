@@ -116,6 +116,7 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 - [ ] 🧪 Confirm OTA cannot/does not alter IAP/payment flows (policy check).
 
 ### Payments / IAP (Epic 5)
+- [ ] 🤖→🧪 **5.3 native IAP frontend** — integrate the store-billing plugin (`cordova-plugin-purchase` / CdvPurchase, Google Play Billing v7+/v8), wire the in-app purchase sheet + "Restore purchases" into `SubscriptionView.vue`, and call the existing `verifyIapPurchase` server endpoint. Code can start once the dependency is approved, but the purchase flow is **only testable with real store products on a device** (server-side validation 5.4 is already done).
 - [ ] 🧪 Sandbox IAP purchase grants tier **only after server validation**, bound to the user.
 - [ ] 🧪 "Restore purchases" + "manage subscription" work.
 - [ ] 🧪 **Cross-channel block**: active Stripe-web user cannot buy via IAP, and vice-versa.
