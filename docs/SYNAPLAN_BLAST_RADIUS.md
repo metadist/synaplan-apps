@@ -69,7 +69,7 @@ These hold the actual logic so shared files stay thin. None of them change exist
 | 3 | `frontend/src/services/authService.ts` | Store/replay native Bearer identity | Native-guarded |
 | 3 | `frontend/src/services/realtime/RealtimeClient.ts`, `stores/realtime.ts` | `wsUrl` from backend `realtime.wsUrl`; resume-reconnect | Same value on web; backend already exposes it |
 | 4 | `frontend/src/stores/config.ts` | `branding` getter (name/colors/fonts/logo/start-page/powered-by) | Additive; defaults reproduce today |
-| 4 | `frontend/src/router/index.ts` | `brandName()`; `resolveDefaultRoute()` / `resolveLandingRoute()` honor branding | Validated against the route table; **fail safe** to `chat`/`login` |
+| 4 | `frontend/src/router/index.ts` | `brandName()`; `resolveDefaultRoute()` / `resolveLandingTarget()` honor branding (route name **or** free-form path) | Resolved against the route table; non-public/unknown/404/self-redirect rejected; **fail safe** to `chat`/`login` |
 | 4 | `frontend/src/App.vue` | `document.title` uses runtime brand name | Falls back to `Synaplan` before config |
 | 4 | `frontend/src/views/LoginView.vue`, `RegisterView.vue`, `LoggedOutView.vue`, `SharedChatView.vue` | `<BrandAttribution>` + `homepageUrl` links | All fall back to current hardcoded values |
 | 4 | `frontend/src/components/widgets/ChatWidget.vue`, `widget.ts` | Hide / re-attribute powered-by from branding config | Defaults show "powered by synaplan" |
