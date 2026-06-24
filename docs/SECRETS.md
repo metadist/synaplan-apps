@@ -6,6 +6,9 @@
 This is part of **Epic 0 — Preparation & Foundations**. It is read/extended by Epic 5
 (payments), Epic 8 (OTA) and Epic 10 (release engineering).
 
+> See **`docs/LAUNCH_CHECKLIST.md`** for the consolidated launch-time view (provider accounts,
+> open decisions, on-device QA, store content) that ties these secrets to the go-live phase.
+
 ## How secrets are injected
 
 - **Local development:** untracked `.env` files (already covered by `.gitignore`) and the local
