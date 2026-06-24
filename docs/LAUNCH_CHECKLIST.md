@@ -116,7 +116,7 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 - [ ] 🧪 Confirm OTA cannot/does not alter IAP/payment flows (policy check).
 
 ### Payments / IAP (Epic 5)
-- [ ] 🤖→🧪 **5.3 native IAP frontend** — integrate the store-billing plugin (`cordova-plugin-purchase` / CdvPurchase, Google Play Billing v7+/v8), wire the in-app purchase sheet + "Restore purchases" into `SubscriptionView.vue`, and call the existing `verifyIapPurchase` server endpoint. Code can start once the dependency is approved, but the purchase flow is **only testable with real store products on a device** (server-side validation 5.4 is already done).
+- [ ] 🤖→🧪 **5.3 native IAP frontend** — dependency `cordova-plugin-purchase` is now **installed** (commit `c89dbf1`). Still to do: wire the in-app purchase sheet + "Restore purchases" into `SubscriptionView.vue` and call the existing `verifyIapPurchase` server endpoint. The purchase flow is **only testable with real store products on a device** (server-side validation 5.4 is already done).
 - [ ] 🧪 Sandbox IAP purchase grants tier **only after server validation**, bound to the user.
 - [ ] 🧪 "Restore purchases" + "manage subscription" work.
 - [ ] 🧪 **Cross-channel block**: active Stripe-web user cannot buy via IAP, and vice-versa.
@@ -124,6 +124,8 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 - [ ] 🧪 Google `acknowledge` < 3 days; `PENDING` not unlocked.
 
 ### Compliance (Epic 9)
+> **Code-complete:** 9.2 app-level `PrivacyInfo.xcprivacy` (commit `4d3ae10`) and 9.3 configurable privacy/ToU URLs + in-app legal links (synaplan `11da457ee`, app bump `96275bc`) are done. The items below remain device-/account-gated.
+
 - [ ] 🧪 In-app **account deletion** works (+ web deletion link for Google).
 - [ ] 🧪 Upload with a broken **`PrivacyInfo.xcprivacy`** is rejected → then fix (cover **every** SDK: Capacitor plugins, Capgo, Sentry, IAP plugin).
 - [ ] 👤 **Privacy-nutrition / data-safety labels** filled and accurate vs actual permissions.
