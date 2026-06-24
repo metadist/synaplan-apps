@@ -160,7 +160,22 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 
 ---
 
-## 7. Related detail docs
+## 7. IAP go-live provisioning (Epic 5.6 — account/infra-bound, cannot be coded)
+
+The server-side validation code (Epic 5.4) is **done** and reads these once set; until then the
+`/api/v1/iap/*` endpoints return 503 and the app stays Stripe/web-only. Every step here needs the
+boss's Apple / Google / Google-Cloud access — none of it can be done from the repo.
+
+1. [ ] 👤 **Apple App Store Connect API key (`.p8`)** + Key ID + Issuer ID → fill `IAP_APPLE_BUNDLE_ID`, `IAP_APPLE_APP_APPLE_ID`, `IAP_APPLE_ENVIRONMENT`, and provide the Apple root CA certs dir (`IAP_APPLE_ROOT_CERTS_DIR`). (Downloadable only once — back up.)
+2. [ ] 👤 **Google Cloud service-account JSON** with Play Developer API access → fill `IAP_GOOGLE_PACKAGE_NAME`, `IAP_GOOGLE_SERVICE_ACCOUNT_JSON`.
+3. [ ] 👤 **Google Cloud Pub/Sub topic** + push subscription pointing at `POST /api/v1/iap/google/notifications` (RTDN), incl. push-endpoint auth.
+4. [ ] 👤 Wire **Apple App Store Server Notifications V2** URL → `POST /api/v1/iap/apple/notifications`.
+5. [ ] 👤 Create **Apple Sandbox testers** + **Google license-testing accounts** (no real charges) for the on-device IAP QA (§4).
+6. [ ] 👤 Store all of the above per `docs/SECRETS.md` (CI secret store / backend env, never git).
+
+---
+
+## 8. Related detail docs
 
 | Doc | Covers |
 |-----|--------|
