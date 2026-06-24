@@ -44,7 +44,7 @@ These hold the actual logic so shared files stay thin. None of them change exist
 | 4 | `backend/src/Seed/BrandingConfigSeeder.php` | Idempotent seed of branding defaults (== today's look) |
 | 8 | `backend/src/Service/Client/MobileVersionService.php` | Min-app-version + store URLs (forced-update gate) |
 | 8 | `backend/src/Seed/MobileConfigSeeder.php` | Idempotent seed of mobile config (gate off by default) |
-| 3 | `frontend/src/services/api/nativeAuth.ts`, `nativeOAuth.ts`, `nativeRuntime.ts` | Native auth/OAuth/runtime helpers (native-guarded) |
+| 3 | `frontend/src/services/api/nativeAuth.ts`, `nativeOAuth.ts`, `nativeRuntime.ts` | Native auth/OAuth/runtime helpers (native-guarded). `nativeAuth.ts` keys Bearer tokens **per resolved server** (§3.0 per-server identity) |
 | 3 | `frontend/src/services/authService.ts` consumers, `RealtimeClient.ts` | (see shared edits) |
 | 4 | `frontend/src/components/BrandAttribution.vue` | `{name} · powered by {label}` component |
 | 4 | `frontend/src/composables/useBrandLogo.ts`, `frontend/src/utils/brandingTheme.ts` | Runtime logo + color/font injection |

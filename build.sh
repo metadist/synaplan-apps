@@ -53,6 +53,28 @@ npm run build
 popd >/dev/null
 echo "    Built: synaplan/frontend/dist/"
 
+echo "==> [2.5/3] Injecting app-owned native bootstrap (Server config, Epic 3 §3.0)"
+# The in-app server switcher + its pre-SPA bootstrap live ENTIRELY in this repo
+# (zero blast radius in the public submodule). We copy the app-owned script into
+# the bundled dist/ and inject it as the FIRST <script> in index.html so it runs
+# before the SPA's deferred ES module and can set window.__SYNAPLAN_API_BASE_URL__.
+DIST_DIR="synaplan/frontend/dist"
+INDEX_HTML="$DIST_DIR/index.html"
+NATIVE_JS="app/synaplan-native.js"
+if [[ -f "$INDEX_HTML" && -f "$NATIVE_JS" ]]; then
+  cp "$NATIVE_JS" "$DIST_DIR/synaplan-native.js"
+  if grep -q 'synaplan-native.js' "$INDEX_HTML"; then
+    echo "    Bootstrap already present in index.html — skipping inject"
+  else
+    # Insert right after <head> so it is the first script the WebView evaluates.
+    # Use a portable perl one-liner (works on macOS + Linux build agents).
+    perl -0pi -e 's/(<head[^>]*>)/$1\n    <script src="\/synaplan-native.js"><\/script>/i' "$INDEX_HTML"
+    echo "    Injected /synaplan-native.js into $INDEX_HTML"
+  fi
+else
+  echo "    WARNING: $INDEX_HTML or $NATIVE_JS missing — skipped bootstrap inject"
+fi
+
 if [[ "$WEB_ONLY" == true ]]; then
   echo "==> [3/3] Skipping cap sync (--web-only)"
   exit 0
