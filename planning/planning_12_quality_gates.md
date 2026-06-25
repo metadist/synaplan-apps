@@ -3,7 +3,7 @@ epic: 12
 title: Quality Gates & Testable Merge Process (cross-cutting)
 sprint: "Cross-cutting (applies to every epic)"
 aspect: null
-status: planned
+status: in-progress
 depends_on: []
 repos:
   - synaplan-apps (private)
@@ -45,9 +45,12 @@ explicit, tested part of the gate.
       `make -C frontend test`. After any runtime-config schema change:
       `make -C frontend generate-schemas` then re-run the type check. Run the **full** suite,
       unfiltered (see the repo's "`--filter` ≠ `make test`" trap).
-- [ ] **`synaplan-apps`** repo gets its own `make ci-local` (or `npm run ci-local`) that runs gates
-      1–4 for the app code (lint + typecheck, click/component tests, parse/config-validation tests,
-      format check). Document it in this repo's README/`docs`.
+- [x] **`synaplan-apps`** repo gets its own `npm run ci-local` (gate 1 typecheck + gate 3
+      parse/config tests), documented in the README. **Dependency-free** by design: uses the
+      bundled `tsc` (`tsconfig.json` typechecks `capacitor.config.ts`) + Node's built-in test
+      runner (`node --test tests/*.test.mjs`) covering the Epic 10.1 build-identity resolver.
+      _Still open (needs new dev-deps → sign-off): ESLint/Prettier (gate 1 lint + gate 4 format)
+      and Playwright/Maestro click tests (gate 2)._
 - [ ] **Pre-commit / pre-push hooks** enforce the gate so it can't be silently skipped; **never**
       bypass with `--no-verify` on a branch headed for `main`.
 

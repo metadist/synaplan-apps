@@ -1,6 +1,19 @@
 # synaplan-apps
 Mobile apps for Synaplan.com platform AND your own hosted AI platforms. Brandable!
 
+## Build & local gate
+
+```bash
+./build.sh                 # build the bundled SPA (+ cap sync); see docs/BUILD_ENVIRONMENTS.md
+npm run ci-local           # app-repo quality gate: typecheck + config/parse tests (no extra deps)
+npm run config:app:print   # show the resolved env/version/bundle-id identity
+```
+
+`npm run ci-local` runs gates 1 & 3 (lint/typecheck + parse) for the **app-repo** code
+(`capacitor.config.ts`, `scripts/`) using only the bundled `tsc` and Node's built-in test
+runner. Changes inside the `synaplan/` submodule keep using that repo's own `make` gate
+(see its `AGENTS.md`). Multi-environment builds: [`docs/BUILD_ENVIRONMENTS.md`](docs/BUILD_ENVIRONMENTS.md).
+
 ## Docs
 
 - **[`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)** — everything deferred to the
