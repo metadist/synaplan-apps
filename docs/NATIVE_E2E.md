@@ -68,6 +68,31 @@ maestro test .maestro/01-smoke.yaml -e APP_ID=com.synaplan.app.dev
 
 Screenshots land in `.maestro/artifacts/` (gitignored).
 
+## Verified runs
+
+| Platform | Build/install | Maestro flows | Notes |
+|----------|---------------|---------------|-------|
+| **Android** (emulator API 35) | ✅ `cap run android` (`com.synaplan.app.dev`) | ✅ **3/3 passed** (`01-smoke`, `02-server-settings`, `03-env-badge`) in ~16s | The automated gate-2 evidence today. |
+| **iOS** (Simulator, iOS 26) | ✅ `cap run ios` (`com.synaplan.app.dev`, display name "Synaplan Dev") | 🧪 app shell verified by direct launch + screenshot (DEV badge + gear render correctly); **Maestro assertions blocked** — see limitation below. | Anti-steering / env-badge confirmed visually. |
+
+## Known limitation — Maestro on iOS + heavy WebViews
+
+On the iOS Simulator the Maestro XCUITest driver **hangs while dumping the view
+hierarchy** of our content-rich WKWebView (the SPA exposes a very large accessibility
+tree). The app itself launches and renders correctly — the gear and the env badge are
+on screen — but `assertVisible` / `extendedWaitUntil` never returns because the
+hierarchy snapshot call stalls. This is a documented Maestro-on-iOS behavior with large
+WebViews, **not an app defect**.
+
+Consequences / how we handle it:
+- **Android is the automated gate-2 runner** for the app shell today (`npm run e2e:dev`).
+- **iOS app-shell health is verified manually** (build → `cap run ios` → launch → confirm
+  no white screen + DEV badge + gear) until the driver limitation is resolved (newer
+  Maestro, or trimming the WebView a11y tree). Track this before relying on iOS Maestro in
+  CI.
+- The deeper, highest-risk paths (login, SSE/WS, OAuth, sandbox IAP) are device/account-
+  gated on **both** platforms anyway and run on the beta tracks (Epic 10.2/10.5).
+
 ## How this is kept honest in `ci-local`
 
 `npm run ci-local` does **not** run Maestro, but `tests/maestro-flows.test.mjs` validates the

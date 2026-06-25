@@ -17,4 +17,4 @@ env:
 - assertVisible: 'Reset to default'
 - tapOn: 'Cancel'
 - assertNotVisible: 'Save'
-- takeScreenshot: artifacts/02-server-settings
+- takeScreenshot: .maestro/artifacts/02-server-settings

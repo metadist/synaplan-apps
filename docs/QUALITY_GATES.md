@@ -65,7 +65,7 @@ the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
 | **10.4 Store listings** | Metadata + screenshots in de/en/es/tr | 4 | ⏳ assets/account-gated |
 | **10.5 Beta/CI** | Live on TestFlight + Play Internal; auth + IAP green in release tracks | 1–5 | ⏳ gated (CI needs sign-off) |
 | **11 Stabilization** | Must-fix bugs closed; all four Aspects no-op for web; full gates green; release-gate checklist complete | 1–5 | ⏳ final gate (reads this matrix + `COMPATIBILITY.md`) |
-| **12 Quality gates** | App `ci-local` + submodule make gate cover gates 1–4; AI review recorded on every PR | 1,2,3,4,5 | ✅ app gate (1 lint+typecheck, 3 parse, 4 format); ✅ gate-2 Maestro flows authored + integrity-guarded (🧪 execution device-gated) |
+| **12 Quality gates** | App `ci-local` + submodule make gate cover gates 1–4; AI review recorded on every PR | 1,2,3,4,5 | ✅ app gate (1 lint+typecheck, 3 parse, 4 format); ✅ gate-2 Maestro flows authored + integrity-guarded; Android run **3/3 green**, iOS shell manually verified (Maestro-iOS WebView limit) |
 | **13 Encapsulation** | Blast-radius registry == actual changed files; every seam guarded + default-safe | 5 | ✅ `SYNAPLAN_BLAST_RADIUS.md` + AI review |
 
 ## Open automation gaps (need a decision before closing)
@@ -79,8 +79,12 @@ the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
   the app-shell smoke (no white screen), the native Server overlay, and the non-prod env badge,
   anchored on app-owned locale-independent strings. Execution is device-gated (built app +
   emulator/sim), so it stays out of the fast `ci-local`; `tests/maestro-flows.test.mjs` guards
-  the flows' integrity there. _Remaining (device/account-gated): login + SSE/WS/OAuth and
-  sandbox-IAP/anti-steering flows need a signed release build + test accounts (Epic 10.2/10.5)._
+  the flows' integrity there. **Verified:** Android emulator **3/3 passed**; iOS Simulator —
+  app shell launches + renders (DEV badge + gear confirmed by screenshot) but Maestro's iOS
+  XCUITest driver hangs dumping the heavy WebView a11y tree, so iOS is **manually verified**
+  for now (known Maestro-on-iOS limitation, not an app defect — see `docs/NATIVE_E2E.md`).
+  _Remaining (device/account-gated): login + SSE/WS/OAuth and sandbox-IAP/anti-steering flows
+  need a signed release build + test accounts (Epic 10.2/10.5)._
 - **Manifest/`PrivacyInfo` validation (gate 3):** ✅ done — `tests/native-manifests.test.mjs`
   validates `Info.plist` (purpose strings + version/bundle-id build-setting wiring + OAuth
   scheme), `AndroidManifest.xml` (permissions + `${appLabel}` + OAuth filter), and the

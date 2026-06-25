@@ -15,4 +15,4 @@ env:
     visible:
       text: '(DEV|STAGING).*'
     timeout: 25000
-- takeScreenshot: artifacts/03-env-badge
+- takeScreenshot: .maestro/artifacts/03-env-badge

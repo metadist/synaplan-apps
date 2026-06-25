@@ -17,4 +17,4 @@ env:
 - extendedWaitUntil:
     visible: 'Server settings'
     timeout: 25000
-- takeScreenshot: artifacts/01-smoke
+- takeScreenshot: .maestro/artifacts/01-smoke

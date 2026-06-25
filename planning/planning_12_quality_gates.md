@@ -74,9 +74,12 @@ explicit, tested part of the gate.
 - [~] **Native click-through** of the app shell — tool decided: **Maestro** (rationale in
       `docs/NATIVE_E2E.md`). Smoke-level flows authored in `.maestro/` (cold launch → no white
       screen; native Server overlay open/cancel; non-prod env badge), anchored on app-owned
-      strings and integrity-guarded by `tests/maestro-flows.test.mjs` in `ci-local`. _Device-gated
-      execution + the deeper paths (change-server→save→reset, login, SSE/WS, OAuth,
-      background/resume) run on the beta tracks for the release gate (Epic 10/11)._
+      strings and integrity-guarded by `tests/maestro-flows.test.mjs` in `ci-local`.
+      **Run on devices: Android emulator 3/3 green; iOS Simulator shell verified by
+      launch+screenshot** (Maestro's iOS driver hangs on the heavy WebView a11y tree → iOS
+      manual for now, tracked in `docs/NATIVE_E2E.md`). _Device-gated deeper paths
+      (change-server→save→reset, login, SSE/WS, OAuth, background/resume) run on the beta tracks
+      for the release gate (Epic 10/11)._
 - [ ] A short, written **reviewer click-path** (the Guideline-4.2 "why this is an app in 30s" walk,
       Epic 9) that QA repeats each release.
 
