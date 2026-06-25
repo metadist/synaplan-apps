@@ -52,22 +52,36 @@ stable base and that the four Aspects didn't regress the web.
 
 ### 11.2 — Aspect regression sweep (web must be unaffected)
 
-- [ ] **Aspect 1 (UA):** web User-Agent unchanged; backend client-detection defaults to web.
-- [ ] **Aspect 2 (branding):** unconfigured deployment looks identical to pre-v4.0 (the default
-      regression test from Epic 4); all four locales intact.
-- [ ] **Aspect 3 (payments):** web Stripe checkout + portal + webhooks still fully work; existing
+> Automated default-safety verified: the full backend + frontend suites (incl. the Epic 2/4/5
+> default-safety + characterization tests) are green (see 11.3). The runtime/visual web checks
+> below stay manual at the release meeting.
+
+- [~] **Aspect 1 (UA):** web User-Agent unchanged; backend client-detection defaults to web.
+      _Automated: `MobileVersionService` + client-context tests green; 🧪 confirm web UA on a real
+      browser request at the gate._
+- [~] **Aspect 2 (branding):** unconfigured deployment looks identical to pre-v4.0 (the default
+      regression test from Epic 4); all four locales intact. _Automated: branding default-safety +
+      i18n-completeness tests green; 🧪 visual default-vs-branded pass at the gate._
+- [~] **Aspect 3 (payments):** web Stripe checkout + portal + webhooks still fully work; existing
       subscriptions report `source: 'stripe'`; open-source (no-billing) mode unaffected.
-- [ ] **Aspect 4 (assets):** web favicons/PWA icons present + correct; brand color consistent.
+      _Automated: subscription/IAP backend tests green; 🧪 live Stripe round-trip at the gate._
+- [~] **Aspect 4 (assets):** web favicons/PWA icons present + correct; brand color consistent.
+      _🧪 visual check at the gate._
 
 ### 11.3 — Full quality gates (both repos)
 
-- [ ] Backend: `make -C backend lint && make -C backend phpstan && make -C backend test`
-      (full suite, unfiltered; re-record characterization snapshots only after reviewing the diff).
-- [ ] Frontend: `make -C frontend lint`, `docker compose exec -T frontend npm run check:types`,
-      `make -C frontend test`. If runtime-config schema changed (Epics 2/4/8):
-      `make -C frontend generate-schemas` then re-run type check.
+- [x] Backend: `make -C backend lint && make -C backend phpstan && make -C backend test`
+      — **all green** (lint 0/698; PHPStan 781 files, no errors; PHPUnit **2256 tests / 8113
+      assertions, 0 failures**, only pre-existing warnings/deprecations/notices). Run 2026-06-25
+      on `feat/native-store-compliance` against the live Docker dev stack; no characterization
+      snapshot drift (no re-record needed).
+- [x] Frontend: `make -C frontend lint` (Prettier + ESLint clean),
+      `docker compose exec -T frontend npm run check:types` (vue-tsc clean),
+      `make -C frontend test` (**78 files / 737 tests passed**). No runtime-config schema change in
+      this sweep, so no `generate-schemas` re-run needed.
 - [ ] App: Epic 3 (auth) + Epic 5 (IAP) acceptance re-verified in **release/TestFlight + Play
-      Internal** builds.
+      Internal** builds. _Device/account-gated — runs at the release gate (see
+      `docs/RELEASE_GATE_v4.md` §3.2/§3.3)._
 
 ### 11.4 — Release gate checklist + coordinated tag
 
