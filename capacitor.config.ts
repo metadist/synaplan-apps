@@ -19,6 +19,25 @@ const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'
 const [major, minor] = pkg.version.split('.')
 const appUserAgent = `Synaplan Mobile V${major}.${minor}`
 
+// ── Epic 10.1: per-environment identity ──────────────────────────────────────
+// SYNAPLAN_ENV (dev|staging|prod, default prod) selects the bundle-id suffix and
+// the visible app-name suffix. The native projects are the source of truth for the
+// installed id (android/app/build.gradle + scripts/app-config.mjs), but `cap`
+// tooling and some plugins read these, so keep them in lock-step. Frozen in
+// docs/IDENTIFIERS.md.
+const APP_ENV_MATRIX = {
+  prod: { idSuffix: '', nameSuffix: '' },
+  staging: { idSuffix: '.staging', nameSuffix: ' Staging' },
+  dev: { idSuffix: '.dev', nameSuffix: ' Dev' },
+} as const
+const appEnv = (process.env.SYNAPLAN_ENV?.trim().toLowerCase() ?? 'prod') as keyof typeof APP_ENV_MATRIX
+const envIdentity = APP_ENV_MATRIX[appEnv]
+if (!envIdentity) {
+  throw new Error(`Unknown SYNAPLAN_ENV "${appEnv}" — use dev | staging | prod`)
+}
+const appId = `com.synaplan.app${envIdentity.idSuffix}`
+const appName = `Synaplan${envIdentity.nameSuffix}`
+
 // ── Dev-only: point the app at a local backend for the Epic 3 spike ───────────
 // When SYNAPLAN_DEV_BACKEND is set at `cap sync` time (e.g. http://10.0.2.2:8000
 // for the Android emulator's host loopback), we relax the WebView so the bundled
@@ -27,8 +46,8 @@ const appUserAgent = `Synaplan Mobile V${major}.${minor}`
 const devBackendUrl = process.env.SYNAPLAN_DEV_BACKEND?.trim()
 
 const config: CapacitorConfig = {
-  appId: 'com.synaplan.app',
-  appName: 'Synaplan',
+  appId,
+  appName,
   // Appended (not overridden) to the default WKWebView/Android WebView UA so the token
   // rides on ALL WebView transports — fetch/XHR, EventSource/SSE, and the WebSocket
   // upgrade — which JS-set headers cannot do. Backend detection: Epic 2.2.

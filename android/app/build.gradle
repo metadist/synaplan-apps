@@ -1,14 +1,55 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
 
+// ── Epic 10.1: single-source version + per-environment identifiers ────────────
+// The human version is owned by this repo's package.json (the same value that
+// drives the UA token and the iOS MARKETING_VERSION). The monotonic build number
+// comes from SYNAPLAN_BUILD_NUMBER (CI) and falls back to the git commit count
+// locally. SYNAPLAN_ENV (dev|staging|prod) selects the applicationId suffix and
+// the visible launcher label. Identifiers are frozen in docs/IDENTIFIERS.md.
+def synaplanVersionName = new JsonSlurper().parse(file("$rootDir/../package.json")).version
+
+def synaplanEnv = (project.findProperty('synaplanEnv')
+        ?: System.getenv('SYNAPLAN_ENV') ?: 'prod').toString().toLowerCase()
+def synaplanEnvMatrix = [
+        prod   : [suffix: '', label: 'Synaplan'],
+        staging: [suffix: '.staging', label: 'Synaplan Staging'],
+        dev    : [suffix: '.dev', label: 'Synaplan Dev'],
+]
+def synaplanEnvConfig = synaplanEnvMatrix[synaplanEnv]
+if (synaplanEnvConfig == null) {
+    throw new GradleException("Unknown SYNAPLAN_ENV '${synaplanEnv}' — use dev | staging | prod")
+}
+
+def synaplanBuildNumber = {
+    def fromEnv = project.findProperty('synaplanBuildNumber') ?: System.getenv('SYNAPLAN_BUILD_NUMBER')
+    if (fromEnv && fromEnv.toString().isInteger() && fromEnv.toString().toInteger() > 0) {
+        return fromEnv.toString().toInteger()
+    }
+    try {
+        def count = 'git rev-list --count HEAD'.execute(null, rootProject.projectDir).text.trim()
+        if (count.isInteger() && count.toInteger() > 0) {
+            return count.toInteger()
+        }
+    } catch (ignored) {
+        // not a git checkout / git unavailable — fall through
+    }
+    return 1
+}()
+
 android {
+    // namespace = the code package (R class / BuildConfig); it stays constant even
+    // when applicationId gets an environment suffix below.
     namespace = "com.synaplan.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.synaplan.app"
+        applicationId "com.synaplan.app" + synaplanEnvConfig.suffix
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode synaplanBuildNumber
+        versionName synaplanVersionName
+        manifestPlaceholders = [appLabel: synaplanEnvConfig.label]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

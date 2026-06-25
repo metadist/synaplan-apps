@@ -19,7 +19,9 @@ dependencies {
     implementation project(':capacitor-share')
     implementation project(':capacitor-splash-screen')
     implementation project(':capacitor-status-bar')
-
+    implementation project(':capgo-capacitor-updater')
+    implementation "com.android.billingclient:billing:9.0.0"
+    implementation "androidx.core:core:1.9.0"
 }
 
 

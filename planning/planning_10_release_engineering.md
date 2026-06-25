@@ -3,7 +3,7 @@ epic: 10
 title: Release Engineering & Delivery
 sprint: "Sprint 10"
 aspect: null
-status: planned
+status: in-progress
 depends_on: [8, 9]
 repos:
   - synaplan-apps (private)
@@ -28,13 +28,25 @@ with OTA (Epic 8) and the joint release gate (Epic 11).
 
 ## Scope / Tasks
 
-### 10.1 — Build environments & versioning
+### 10.1 — Build environments & versioning ✅ (code-complete)
 
-- [ ] Local builds: iOS only on macOS/Xcode, Android via Android Studio/Gradle
+- [x] Local builds: iOS only on macOS/Xcode, Android via Android Studio/Gradle
       (`npx cap run ios|android`).
-- [ ] Auto-increment `CFBundleVersion` / `versionCode`; separate **bundle IDs for
+- [x] Auto-increment `CFBundleVersion` / `versionCode`; separate **bundle IDs for
       dev/staging/prod** + an environment switch (`setApiBaseUrl`, Epic 3). Keep versions aligned
       with the UA version (Epic 2) and the compatibility matrix (Epic 8).
+
+> **Implemented** (see `docs/BUILD_ENVIRONMENTS.md`). A single env switch
+> `SYNAPLAN_ENV` (dev|staging|prod) selects the bundle id suffix (`.dev`/`.staging`)
+> and a visible app-name suffix ("Synaplan Dev"/"Synaplan Staging"). The human
+> version is owned by `package.json` (drives `versionName`/`MARKETING_VERSION` **and**
+> the UA token), and `SYNAPLAN_BUILD_NUMBER` (CI) → `versionCode`/`CFBundleVersion`,
+> falling back to the git commit count locally. Android is wired Gradle-natively
+> (`android/app/build.gradle`); iOS is stamped by `scripts/app-config.mjs` (run from
+> `build.sh`). Non-prod builds also carry an in-app environment badge.
+> **Verified** on the Android emulator: `com.synaplan.app.dev`, label "Synaplan Dev",
+> versionName 4.0.0 / versionCode 1, badge "DEV · 4.0.0 (1)" — coexisting with prod;
+> iOS resolves `com.synaplan.app.dev` / 4.0.0 via `xcodebuild -showBuildSettings`.
 
 ### 10.2 — Signing & secrets
 

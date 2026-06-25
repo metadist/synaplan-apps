@@ -329,6 +329,32 @@
     }, 50)
   }
 
+  // Epic 10.1: visible environment indicator for non-prod builds. build.sh stamps
+  // window.__SYNAPLAN_ENV__ (+ version/build) into the bundle; prod shows nothing.
+  function mountEnvBadge() {
+    try {
+      var env = window.__SYNAPLAN_ENV__
+      if (!env || env === 'prod') return
+      if (document.getElementById('synaplan-env-badge')) return
+      var version = window.__SYNAPLAN_APP_VERSION__ || ''
+      var build = window.__SYNAPLAN_BUILD__ || ''
+      var label = String(env).toUpperCase()
+      if (version) label += ' \u00b7 ' + version + (build ? ' (' + build + ')' : '')
+      var badge = el('div', { id: 'synaplan-env-badge' }, label)
+      badge.setAttribute(
+        'style',
+        'position:fixed;top:env(safe-area-inset-top,0px);left:50%;transform:translateX(-50%);' +
+          'z-index:2147483645;background:#b91c1c;color:#fff;font:600 11px/1.5 -apple-system,' +
+          'BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:2px 12px;' +
+          'border-radius:0 0 9px 9px;letter-spacing:.4px;opacity:.92;pointer-events:none;' +
+          'max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+      )
+      document.body.appendChild(badge)
+    } catch (e) {
+      /* badge is best-effort; never block the app */
+    }
+  }
+
   // Discreet, persistent gear affordance so the Server settings are always
   // reachable (even mid-session). Bottom-leading, low-profile.
   function mountGear() {
@@ -377,6 +403,7 @@
   // ── Mount UI + connectivity self-check (native only) ────────────────────────
   if (isNativeShell()) {
     var onReady = function () {
+      mountEnvBadge()
       mountGear()
       // Self-check: if the configured server is unreachable, auto-open the
       // settings so the user can fix it — the SPA would otherwise be stuck.

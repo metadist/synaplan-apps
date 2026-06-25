@@ -14,6 +14,8 @@
     "cap:android": "cap run android",
     "cap:open:ios": "cap open ios",
     "cap:open:android": "cap open android",
+    "config:app": "node scripts/app-config.mjs",
+    "config:app:print": "node scripts/app-config.mjs --print",
     "assets:generate": "capacitor-assets generate --ios --android --iconBackgroundColor '#003fc7' --iconBackgroundColorDark '#003fc7' --splashBackgroundColor '#003fc7' --splashBackgroundColorDark '#003fc7'",
     "ota:upload": "npx @capgo/cli@latest bundle upload --channel production --path synaplan/frontend/dist --bundle \"$npm_package_version\"",
     "ota:key:create": "npx @capgo/cli@latest key create"

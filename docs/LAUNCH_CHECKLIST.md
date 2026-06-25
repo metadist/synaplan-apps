@@ -134,6 +134,7 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 - [ ] 🤖/👤 Age rating, support URL, privacy URL set in **both** stores; Android **Target API 35** confirmed.
 
 ### Release / beta (Epic 10)
+- [x] ⚙️ **Build environments + versioning (Epic 10.1):** `SYNAPLAN_ENV` (dev|staging|prod) → bundle-id suffix + app-name suffix + in-app badge; version from `package.json`, `versionCode`/`CFBundleVersion` from `SYNAPLAN_BUILD_NUMBER` (git-count fallback). See `docs/BUILD_ENVIRONMENTS.md`. Verified on Android emulator + iOS build settings.
 - [ ] 🧪 Live on **TestFlight** (iOS) + **Play Internal Testing** (Android), installable by testers.
 - [ ] 🧪 Re-run Epic 3 **auth** + Epic 5 **IAP** acceptance in the **release** tracks (WKWebView/StoreKit differ from debug).
 - [ ] 🧪 Forced test crash appears in the crash dashboard.
