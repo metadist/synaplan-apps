@@ -143,14 +143,19 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 
 ## 5. Store-listing content needed (per locale: de / en / es / tr)
 
-- [ ] App name + subtitle/short description
-- [ ] Full description (anti-steering compliant — no cheaper-web-price advertising)
-- [ ] Keywords (App Store)
-- [ ] Screenshots (see §4)
-- [ ] Android feature graphic
-- [ ] Promotional / what's-new text
-- [ ] Support URL, marketing URL, privacy URL, ToU URL
-- [ ] Age rating questionnaire answers
+> **Copy drafted (Epic 10.4):** all text below is written for both stores × 4 locales in
+> [`docs/STORE_LISTINGS.md`](STORE_LISTINGS.md) — store-safe (no third-party trademarks in
+> name/keywords, anti-steering compliant), within each field's character limit. The remaining
+> items are asset- or account-gated.
+
+- [x] App name + subtitle/short description → `docs/STORE_LISTINGS.md`
+- [x] Full description (anti-steering compliant — no cheaper-web-price advertising) → `docs/STORE_LISTINGS.md`
+- [x] Keywords (App Store) → `docs/STORE_LISTINGS.md`
+- [ ] Screenshots (see §4) 🧪 device + Epic 6 assets
+- [ ] Android feature graphic 🧪 Epic 6 assets
+- [x] Promotional / what's-new text → `docs/STORE_LISTINGS.md`
+- [ ] Support URL, marketing URL, privacy URL, ToU URL 👤 confirm final URLs (drafted defaults in `docs/STORE_LISTINGS.md`)
+- [ ] Age rating questionnaire answers 👤 (likely iOS 17+ / Play Teen — confirm)
 
 ---
 

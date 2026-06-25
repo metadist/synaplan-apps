@@ -72,10 +72,16 @@ with OTA (Epic 8) and the joint release gate (Epic 11).
 > - **Privacy manifest / Data Safety:** add the vendor's required `PrivacyInfo` reasons +
 >   declare "crash data / diagnostics" in both stores once the SDK is in.
 
-### 10.4 — Store listings
+### 10.4 — Store listings (copy drafted)
 
-- [ ] Screenshots + descriptions in **4 languages (de/en/es/tr)** (assets from Epic 6), age
-      rating, support/privacy URLs (Epic 9).
+- [x] **Descriptions in 4 languages (de/en/es/tr)** for App Store + Google Play →
+      [`docs/STORE_LISTINGS.md`](../docs/STORE_LISTINGS.md): name/subtitle/short description,
+      keywords (iOS), full description, promotional + what's-new text — store-safe (no
+      third-party trademarks in name/keywords, anti-steering compliant) and within every field's
+      character limit.
+- [ ] Screenshots (Epic 6 assets) + Android feature graphic — device/asset-gated.
+- [ ] Age rating questionnaire + final support/privacy/ToU/marketing URLs — 👤 decisions
+      (drafted defaults + the likely iOS 17+ / Play Teen rating noted in `docs/STORE_LISTINGS.md`).
 
 ### 10.5 — Beta distribution + CI
 
