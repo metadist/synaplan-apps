@@ -10,7 +10,7 @@
 |---|------|----------------------------|--------------------------|
 | 1 | **Lint** (style + static safety) | `npm run typecheck` (tsc on `capacitor.config.ts`) | `make -C backend lint`, `make -C backend phpstan`, `make -C frontend lint`, `npm run check:types` (vue-tsc) |
 | 2 | **Click** (it actually works) | native click-through (manual / Maestro — pending) | Playwright (web), Vitest + Testing Library (components) |
-| 3 | **Parse** (config/contract validates) | `npm run test` (`tests/*.test.mjs`) | Zod runtime-config parse tests, UA-parser unit test, manifest/`Info.plist`/`PrivacyInfo` validation |
+| 3 | **Parse** (config/contract validates) | `npm run test` (`tests/*.test.mjs`): build-identity resolver **+ native-manifest validation** (Info.plist purpose strings + build-setting wiring, AndroidManifest permissions + `${appLabel}`, `PrivacyInfo.xcprivacy` structure, all XML well-formed) | Zod runtime-config parse tests, UA-parser unit test |
 | 4 | **Format** (deterministic, complete) | (Prettier pending — needs dev-dep) | `prettier --check`, `php-cs-fixer --dry-run`, **i18n completeness (en/de/es/tr)** |
 | 5 | **AI logic review** (Cursor) | [`docs/AI_LOGIC_REVIEW.md`](AI_LOGIC_REVIEW.md) on every PR | same checklist |
 
@@ -54,11 +54,11 @@ the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
 | **5 Payments** | Open-source mode (no keys) → billing disabled, unlimited, no purchase UI | 2,5 | 🧪 + default-safety AI review |
 | **6 Assets (Aspect 4)** | Icon/splash set renders on real devices (incl. Android adaptive, dark); clean clone not missing favicons; brand color consistent | 1,2 | 🧪 device home-screen; 🟡 clean-clone build check |
 | **7 Native features** | Camera/file/mic/download/share on device; permission-denial degrades (no crash); token in Keychain/Keystore; offline recovers | 2,5 | 🧪 device + **security review (token storage, never logged)** |
-| **7 Native features** | iOS purpose strings present (missing → crash/reject); reCAPTCHA works under `capacitor://`; no white screen | 1,3 | 🧪 + `Info.plist` validation (gate 3, pending automation) |
+| **7 Native features** | iOS purpose strings present (missing → crash/reject); reCAPTCHA works under `capacitor://`; no white screen | 1,3 | ✅ `Info.plist` purpose-string + well-formedness check (`tests/native-manifests.test.mjs`); 🧪 reCAPTCHA/device |
 | **8 OTA / forced update** | OTA bundle delivered + applied on restart; rollback works; min-version gate blocks too-old then allows | 2,5 | 🧪 device rollout + **"no payment/behavior logic via OTA" AI review** |
 | **8 OTA** | `COMPATIBILITY.md` current; `OTA_POLICY.md` exists | 4,5 | ✅ docs present |
 | **9 Store compliance** | In-app account deletion (+ web link for Google); anti-steering verified; restore + manage-via-store present | 2,5 | 🧪 reviewer path (9.4/9.5 code-complete) + AI store-policy review |
-| **9 Store compliance** | Build with valid `PrivacyInfo.xcprivacy` (incl. all SDK manifests) passes upload; privacy/data-safety labels accurate | 3 | 🧪 upload-rejection test (device/account-gated) |
+| **9 Store compliance** | Build with valid `PrivacyInfo.xcprivacy` (incl. all SDK manifests) passes upload; privacy/data-safety labels accurate | 3 | 🟡 app-level `PrivacyInfo` structure + well-formedness checked (`tests/native-manifests.test.mjs`); 🧪 SDK-manifest completeness + upload-rejection test (device/account-gated) |
 | **10.1 Build env + versioning** | One env switch → correct bundle id + auto-incremented version per env; version single-sourced | 1,3 | ✅ `npm run ci-local` (`tests/app-config.test.mjs`) + verified on Android emu + iOS build settings |
 | **10.2 Signing** | One command per platform → signed build for a chosen env | — | ⏳ account/sign-off-gated |
 | **10.3 Crash reporting** | Test crash reaches the dashboard | — | ⏳ vendor decision pending (params decided) |
@@ -74,6 +74,9 @@ the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
   "ask before adding dependencies" sign-off. Until then, gate 1 = `tsc` typecheck only.
 - **Native click-through (gate 2):** Maestro vs Appium vs Playwright-mobile for the app shell
   (Epic 12 open question). Currently manual reviewer click-path only.
-- **Manifest/`PrivacyInfo` validation (gate 3):** wire `capacitor.config.ts` + `Info.plist` +
-  `PrivacyInfo.xcprivacy` schema validation into `ci-local` (no new dep needed for plist XML
-  well-formedness; SDK-manifest completeness is device/upload-gated).
+- **Manifest/`PrivacyInfo` validation (gate 3):** ✅ done — `tests/native-manifests.test.mjs`
+  validates `Info.plist` (purpose strings + version/bundle-id build-setting wiring + OAuth
+  scheme), `AndroidManifest.xml` (permissions + `${appLabel}` + OAuth filter), and the
+  app-level `PrivacyInfo.xcprivacy` (required-reason structure), all XML well-formed via the
+  dependency-free `scripts/xml-wellformed.mjs`. _Remaining (device/upload-gated): SDK-manifest
+  completeness across every pod/SPM package._
