@@ -84,8 +84,14 @@ function patchIos(cfg) {
   const pbxPath = join(ROOT, 'ios/App/App.xcodeproj/project.pbxproj')
   let pbx = readFileSync(pbxPath, 'utf-8')
   pbx = pbx.replace(/MARKETING_VERSION = [^;]+;/g, `MARKETING_VERSION = ${cfg.version};`)
-  pbx = pbx.replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, `CURRENT_PROJECT_VERSION = ${cfg.buildNumber};`)
-  pbx = pbx.replace(/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/g, `PRODUCT_BUNDLE_IDENTIFIER = ${cfg.bundleId};`)
+  pbx = pbx.replace(
+    /CURRENT_PROJECT_VERSION = [^;]+;/g,
+    `CURRENT_PROJECT_VERSION = ${cfg.buildNumber};`
+  )
+  pbx = pbx.replace(
+    /PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/g,
+    `PRODUCT_BUNDLE_IDENTIFIER = ${cfg.bundleId};`
+  )
   writeFileSync(pbxPath, pbx)
 
   const plistPath = join(ROOT, 'ios/App/App/Info.plist')

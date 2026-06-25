@@ -15,7 +15,10 @@ const pkgVersion = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'))
 
 /** Run `resolveAppConfig()` with a controlled environment, then restore it. */
 function withEnv(env, fn) {
-  const saved = { SYNAPLAN_ENV: process.env.SYNAPLAN_ENV, SYNAPLAN_BUILD_NUMBER: process.env.SYNAPLAN_BUILD_NUMBER }
+  const saved = {
+    SYNAPLAN_ENV: process.env.SYNAPLAN_ENV,
+    SYNAPLAN_BUILD_NUMBER: process.env.SYNAPLAN_BUILD_NUMBER,
+  }
   try {
     delete process.env.SYNAPLAN_ENV
     delete process.env.SYNAPLAN_BUILD_NUMBER

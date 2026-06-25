@@ -45,19 +45,21 @@ explicit, tested part of the gate.
       `make -C frontend test`. After any runtime-config schema change:
       `make -C frontend generate-schemas` then re-run the type check. Run the **full** suite,
       unfiltered (see the repo's "`--filter` ≠ `make test`" trap).
-- [x] **`synaplan-apps`** repo gets its own `npm run ci-local` (gate 1 typecheck + gate 3
-      parse/config tests), documented in the README. **Dependency-free** by design: uses the
-      bundled `tsc` (`tsconfig.json` typechecks `capacitor.config.ts`) + Node's built-in test
-      runner (`node --test tests/*.test.mjs`) covering the Epic 10.1 build-identity resolver.
-      _Still open (needs new dev-deps → sign-off): ESLint/Prettier (gate 1 lint + gate 4 format)
-      and Playwright/Maestro click tests (gate 2)._
+- [x] **`synaplan-apps`** repo gets its own `npm run ci-local` covering gate 1 (ESLint lint +
+      `tsc` typecheck), gate 3 (parse/config + native-manifest tests), and gate 4 (Prettier
+      format-check), documented in the README. The `tsconfig.json` typechecks `capacitor.config.ts`,
+      Node's built-in test runner (`node --test tests/*.test.mjs`) covers the Epic 10.1
+      build-identity resolver + manifest validation, and ESLint/Prettier (dev-deps, signed off)
+      lint/format the app-owned code (`capacitor.config.ts`, `scripts/`, `tests/`, ES5 bootstrap
+      via a relaxed override). _Still open (needs sign-off): Playwright/Maestro click tests (gate 2)._
 - [ ] **Pre-commit / pre-push hooks** enforce the gate so it can't be silently skipped; **never**
       bypass with `--no-verify` on a branch headed for `main`.
 
 ### 12.2 — Gate 1: Lint
 
-- [ ] App repo: ESLint + Prettier (lint) + TypeScript strict on all `synaplan-apps` TS;
-      `capacitor.config.ts` typechecks.
+- [x] App repo: ESLint (flat config `eslint.config.js`) + Prettier + TypeScript strict on all
+      `synaplan-apps` TS; `capacitor.config.ts` typechecks. Wired into `npm run ci-local`
+      (`npm run lint`, `npm run format:check`). ES5 bootstrap linted with a relaxed override.
 - [ ] Submodule changes: PSR-12 + PHPStan (backend), ESLint + `vue-tsc` (frontend), markdownlint
       (docs). No new lint suppressions without a tracked reason.
 
@@ -89,7 +91,9 @@ explicit, tested part of the gate.
 
 ### 12.5 — Gate 4: Format
 
-- [ ] `prettier --check`, `php-cs-fixer --dry-run`, `markdownlint` all clean.
+- [x] App repo: `prettier --check` (`npm run format:check`) clean on app-owned code, wired into
+      `npm run ci-local`. Submodule keeps `php-cs-fixer --dry-run` + its own `prettier --check`.
+- [ ] `markdownlint` all clean.
 - [ ] **i18n completeness**: a test fails if any key is missing from any locale —
       `synaplan` set `{en,de,es,tr}`; the Synamail-style set is out of scope here. (A missing key
       silently falls back to English — treat it as a format failure.)

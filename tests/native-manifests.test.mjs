@@ -43,9 +43,18 @@ test('Info.plist declares every permission purpose string (missing → crash/rej
 
 test('Info.plist keeps the Epic 10.1 build-setting variables (version/bundle id wiring)', () => {
   const plist = read(INFO_PLIST)
-  assert.match(plist, /<key>CFBundleIdentifier<\/key>\s*<string>\$\(PRODUCT_BUNDLE_IDENTIFIER\)<\/string>/)
-  assert.match(plist, /<key>CFBundleShortVersionString<\/key>\s*<string>\$\(MARKETING_VERSION\)<\/string>/)
-  assert.match(plist, /<key>CFBundleVersion<\/key>\s*<string>\$\(CURRENT_PROJECT_VERSION\)<\/string>/)
+  assert.match(
+    plist,
+    /<key>CFBundleIdentifier<\/key>\s*<string>\$\(PRODUCT_BUNDLE_IDENTIFIER\)<\/string>/
+  )
+  assert.match(
+    plist,
+    /<key>CFBundleShortVersionString<\/key>\s*<string>\$\(MARKETING_VERSION\)<\/string>/
+  )
+  assert.match(
+    plist,
+    /<key>CFBundleVersion<\/key>\s*<string>\$\(CURRENT_PROJECT_VERSION\)<\/string>/
+  )
   assert.match(plist, /<key>CFBundleDisplayName<\/key>\s*<string>[^<]+<\/string>/)
 })
 
@@ -61,7 +70,11 @@ test('PrivacyInfo.xcprivacy is well-formed XML', () => {
 
 test('PrivacyInfo.xcprivacy declares the required-reason API structure', () => {
   const p = read(PRIVACY)
-  for (const key of ['NSPrivacyTracking', 'NSPrivacyCollectedDataTypes', 'NSPrivacyAccessedAPITypes']) {
+  for (const key of [
+    'NSPrivacyTracking',
+    'NSPrivacyCollectedDataTypes',
+    'NSPrivacyAccessedAPITypes',
+  ]) {
     assert.match(p, new RegExp(`<key>${key}</key>`), `PrivacyInfo missing <key>${key}</key>`)
   }
   // Every accessed-API entry must pair a type with at least one reason code.
@@ -77,8 +90,16 @@ test('AndroidManifest.xml is well-formed XML', () => {
 
 test('AndroidManifest declares the required permissions (Epic 7)', () => {
   const m = read(ANDROID_MANIFEST)
-  for (const perm of ['android.permission.INTERNET', 'android.permission.RECORD_AUDIO', 'android.permission.CAMERA']) {
-    assert.match(m, new RegExp(`<uses-permission android:name="${perm.replace(/\./g, '\\.')}"`), `missing ${perm}`)
+  for (const perm of [
+    'android.permission.INTERNET',
+    'android.permission.RECORD_AUDIO',
+    'android.permission.CAMERA',
+  ]) {
+    assert.match(
+      m,
+      new RegExp(`<uses-permission android:name="${perm.replace(/\./g, '\\.')}"`),
+      `missing ${perm}`
+    )
   }
 })
 
@@ -86,11 +107,18 @@ test('AndroidManifest uses the Epic 10.1 ${appLabel} placeholder (env-aware laun
   const m = read(ANDROID_MANIFEST)
   const count = (m.match(/android:label="\$\{appLabel\}"/g) || []).length
   assert.ok(count >= 1, 'AndroidManifest should label the app via ${appLabel}')
-  assert.doesNotMatch(m, /android:label="@string\/app_name"/, 'app_name label should be replaced by ${appLabel}')
+  assert.doesNotMatch(
+    m,
+    /android:label="@string\/app_name"/,
+    'app_name label should be replaced by ${appLabel}'
+  )
 })
 
 test('AndroidManifest keeps the OAuth deep-link intent filter (Epic 3)', () => {
-  assert.match(read(ANDROID_MANIFEST), /<data android:scheme="com\.synaplan\.app" android:host="oauth"\s*\/>/)
+  assert.match(
+    read(ANDROID_MANIFEST),
+    /<data android:scheme="com\.synaplan\.app" android:host="oauth"\s*\/>/
+  )
 })
 
 // ── well-formedness checker self-test (so the gate itself is trustworthy) ─────

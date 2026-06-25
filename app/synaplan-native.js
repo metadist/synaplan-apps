@@ -114,7 +114,10 @@
           })
       })
       .catch(function (err) {
-        var msg = err && err.name === 'AbortError' ? 'Server did not respond in time.' : 'Server unreachable.'
+        var msg =
+          err && err.name === 'AbortError'
+            ? 'Server did not respond in time.'
+            : 'Server unreachable.'
         return { ok: false, error: msg }
       })
       .then(function (result) {
@@ -204,7 +207,9 @@
         var p = el(
           'div',
           null,
-          'Choose which Synaplan server this app connects to. The default is ' + DEFAULT_SERVER_URL + '.'
+          'Choose which Synaplan server this app connects to. The default is ' +
+            DEFAULT_SERVER_URL +
+            '.'
         )
         p.setAttribute('style', 'font-size:13px;color:#555;margin:0 0 14px;line-height:1.4;')
         return p
@@ -359,7 +364,11 @@
   // reachable (even mid-session). Bottom-leading, low-profile.
   function mountGear() {
     if (document.getElementById(GEAR_ID)) return
-    var gear = el('button', { id: GEAR_ID, type: 'button', 'aria-label': 'Server settings' }, '\u2699')
+    var gear = el(
+      'button',
+      { id: GEAR_ID, type: 'button', 'aria-label': 'Server settings' },
+      '\u2699'
+    )
     gear.setAttribute(
       'style',
       'position:fixed;left:calc(env(safe-area-inset-left,0px) + 10px);' +
@@ -412,7 +421,9 @@
           openOverlay({
             dismissable: false,
             message:
-              'Can\u2019t reach ' + resolveServerUrl() + '. Check the address or reset to the default server.',
+              'Can\u2019t reach ' +
+              resolveServerUrl() +
+              '. Check the address or reset to the default server.',
           })
         }
       })

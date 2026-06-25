@@ -1,0 +1,6 @@
+ios/
+android/
+synaplan/
+node_modules/
+**/dist/
+package-lock.json

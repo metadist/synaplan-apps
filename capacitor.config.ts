@@ -30,7 +30,8 @@ const APP_ENV_MATRIX = {
   staging: { idSuffix: '.staging', nameSuffix: ' Staging' },
   dev: { idSuffix: '.dev', nameSuffix: ' Dev' },
 } as const
-const appEnv = (process.env.SYNAPLAN_ENV?.trim().toLowerCase() ?? 'prod') as keyof typeof APP_ENV_MATRIX
+const appEnv = (process.env.SYNAPLAN_ENV?.trim().toLowerCase() ??
+  'prod') as keyof typeof APP_ENV_MATRIX
 const envIdentity = APP_ENV_MATRIX[appEnv]
 if (!envIdentity) {
   throw new Error(`Unknown SYNAPLAN_ENV "${appEnv}" — use dev | staging | prod`)

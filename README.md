@@ -5,14 +5,16 @@ Mobile apps for Synaplan.com platform AND your own hosted AI platforms. Brandabl
 
 ```bash
 ./build.sh                 # build the bundled SPA (+ cap sync); see docs/BUILD_ENVIRONMENTS.md
-npm run ci-local           # app-repo quality gate: typecheck + config/parse tests (no extra deps)
+npm run ci-local           # app-repo quality gate: lint + format-check + typecheck + parse tests
 npm run config:app:print   # show the resolved env/version/bundle-id identity
 ```
 
-`npm run ci-local` runs gates 1 & 3 (lint/typecheck + parse) for the **app-repo** code
-(`capacitor.config.ts`, `scripts/`) using only the bundled `tsc` and Node's built-in test
-runner. Changes inside the `synaplan/` submodule keep using that repo's own `make` gate
-(see its `AGENTS.md`). Multi-environment builds: [`docs/BUILD_ENVIRONMENTS.md`](docs/BUILD_ENVIRONMENTS.md).
+`npm run ci-local` runs gates 1, 3 & 4 (ESLint lint + `tsc` typecheck, parse tests, Prettier
+format-check) for the **app-repo** code (`capacitor.config.ts`, `scripts/`, `tests/`, and the
+ES5 bootstrap). Use `npm run lint:fix` / `npm run format` to auto-fix. Changes inside the
+`synaplan/` submodule keep using that repo's own `make` gate (see its `AGENTS.md`).
+Gate details: [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md) · Multi-environment builds:
+[`docs/BUILD_ENVIRONMENTS.md`](docs/BUILD_ENVIRONMENTS.md).
 
 ## Docs
 
