@@ -107,14 +107,18 @@ explicit, tested part of the gate.
         (Epics 5/8/9).
       - **Security logic:** Bearer never logged, per-server identity isolation (Epic 3), no UA used
         as an auth control (Epic 2).
-- [ ] Record a short, repeatable **review prompt/checklist** in `docs/` so any reviewer (human or
-      agent) runs the same logic review.
+- [x] Record a short, repeatable **review prompt/checklist** in `docs/` so any reviewer (human or
+      agent) runs the same logic review → [`docs/AI_LOGIC_REVIEW.md`](../docs/AI_LOGIC_REVIEW.md)
+      (copy-paste prompt covering default-safety/blast-radius, Aspect regression, store policy,
+      security, i18n). The "run it on every PR + record" part stays a per-PR process step.
 
 ### 12.7 — Per-epic test matrix (make "everything testable" concrete)
 
-- [ ] Each `planning_<n>_*.md` "Test notes" section maps its checks to the five gates above. Keep a
+- [x] Each `planning_<n>_*.md` "Test notes" section maps its checks to the five gates above. Keep a
       single matrix (in this repo's `docs/QUALITY_GATES.md`) so it's obvious which gate covers which
-      acceptance criterion, and which are still manual-only (with a reason).
+      acceptance criterion, and which are still manual-only (with a reason) →
+      [`docs/QUALITY_GATES.md`](../docs/QUALITY_GATES.md) (per-epic matrix for Epics 1–13 with
+      automated/manual/pending status + the standing default-safety regression).
 
 ## Acceptance criteria (Definition of Done)
 

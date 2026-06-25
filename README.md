@@ -19,6 +19,9 @@ runner. Changes inside the `synaplan/` submodule keep using that repo's own `mak
 - **[`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)** — everything deferred to the
   launch/device/go-live phase: provider accounts, secrets & env, open product decisions,
   on-device QA, store-listing content. **Start here for "what we still need at the end".**
+- [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md) — per-epic test matrix (the five gates)
+- [`docs/AI_LOGIC_REVIEW.md`](docs/AI_LOGIC_REVIEW.md) — gate-5 AI review checklist/prompt
+- [`docs/BUILD_ENVIRONMENTS.md`](docs/BUILD_ENVIRONMENTS.md) — dev/staging/prod builds + versioning
 - [`docs/SECRETS.md`](docs/SECRETS.md) — secret inventory & injection policy
 - [`docs/IDENTIFIERS.md`](docs/IDENTIFIERS.md) — bundle IDs / Team ID
 - [`docs/OTA_POLICY.md`](docs/OTA_POLICY.md) · [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) — OTA rules + version matrix
