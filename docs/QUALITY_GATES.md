@@ -9,7 +9,7 @@
 | # | Gate | App repo (`synaplan-apps`) | Submodule (`synaplan/`) |
 |---|------|----------------------------|--------------------------|
 | 1 | **Lint** (style + static safety) | `npm run lint` (ESLint flat config: `capacitor.config.ts` + `scripts/` + `tests/` + ES5 bootstrap) **and** `npm run typecheck` (tsc on `capacitor.config.ts`) | `make -C backend lint`, `make -C backend phpstan`, `make -C frontend lint`, `npm run check:types` (vue-tsc) |
-| 2 | **Click** (it actually works) | native click-through (manual / Maestro — pending) | Playwright (web), Vitest + Testing Library (components) |
+| 2 | **Click** (it actually works) | native click-through via **Maestro** (`npm run e2e`, [`.maestro/`](../.maestro), [`docs/NATIVE_E2E.md`](NATIVE_E2E.md)) — device-gated; flow integrity guarded in `ci-local` | Playwright (web), Vitest + Testing Library (components) |
 | 3 | **Parse** (config/contract validates) | `npm run test` (`tests/*.test.mjs`): build-identity resolver **+ native-manifest validation** (Info.plist purpose strings + build-setting wiring, AndroidManifest permissions + `${appLabel}`, `PrivacyInfo.xcprivacy` structure, all XML well-formed) | Zod runtime-config parse tests, UA-parser unit test |
 | 4 | **Format** (deterministic, complete) | `npm run format:check` (Prettier on app-owned code: `capacitor.config.ts`, `eslint.config.js`, `scripts/`, `tests/`, ES5 bootstrap) | `prettier --check`, `php-cs-fixer --dry-run`, **i18n completeness (en/de/es/tr)** |
 | 5 | **AI logic review** (Cursor) | [`docs/AI_LOGIC_REVIEW.md`](AI_LOGIC_REVIEW.md) on every PR | same checklist |
@@ -65,7 +65,7 @@ the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
 | **10.4 Store listings** | Metadata + screenshots in de/en/es/tr | 4 | ⏳ assets/account-gated |
 | **10.5 Beta/CI** | Live on TestFlight + Play Internal; auth + IAP green in release tracks | 1–5 | ⏳ gated (CI needs sign-off) |
 | **11 Stabilization** | Must-fix bugs closed; all four Aspects no-op for web; full gates green; release-gate checklist complete | 1–5 | ⏳ final gate (reads this matrix + `COMPATIBILITY.md`) |
-| **12 Quality gates** | App `ci-local` + submodule make gate cover gates 1–4; AI review recorded on every PR | 1,3,4,5 | ✅ app gate (1 lint+typecheck, 3 parse, 4 format); 🧪 click (Maestro) ⏳ open |
+| **12 Quality gates** | App `ci-local` + submodule make gate cover gates 1–4; AI review recorded on every PR | 1,2,3,4,5 | ✅ app gate (1 lint+typecheck, 3 parse, 4 format); ✅ gate-2 Maestro flows authored + integrity-guarded (🧪 execution device-gated) |
 | **13 Encapsulation** | Blast-radius registry == actual changed files; every seam guarded + default-safe | 5 | ✅ `SYNAPLAN_BLAST_RADIUS.md` + AI review |
 
 ## Open automation gaps (need a decision before closing)
@@ -74,8 +74,13 @@ the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
   + Prettier (`.prettierrc.json`) added as dev-deps; wired into `npm run ci-local` as
   `npm run lint` and `npm run format:check`. The ES5 bootstrap (`app/synaplan-native.js`) is
   linted with a relaxed browser/ES5 override; the `synaplan/` submodule keeps its own toolchain.
-- **Native click-through (gate 2):** Maestro vs Appium vs Playwright-mobile for the app shell
-  (Epic 12 open question). Currently manual reviewer click-path only.
+- **Native click-through (gate 2):** ✅ tool decided — **Maestro** (rationale + run steps in
+  [`docs/NATIVE_E2E.md`](NATIVE_E2E.md)). Committed flows in [`.maestro/`](../.maestro) cover
+  the app-shell smoke (no white screen), the native Server overlay, and the non-prod env badge,
+  anchored on app-owned locale-independent strings. Execution is device-gated (built app +
+  emulator/sim), so it stays out of the fast `ci-local`; `tests/maestro-flows.test.mjs` guards
+  the flows' integrity there. _Remaining (device/account-gated): login + SSE/WS/OAuth and
+  sandbox-IAP/anti-steering flows need a signed release build + test accounts (Epic 10.2/10.5)._
 - **Manifest/`PrivacyInfo` validation (gate 3):** ✅ done — `tests/native-manifests.test.mjs`
   validates `Info.plist` (purpose strings + version/bundle-id build-setting wiring + OAuth
   scheme), `AndroidManifest.xml` (permissions + `${appLabel}` + OAuth filter), and the

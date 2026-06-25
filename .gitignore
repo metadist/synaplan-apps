@@ -175,6 +175,10 @@ android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
 android/capacitor-cordova-android-plugins/
 
+# Maestro native E2E artifacts (Gate 2) — screenshots/recordings from device runs.
+# The flows themselves (.maestro/*.yaml) ARE committed; their output is not.
+.maestro/artifacts/
+
 # ──────────────────────────────────────────────────────────────────────────
 # Secrets & signing (NEVER commit — see docs/SECRETS.md)
 # ──────────────────────────────────────────────────────────────────────────

@@ -13,6 +13,10 @@ npm run config:app:print   # show the resolved env/version/bundle-id identity
 format-check) for the **app-repo** code (`capacitor.config.ts`, `scripts/`, `tests/`, and the
 ES5 bootstrap). Use `npm run lint:fix` / `npm run format` to auto-fix. Changes inside the
 `synaplan/` submodule keep using that repo's own `make` gate (see its `AGENTS.md`).
+Native click-through (gate 2) runs via Maestro and is **device-gated** (built app + booted
+emulator/simulator), so it lives outside `ci-local`: `npm run e2e` — see
+[`docs/NATIVE_E2E.md`](docs/NATIVE_E2E.md). (`ci-local` still guards the flow files' integrity.)
+
 Gate details: [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md) · Multi-environment builds:
 [`docs/BUILD_ENVIRONMENTS.md`](docs/BUILD_ENVIRONMENTS.md).
 

@@ -1,0 +1,20 @@
+# Gate 2 (Click) — app-shell cold-launch smoke.
+#
+# Proves the bundled SPA actually boots in the native WebView (no white screen).
+# The app-owned native bootstrap (app/synaplan-native.js) mounts a "Server settings"
+# gear in onReady() — independent of the SPA, the network, or the UI locale — so its
+# presence is a stable proof that index.html loaded and JS executed in the shell.
+#
+# appId is parameterised so the same flow runs against any environment build:
+#   maestro test .maestro                                  # prod (com.synaplan.app)
+#   maestro test .maestro -e APP_ID=com.synaplan.app.dev   # dev build
+appId: ${APP_ID}
+env:
+  APP_ID: com.synaplan.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Server settings'
+    timeout: 25000
+- takeScreenshot: artifacts/01-smoke
