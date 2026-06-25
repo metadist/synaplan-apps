@@ -124,9 +124,9 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 - [ ] 🧪 Google `acknowledge` < 3 days; `PENDING` not unlocked.
 
 ### Compliance (Epic 9)
-> **Code-complete:** 9.2 app-level `PrivacyInfo.xcprivacy` (commit `4d3ae10`) and 9.3 configurable privacy/ToU URLs + in-app legal links (synaplan `11da457ee`, app bump `96275bc`) are done. The items below remain device-/account-gated.
+> **Code-complete:** 9.1 in-app account deletion (pre-existing `DELETE /api/v1/profile` + `UserDeletionService`) **plus** the Google-required public web deletion page + configurable `BRAND_ACCOUNT_DELETION_URL` (synaplan `fcbb78c51`), 9.2 app-level `PrivacyInfo.xcprivacy` (commit `4d3ae10`), and 9.3 configurable privacy/ToU URLs + in-app legal links (synaplan `11da457ee`, app bump `96275bc`) are done. The items below remain device-/account-gated.
 
-- [ ] 🧪 In-app **account deletion** works (+ web deletion link for Google).
+- [ ] 🧪 In-app **account deletion** works (+ web deletion link for Google) — **code done**: in-app flow in Profile → Danger Zone, public page at `/account-deletion` (or branded `BRAND_ACCOUNT_DELETION_URL`); on-device verification + filling the store metadata URL still pending.
 - [ ] 🧪 Upload with a broken **`PrivacyInfo.xcprivacy`** is rejected → then fix (cover **every** SDK: Capacitor plugins, Capgo, Sentry, IAP plugin).
 - [ ] 👤 **Privacy-nutrition / data-safety labels** filled and accurate vs actual permissions.
 - [ ] 🧪 Reviewer path: install → native value visible in ~30 s → find privacy/ToU → restore purchases → delete account.
