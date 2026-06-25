@@ -195,3 +195,4 @@ boss's Apple / Google / Google-Cloud access — none of it can be done from the 
 | `docs/ASSETS.md` | Icon/splash master art + regeneration |
 | `docs/SERVER_CONFIG.md` | In-app server switcher + default server URL |
 | `docs/SYNAPLAN_BLAST_RADIUS.md` | Every change made to the public submodule |
+| `docs/RELEASE_GATE_v4.md` | The go/no-go decision gate that consumes this checklist (Epic 11) |

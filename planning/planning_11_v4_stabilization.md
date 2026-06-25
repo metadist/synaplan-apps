@@ -71,9 +71,12 @@ stable base and that the four Aspects didn't regress the web.
 
 ### 11.4 — Release gate checklist + coordinated tag
 
-- [ ] Produce a `docs/RELEASE_GATE_v4.md` with explicit go/no-go items pulling from every epic's
+- [x] Produce a `docs/RELEASE_GATE_v4.md` with explicit go/no-go items pulling from every epic's
       acceptance criteria (auth, IAP source-gating, branding default-safety, privacy manifest,
-      assets, OTA, forced-update).
+      assets, OTA, forced-update). _Drafted: decision-oriented gate with engineering gates (§1),
+      Aspect default-safety regression (§2), per-epic acceptance (§3), store/assets (§4),
+      accounts/secrets (§5), crash reporting (§6), coordinated tagging (§7), sign-off + waivers
+      (§8). Cross-links QUALITY_GATES / LAUNCH_CHECKLIST / COMPATIBILITY instead of duplicating._
 - [ ] Confirm `docs/COMPATIBILITY.md` (Epic 8) is accurate; pin the app submodule to the exact
       v4.0 release tag; tag platform + app together.
 
