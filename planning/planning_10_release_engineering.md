@@ -53,9 +53,24 @@ with OTA (Epic 8) and the joint release gate (Epic 11).
 - [ ] Signing management (e.g. **fastlane**): Apple certificates/profiles, Android keystore. Store
       secrets per `docs/SECRETS.md`; never in git.
 
-### 10.3 — Crash reporting
+### 10.3 — Crash reporting (parameters decided; **vendor deferred to the end**)
 
-- [ ] Native crash reporting (e.g. Sentry) — needs its own Apple privacy manifest (Epic 9).
+- [ ] Native crash reporting — needs its own Apple privacy manifest (Epic 9).
+
+> **Decided** (2026-06-25), implementation BLOCKED on the vendor pick (see end-of-project
+> decisions). When the vendor is chosen, build to these parameters:
+> - **Hosting / residency:** EU SaaS region (managed; self-host only if later required).
+> - **Capture scope:** native crashes **+ WebView JS errors**, wired in the native shell
+>   and `isNativeApp()`-gated — no crash SDK on the plain web deployment (zero blast
+>   radius in the submodule).
+> - **Consent (GDPR):** ON by default with a clear **opt-out** toggle in settings + a
+>   privacy disclosure. Respect the toggle before initializing the SDK.
+> - **PII:** strict scrubbing — never send message content or auth tokens, anonymize IP;
+>   send only stack traces, device model/OS, and the app version/build.
+> - **Environments:** enabled in **prod + staging** only (dev off), tagged with the
+>   Epic 10.1 version/build as the release for symbolication.
+> - **Privacy manifest / Data Safety:** add the vendor's required `PrivacyInfo` reasons +
+>   declare "crash data / diagnostics" in both stores once the SDK is in.
 
 ### 10.4 — Store listings
 
@@ -94,4 +109,5 @@ with OTA (Epic 8) and the joint release gate (Epic 11).
 ## Open questions
 
 - Use fastlane now or manual signing for the first release?
-- Crash-reporting vendor choice (Sentry vs other) + data-residency for EU.
+- **Crash-reporting vendor choice** (Sentry vs Crashlytics vs Bugsnag) — **deferred to the
+  end-of-project decisions**. Residency + all other parameters are already decided (see 10.3).

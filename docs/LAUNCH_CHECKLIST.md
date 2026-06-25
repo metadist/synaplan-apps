@@ -88,7 +88,7 @@ each affects launch scope.
 
 ### Release engineering (Epic 10)
 - [ ] **fastlane now**, or manual signing for the first release? 👤
-- [ ] **Crash-reporting vendor** (Sentry vs other) + **EU data residency** requirement? 👤
+- [ ] **Crash-reporting vendor** (Sentry vs Crashlytics vs Bugsnag)? 👤 — **DEFERRED, decide before 10.3 build.** Everything else is already decided: EU SaaS region, capture native + WebView JS (native-gated), opt-out default + privacy disclosure, strict PII scrubbing, prod+staging only, release-tagged via Epic 10.1. See `planning/planning_10` §10.3.
 
 ---
 
