@@ -76,6 +76,16 @@ in addition to cookies.
 > public `synaplan` repo. The only submodule touch is reading the resolved value in 3.1. See
 > [Epic 13](planning_13_synaplan_encapsulation.md).
 
+> **Update (UX revision):** the always-on floating **gear** was removed. The user-facing switcher
+> now lives **inside the SPA** at **Admin → App server** (native-only tab), styled with the app's
+> Tailwind/i18n, while the app-owned bootstrap shim (`app/synaplan-native.js`) keeps owning the
+> persisted value, URL validation/probe and reload. The SPA calls the app-owned
+> `window.SynaplanServer` API through a typed seam (`services/api/nativeServer.ts`). The app-owned
+> overlay is retained **only as a recovery surface** that auto-opens when the configured server is
+> unreachable (so a bad URL can't lock the user out before the SPA — and thus the admin tab — can
+> load). A dev/staging device build can also bake a LAN backend default via
+> `SYNAPLAN_API_BASE_URL` at build time (localStorage choice still wins).
+
 - [ ] **Default server constant** in `synaplan-apps` (e.g. `app/server-config.ts`):
       `DEFAULT_SERVER_URL = 'https://web.synaplan.com'`. This is the only place the default lives.
 - [ ] **Server config store + persistence**: persist the chosen server URL in encrypted native

@@ -19,15 +19,20 @@ because it installs as a standalone binary — keeps the app-repo's lean depende
 
 ## What the flows assert
 
-The flows live in [`.maestro/`](../.maestro) and anchor on **app-owned, locale-independent**
-strings from `app/synaplan-native.js` (not SPA/i18n text), so they are robust across servers,
-locales, and branding:
+The flows live in [`.maestro/`](../.maestro) and anchor on the **app-owned, locale-independent**
+environment badge from `app/synaplan-native.js` (not SPA/i18n text), so they are robust across
+servers, locales, and branding:
 
 | Flow | Proves |
 |------|--------|
-| `01-smoke.yaml` | Cold launch renders the bundled SPA — **no white screen**. Waits for the app-owned "Server settings" gear, which only appears once `index.html` + JS booted in the shell. |
-| `02-server-settings.yaml` | The native Server overlay (Epic 3 §3.0) opens from the gear, shows Save / Cancel / Reset, and dismisses cleanly. |
+| `01-smoke.yaml` | Cold launch (clean state) renders the bundled SPA — **no white screen**. Waits for the app-owned env badge, which only appears once `index.html` + JS booted in the shell. Targets a non-prod build (the badge is prod-hidden). |
 | `03-env-badge.yaml` | Non-prod builds show the env badge (Epic 10.1) so a tester never mistakes dev/staging for prod. **Run against a dev/staging build only.** |
+
+> **The old always-on "Server settings" gear was removed.** The server switch now lives inside
+> the SPA (Admin → App server, native-only). The previous `02-server-settings.yaml` (which drove
+> the gear-opened overlay) was therefore dropped. The app-owned overlay still exists as a
+> **recovery surface** (auto-opens when the configured server is unreachable), but that path is
+> verified manually — pre-seeding an unreachable URL is not reliably scriptable in Maestro.
 
 > Higher-risk paths (login + chat **SSE** + realtime **WS** + **OAuth**, sandbox **IAP** /
 > restore / anti-steering) are intentionally **not** scripted here yet — they require a
@@ -70,16 +75,21 @@ Screenshots land in `.maestro/artifacts/` (gitignored).
 
 ## Verified runs
 
+> The suite was reduced from 3 → 2 flows when the always-on gear was removed (server switch
+> moved into the SPA's Admin → App server panel). The runs below were on the previous 3-flow
+> suite; the gate must be **re-verified on a dev/staging build** after this change (env-badge
+> anchor is unchanged, so `01-smoke` + `03-env-badge` are expected to pass on Android as before).
+
 | Platform | Build/install | Maestro flows | Notes |
 |----------|---------------|---------------|-------|
-| **Android** (emulator API 35) | ✅ `cap run android` (`com.synaplan.app.dev`) | ✅ **3/3 passed** (`01-smoke`, `02-server-settings`, `03-env-badge`) in ~16s | The automated gate-2 evidence today. |
-| **iOS** (Simulator, iOS 26) | ✅ `cap run ios` (`com.synaplan.app.dev`, display name "Synaplan Dev") | 🧪 app shell verified by direct launch + screenshot (DEV badge + gear render correctly); **Maestro assertions blocked** — see limitation below. | Anti-steering / env-badge confirmed visually. |
+| **Android** (emulator API 35) | ✅ `cap run android` (`com.synaplan.app.dev`) | ✅ previously 3/3 (`01-smoke`, `02-server-settings`, `03-env-badge`); now 2 flows (`01-smoke`, `03-env-badge`) — re-verify | The automated gate-2 runner. |
+| **iOS** (Simulator, iOS 26) | ✅ `cap run ios` (`com.synaplan.app.dev`, display name "Synaplan Dev") | 🧪 app shell verified by direct launch + screenshot (DEV badge renders correctly); **Maestro assertions blocked** — see limitation below. | Anti-steering / env-badge confirmed visually. |
 
 ## Known limitation — Maestro on iOS + heavy WebViews
 
 On the iOS Simulator the Maestro XCUITest driver **hangs while dumping the view
 hierarchy** of our content-rich WKWebView (the SPA exposes a very large accessibility
-tree). The app itself launches and renders correctly — the gear and the env badge are
+tree). The app itself launches and renders correctly — the env badge is
 on screen — but `assertVisible` / `extendedWaitUntil` never returns because the
 hierarchy snapshot call stalls. This is a documented Maestro-on-iOS behavior with large
 WebViews, **not an app defect**.
@@ -87,7 +97,7 @@ WebViews, **not an app defect**.
 Consequences / how we handle it:
 - **Android is the automated gate-2 runner** for the app shell today (`npm run e2e:dev`).
 - **iOS app-shell health is verified manually** (build → `cap run ios` → launch → confirm
-  no white screen + DEV badge + gear) until the driver limitation is resolved (newer
+  no white screen + DEV badge) until the driver limitation is resolved (newer
   Maestro, or trimming the WebView a11y tree). Track this before relying on iOS Maestro in
   CI.
 - The deeper, highest-risk paths (login, SSE/WS, OAuth, sandbox IAP) are device/account-
@@ -97,6 +107,6 @@ Consequences / how we handle it:
 
 `npm run ci-local` does **not** run Maestro, but `tests/maestro-flows.test.mjs` validates the
 committed flows (correct `${APP_ID}` parameterisation, a real `launchApp` + assertion body, and
-the exact app-owned anchors the flows depend on). If someone renames the "Server settings" gear
-or a Server-overlay button in `app/synaplan-native.js` without updating the flows, the gate goes
-red locally — long before the device run would.
+the app-owned env-badge anchor the flows depend on). If someone changes the env-badge label in
+`app/synaplan-native.js` without updating the flows, the gate goes red locally — long before the
+device run would.

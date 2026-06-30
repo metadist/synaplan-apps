@@ -75,6 +75,13 @@ window.__SYNAPLAN_ENV__ = "${APP_ENV}";
 window.__SYNAPLAN_APP_VERSION__ = "${APP_VERSION}";
 window.__SYNAPLAN_BUILD__ = "${APP_BUILD}";
 EOF
+  # Optional build-time server default: lets a dev/staging device build target a
+  # LAN backend (e.g. http://192.168.x.x:8000) without any in-app switching. A
+  # user choice in localStorage still wins. Unset → app uses web.synaplan.com.
+  if [[ -n "${SYNAPLAN_API_BASE_URL:-}" ]]; then
+    echo "window.__SYNAPLAN_API_BASE_URL_DEFAULT__ = \"${SYNAPLAN_API_BASE_URL}\";" >> "$DIST_DIR/synaplan-env.js"
+    echo "    Stamped server default=${SYNAPLAN_API_BASE_URL} into $DIST_DIR/synaplan-env.js"
+  fi
   echo "    Stamped env=${APP_ENV} version=${APP_VERSION} build=${APP_BUILD} into $DIST_DIR/synaplan-env.js"
 
   if grep -q 'synaplan-native.js' "$INDEX_HTML"; then

@@ -9,11 +9,15 @@
  *   1. Resolve the configured server URL synchronously (localStorage) and expose
  *      it to the SPA bootstrap via window.__SYNAPLAN_API_BASE_URL__, which the
  *      submodule reads in main.ts / nativeRuntime.ts (the single seam, §3.1).
- *      Falls back to DEFAULT_SERVER_URL on a fresh install.
- *   2. Provide a native "Server" settings surface (app-owned overlay, NOT the
- *      SPA): show current server, edit, validate-by-probe, Save, Reset.
- *   3. Auto-open that surface when the configured server is unreachable, so the
- *      user can always fix a wrong URL even if the SPA can't load.
+ *      Falls back to the build default (window.__SYNAPLAN_API_BASE_URL_DEFAULT__,
+ *      stamped by build.sh) → DEFAULT_SERVER_URL on a fresh install.
+ *   2. Expose an app-owned control surface via window.SynaplanServer
+ *      (get/getDefault/save/reset/open). The user-facing UI to change the server
+ *      now lives INSIDE the SPA (Admin → App server), which calls this API. There
+ *      is intentionally NO always-on floating gear anymore.
+ *   3. RECOVERY ONLY: auto-open a minimal app-owned overlay when the configured
+ *      server is unreachable, so the user can always fix a wrong URL or reset to
+ *      the default even when the SPA (and thus the Admin panel) can't load.
  *
  * Notes:
  *   - The server URL is NOT a secret, and the bootstrap must read it
@@ -27,7 +31,19 @@
 ;(function () {
   'use strict'
 
+  // Production default. A build can override this (e.g. a dev/staging device build
+  // pointed at a LAN backend) via window.__SYNAPLAN_API_BASE_URL_DEFAULT__, stamped
+  // by build.sh from $SYNAPLAN_API_BASE_URL. A user choice in localStorage always
+  // wins over this; this is only the "fresh install" fallback.
   var DEFAULT_SERVER_URL = 'https://web.synaplan.com'
+  try {
+    var buildDefault = window.__SYNAPLAN_API_BASE_URL_DEFAULT__
+    if ('string' === typeof buildDefault && '' !== buildDefault.replace(/^\s+|\s+$/g, '')) {
+      DEFAULT_SERVER_URL = buildDefault.replace(/^\s+|\s+$/g, '').replace(/\/+$/, '')
+    }
+  } catch (e) {
+    /* keep production default */
+  }
   var STORAGE_KEY = 'synaplan.serverUrl'
   var GLOBAL_KEY = '__SYNAPLAN_API_BASE_URL__'
   var PROBE_PATH = '/api/v1/config/runtime'
@@ -155,8 +171,10 @@
   }
 
   // ── 2/3. App-owned Server settings overlay (vanilla DOM, isolated styles) ───
+  // Used only as the RECOVERY surface (auto-opened on an unreachable server) and
+  // when the SPA explicitly calls window.SynaplanServer.open(). The primary,
+  // user-facing way to change the server lives in the SPA (Admin → App server).
   var OVERLAY_ID = 'synaplan-server-overlay'
-  var GEAR_ID = 'synaplan-server-gear'
 
   function el(tag, attrs, text) {
     var node = document.createElement(tag)
@@ -360,30 +378,8 @@
     }
   }
 
-  // Discreet, persistent gear affordance so the Server settings are always
-  // reachable (even mid-session). Bottom-leading, low-profile.
-  function mountGear() {
-    if (document.getElementById(GEAR_ID)) return
-    var gear = el(
-      'button',
-      { id: GEAR_ID, type: 'button', 'aria-label': 'Server settings' },
-      '\u2699'
-    )
-    gear.setAttribute(
-      'style',
-      'position:fixed;left:calc(env(safe-area-inset-left,0px) + 10px);' +
-        'bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:2147483646;' +
-        'width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;' +
-        'background:rgba(0,0,0,.35);color:#fff;font-size:17px;line-height:34px;text-align:center;' +
-        'padding:0;opacity:.55;'
-    )
-    gear.addEventListener('click', function () {
-      openOverlay({ dismissable: true })
-    })
-    document.body.appendChild(gear)
-  }
-
-  // Public API for debugging / future native triggers.
+  // Public API consumed by the SPA's in-app "Admin → App server" panel
+  // (synaplan submodule, native-only) and available for debugging.
   window.SynaplanServer = {
     get: resolveServerUrl,
     getDefault: function () {
@@ -413,9 +409,9 @@
   if (isNativeShell()) {
     var onReady = function () {
       mountEnvBadge()
-      mountGear()
       // Self-check: if the configured server is unreachable, auto-open the
-      // settings so the user can fix it — the SPA would otherwise be stuck.
+      // recovery overlay so the user can fix it — the SPA (and the in-app Admin
+      // server panel) would otherwise be stuck on a white screen.
       probeServer(resolveServerUrl()).then(function (result) {
         if (!result.ok && !document.getElementById(OVERLAY_ID)) {
           openOverlay({

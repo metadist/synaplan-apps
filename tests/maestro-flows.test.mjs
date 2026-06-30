@@ -5,8 +5,11 @@
  *   - correct, env-parameterised appId
  *   - a flow body (launchApp + at least one assertion)
  *   - the stable app-owned anchors the flows rely on (from synaplan-native.js)
- * If someone renames the "Server settings" gear or a button, this fails here in
- * `npm run ci-local` long before the device run would.
+ * The remaining locale-/network-independent app-owned anchor is the non-prod
+ * environment badge (the old "Server settings" gear was removed; the server
+ * switch now lives in the SPA's Admin → App server panel). If someone changes
+ * the env-badge label, this fails here in `npm run ci-local` long before the
+ * device run would.
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -23,7 +26,7 @@ const flows = readdirSync(MAESTRO_DIR)
   .sort()
 
 test('the .maestro suite contains the expected app-shell flows', () => {
-  for (const expected of ['01-smoke.yaml', '02-server-settings.yaml', '03-env-badge.yaml']) {
+  for (const expected of ['01-smoke.yaml', '03-env-badge.yaml']) {
     assert.ok(flows.includes(expected), `missing Maestro flow: ${expected}`)
   }
 })
@@ -56,17 +59,15 @@ for (const file of flows) {
   })
 }
 
-test('01-smoke anchors on the app-owned "Server settings" gear (no white screen)', () => {
+test('01-smoke anchors on the app-owned env badge (no white screen)', () => {
   const body = read('01-smoke.yaml')
-  assert.ok(body.includes('Server settings'), 'smoke flow must wait for the Server settings gear')
+  assert.match(body, /DEV\|STAGING/, 'smoke flow must wait for the app-owned env badge')
   assert.match(body, /clearState:\s*true/, 'smoke flow should cold-launch from a clean state')
-})
-
-test('02-server-settings drives the native overlay via app-owned buttons', () => {
-  const body = read('02-server-settings.yaml')
-  for (const anchor of ['Server settings', 'Save', 'Cancel', 'Reset to default']) {
-    assert.ok(body.includes(anchor), `server-settings flow must reference "${anchor}"`)
-  }
+  const def = body.match(/APP_ID:\s*(\S+)/)
+  assert.ok(
+    def && def[1] !== 'com.synaplan.app',
+    'smoke flow must default to a non-prod build (the env badge is prod-hidden)'
+  )
 })
 
 test('03-env-badge defaults to a non-prod build and checks the env badge', () => {
