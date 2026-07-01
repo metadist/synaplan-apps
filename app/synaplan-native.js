@@ -170,6 +170,39 @@
     }
   }
 
+  // ── Lock the viewport: the native app must NEVER zoom ───────────────────────
+  // iOS auto-zooms when focusing an input whose font-size < 16px, and pinch-zoom
+  // is undesirable in a native shell. The submodule's index.html viewport meta
+  // intentionally allows zoom on the plain web deployment, so we override it ONLY
+  // inside the native shell (zero blast radius in the public submodule) by adding
+  // maximum-scale=1 + user-scalable=no. WKWebView and the Android WebView both
+  // honor a viewport meta updated after DOMContentLoaded.
+  var LOCKED_VIEWPORT =
+    'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, ' +
+    'viewport-fit=cover, interactive-widget=resizes-content'
+
+  function enforceNoZoomViewport() {
+    try {
+      var metas = document.querySelectorAll('meta[name="viewport"]')
+      if (!metas || metas.length === 0) {
+        var head = document.head || document.getElementsByTagName('head')[0]
+        if (!head) return
+        var meta = document.createElement('meta')
+        meta.setAttribute('name', 'viewport')
+        meta.setAttribute('content', LOCKED_VIEWPORT)
+        head.appendChild(meta)
+        return
+      }
+      for (var i = 0; i < metas.length; i++) {
+        if (metas[i].getAttribute('content') !== LOCKED_VIEWPORT) {
+          metas[i].setAttribute('content', LOCKED_VIEWPORT)
+        }
+      }
+    } catch (e) {
+      /* best-effort: never block the app */
+    }
+  }
+
   // ── 2/3. App-owned Server settings overlay (vanilla DOM, isolated styles) ───
   // Used only as the RECOVERY surface (auto-opened on an unreachable server) and
   // when the SPA explicitly calls window.SynaplanServer.open(). The primary,
@@ -408,6 +441,7 @@
   // ── Mount UI + connectivity self-check (native only) ────────────────────────
   if (isNativeShell()) {
     var onReady = function () {
+      enforceNoZoomViewport()
       mountEnvBadge()
       // Self-check: if the configured server is unreachable, auto-open the
       // recovery overlay so the user can fix it — the SPA (and the in-app Admin

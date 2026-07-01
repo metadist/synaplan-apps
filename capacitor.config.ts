@@ -59,7 +59,12 @@ const config: CapacitorConfig = {
   // iosScheme is revisited in Epic 3 (cookie/origin parity). Default 'capacitor' for now;
   // native auth uses Bearer tokens (Epic 3), so cross-origin cookie parity is not required.
   ios: {
-    contentInset: 'always',
+    // The SPA handles safe areas itself via CSS env(safe-area-inset-*) (bottom tab
+    // bar, headers, sidebar rail) with viewport-fit=cover — the same model the
+    // Android WebView uses. 'always' would ALSO apply a native scroll-view inset,
+    // double-counting the safe area and leaving a large empty gap below the mobile
+    // tab bar. 'never' lets the CSS insets be the single source of truth.
+    contentInset: 'never',
   },
   android: {
     // Allow http only for local dev tooling; production talks to https. Hardened in Epic 7.
