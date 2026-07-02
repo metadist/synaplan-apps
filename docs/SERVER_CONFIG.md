@@ -15,6 +15,7 @@ URL (see [Blast Radius](SYNAPLAN_BLAST_RADIUS.md)).
 | Persistence | `localStorage['synaplan.serverUrl']` | The URL is **not a secret** and must be read synchronously at bootstrap; `localStorage` is persistent in the `capacitor://localhost` / `https://localhost` WebView origin |
 | Validation | `probeServer()` | `GET {url}/api/v1/config/runtime` (public, no auth) must return 200 + a JSON object before saving — no half-applied state |
 | Settings UI | `app/synaplan-native.js` overlay | App-owned vanilla-DOM overlay (NOT the SPA): current server, edit, Save, Reset. Reachable via a discreet gear button and **auto-opens when the configured server is unreachable** |
+| First-run onboarding | `synaplan/frontend/src/components/onboarding/OnboardingServerStep.vue` | Step 2 of the native first-run flow (`/onboarding`): default server preselected, "Use my own server" expert affordance. Probes + persists via the same `window.SynaplanServer.save()` seam; the resulting WebView reload resumes the flow at step 3 (sessionStorage resume step) |
 | Per-server identity | `synaplan/frontend/src/services/api/nativeAuth.ts` | Bearer-token secure-storage keys are suffixed with a hash of the resolved server URL, so A's token is never sent to B and switching back restores A's session |
 
 ## Switch flow
