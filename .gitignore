@@ -163,6 +163,9 @@ ios/capacitor-cordova-ios-plugins/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 
+# Local xcodebuild -derivedDataPath output (e.g. build-sim/, build-device/)
+build-*/
+
 # Android
 android/.gradle/
 android/build/
