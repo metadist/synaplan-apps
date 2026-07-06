@@ -177,9 +177,14 @@
   // inside the native shell (zero blast radius in the public submodule) by adding
   // maximum-scale=1 + user-scalable=no. WKWebView and the Android WebView both
   // honor a viewport meta updated after DOMContentLoaded.
+  // `interactive-widget=overlays-content`: on Android the soft keyboard OVERLAYS
+  // the content (the layout viewport keeps full height) to match iOS's
+  // Keyboard.resize = 'none'. The SPA floats the chat composer above the keyboard
+  // via the --keyboard-inset-height var (see initKeyboardInsetBridge below), so
+  // the page never shrinks on either platform.
   var LOCKED_VIEWPORT =
     'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, ' +
-    'viewport-fit=cover, interactive-widget=resizes-content'
+    'viewport-fit=cover, interactive-widget=overlays-content'
 
   function enforceNoZoomViewport() {
     try {
@@ -463,10 +468,50 @@
     },
   }
 
+  // ── Keyboard inset bridge (float the composer above the keyboard) ───────────
+  // With Keyboard.resize = 'none' the WebView keeps its full height, so the
+  // page never shrinks. We publish the keyboard height as the CSS variable
+  // `--keyboard-inset-height` on <html>; the SPA (style.css .chat-composer-sticky)
+  // translates the chat composer up by that amount. `keyboardWillShow` fires at
+  // the START of the iOS keyboard animation WITH the final height, so a matching
+  // CSS transition slides the composer up in sync — no lag. Every call is
+  // guarded so a missing plugin / non-native context is a silent no-op.
+  function setKeyboardInset(px) {
+    try {
+      var height = typeof px === 'number' && px > 0 ? Math.round(px) : 0
+      document.documentElement.style.setProperty('--keyboard-inset-height', height + 'px')
+      // Notify the SPA so keyboard-aware views (chat) can re-pin their scroll to
+      // the bottom once the inset-driven padding has been applied. Fired for both
+      // show (height > 0) and hide (height === 0).
+      window.dispatchEvent(
+        new CustomEvent('synaplan:keyboardinset', { detail: { height: height } })
+      )
+    } catch (e) {
+      /* best-effort: never throw into the SPA */
+    }
+  }
+
+  function initKeyboardInsetBridge() {
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var keyboard = plugins && plugins.Keyboard
+      if (!keyboard || typeof keyboard.addListener !== 'function') return
+      keyboard.addListener('keyboardWillShow', function (info) {
+        setKeyboardInset(info && info.keyboardHeight)
+      })
+      keyboard.addListener('keyboardWillHide', function () {
+        setKeyboardInset(0)
+      })
+    } catch (e) {
+      /* best-effort: the composer simply keeps its default bottom position */
+    }
+  }
+
   // ── Mount UI + connectivity self-check (native only) ────────────────────────
   if (isNativeShell()) {
     var onReady = function () {
       enforceNoZoomViewport()
+      initKeyboardInsetBridge()
       mountEnvBadge()
       // Self-check: if the configured server is unreachable, auto-open the
       // recovery overlay so the user can fix it — the SPA (and the in-app Admin

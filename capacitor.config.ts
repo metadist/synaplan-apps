@@ -83,8 +83,14 @@ const config: CapacitorConfig = {
       splashImmersive: false,
     },
     Keyboard: {
-      // Non-Ionic Vue SPA: let the WebView resize natively so the chat input stays visible.
-      resize: 'native',
+      // Non-Ionic Vue SPA. `resize: 'none'` keeps the WebView at FULL height when
+      // the keyboard opens — the page must never shrink or reflow (that also
+      // caused a ~1s lag from the native resize animation). Instead the SPA floats
+      // the chat composer above the keyboard using the keyboard height that
+      // app/synaplan-native.js publishes as the `--keyboard-inset-height` CSS var
+      // from the Keyboard `keyboardWillShow`/`keyboardWillHide` events (fired at
+      // the START of the iOS animation, so a CSS transition glides in sync).
+      resize: 'none',
       resizeOnFullScreen: true,
     },
     // ── OTA live updates (Epic 8.1, Capgo) ─────────────────────────────────────
