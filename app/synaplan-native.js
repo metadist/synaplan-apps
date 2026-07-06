@@ -438,6 +438,31 @@
     },
   }
 
+  // ── Haptics bridge (Taptic Engine on iOS, vibration on Android) ─────────────
+  // Wraps the Capacitor Haptics plugin so the SPA can fire a single impact
+  // WITHOUT importing @capacitor/* into the public submodule (it stays
+  // Capacitor-free; the SPA calls this via services/api/nativeHaptics.ts). Every
+  // call is guarded: a missing plugin / non-native context is a silent no-op so
+  // haptics can never break an interaction.
+  function hapticImpact(style) {
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var haptics = plugins && plugins.Haptics
+      if (!haptics || typeof haptics.impact !== 'function') return
+      var map = { light: 'LIGHT', medium: 'MEDIUM', heavy: 'HEAVY' }
+      var impactStyle = map[String(style || 'light').toLowerCase()] || 'LIGHT'
+      haptics.impact({ style: impactStyle })
+    } catch (e) {
+      /* best-effort: never throw into the SPA */
+    }
+  }
+
+  window.SynaplanHaptics = {
+    impact: function (style) {
+      hapticImpact(style)
+    },
+  }
+
   // ── Mount UI + connectivity self-check (native only) ────────────────────────
   if (isNativeShell()) {
     var onReady = function () {
