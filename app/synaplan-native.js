@@ -499,6 +499,14 @@
       keyboard.addListener('keyboardWillShow', function (info) {
         setKeyboardInset(info && info.keyboardHeight)
       })
+      // Re-assert the inset once the keyboard is FULLY shown. WKWebView can reset
+      // the scroll position during the slide-in animation, so any scroll-assist
+      // that runs on `keyboardWillShow` (animation start) gets undone. Firing the
+      // inset event again here gives the SPA a correctly-timed signal to scroll a
+      // focused input clear of the keyboard (keyboardScrollAssist.ts).
+      keyboard.addListener('keyboardDidShow', function (info) {
+        setKeyboardInset(info && info.keyboardHeight)
+      })
       keyboard.addListener('keyboardWillHide', function () {
         setKeyboardInset(0)
       })

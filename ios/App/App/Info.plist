@@ -60,6 +60,19 @@
 	<!-- Epic 7.2: optional biometric app lock. Required or Face ID access crashes. -->
 	<key>NSFaceIDUsageDescription</key>
 	<string>Synaplan uses Face ID to unlock the app.</string>
+	<!-- Self-hosting / dev: let the app reach a Synaplan backend on the local
+	     network (e.g. http://192.168.x.x:8000) configured under Admin → App server.
+	     NSAllowsLocalNetworking relaxes App Transport Security ONLY for private and
+	     link-local addresses (App Store safe; it does NOT permit arbitrary cleartext
+	     HTTP to the public internet). The usage string is required so iOS can show
+	     the Local Network permission prompt on first connection. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Synaplan connects to a Synaplan server on your local network when you configure one under Admin → App server.</string>
 	<!-- OAuth deep link (Epic 3): com.synaplan.app://oauth/callback -->
 	<key>CFBundleURLTypes</key>
 	<array>
