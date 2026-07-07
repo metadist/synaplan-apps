@@ -119,8 +119,9 @@ CapacitorUpdater: {
       keys, DB + dashboard passwords (all in `/opt/capgo/secrets.env` on the box, chmod 600).
 - [x] DNS + TLS: wildcard `*.capgo.synaplan.com` → box; Caddy auto-ACME for
       `capgo.` (console), `api.` (plugin API), `sb.` (Kong). Studio not publicly exposed.
-- [ ] Disable public signup in GoTrue (invite-only console) — currently signup is OPEN with
-      email autoconfirm; lock down before real use. **← remaining**
+- [x] Public signup disabled (2026-07-07): GoTrue `DISABLE_SIGNUP=true` (API returns
+      `signup_disabled`) + Caddy 302-redirects `/register*`, `/confirm-signup*`,
+      `/resend_email*` → `/login`. New users: create via SQL/Studio like the admin account.
 
 ### 14.2 — Deploy Capgo onto the stack — ✅ DONE 2026-07-07
 
