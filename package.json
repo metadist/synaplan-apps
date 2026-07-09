@@ -46,7 +46,8 @@
     "@capacitor/splash-screen": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
     "@capgo/capacitor-updater": "^8.49.7",
-    "cordova-plugin-purchase": "^13.17.2"
+    "cordova-plugin-purchase": "^13.17.2",
+    "cordova-plugin-purchase-storekit2": "^1.0.5"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
