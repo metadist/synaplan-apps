@@ -37,11 +37,15 @@ IAP_APPLE_ENVIRONMENT=Xcode          # accepts Xcode-signed JWS (NEVER in prod)
 IAP_APPLE_ROOT_CERTS_DIR=var/apple-roots   # must exist and contain ≥1 file
 ```
 
-`isConfigured()` requires a non-empty root-certs dir even in Xcode mode, so
-create it with a placeholder once:
+`isConfigured()` requires a non-empty root-certs dir even in Xcode mode, and
+the App Store Server Library parses every file in it as a **DER**-encoded
+certificate at verifier construction — a PEM file (e.g. the system
+`ca-certificates.crt` bundle) makes initialization fail with
+`INVALID_CERTIFICATE` and every verify returns 503. Put Apple's real root CA
+(already DER) there once:
 
 ```bash
-docker compose exec backend sh -c 'mkdir -p var/apple-roots && cp /etc/ssl/certs/ca-certificates.crt var/apple-roots/'
+docker compose exec backend sh -c 'mkdir -p var/apple-roots && curl -fsSL https://www.apple.com/certificateauthority/AppleRootCA-G3.cer -o var/apple-roots/AppleRootCA-G3.cer'
 docker compose exec backend php bin/console cache:clear
 ```
 
