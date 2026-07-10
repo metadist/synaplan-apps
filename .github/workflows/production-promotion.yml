@@ -1,0 +1,292 @@
+name: Mobile Production Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Promotion operation
+        required: true
+        default: promote
+        type: choice
+        options: [promote, pause, resume, rollback]
+      platform:
+        description: Store platform
+        required: true
+        default: all
+        type: choice
+        options: [all, apple, google]
+      app_version:
+        description: Public app version
+        required: true
+        type: string
+      store_rc_run_id:
+        description: Successful Mobile Store RC workflow run ID
+        required: true
+        type: string
+      apple_build_number:
+        description: App Store Connect build number
+        required: false
+        type: string
+      apple_phased_release:
+        description: Use Apple phased release
+        required: true
+        default: true
+        type: boolean
+      google_version_code:
+        description: Google Play version code
+        required: false
+        type: string
+      google_rollout_percent:
+        description: Google managed rollout percentage (0.01-100)
+        required: true
+        default: '5'
+        type: string
+      dry_run:
+        description: Validate and emit a promotion request only
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: mobile-production-promotion
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  attestations: read
+  contents: read
+
+jobs:
+  promotion-request:
+    name: Validate production promotion
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Verify signed release-candidate provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STORE_RC_RUN_ID: ${{ inputs.store_rc_run_id }}
+          APP_VERSION: ${{ inputs.app_version }}
+          PLATFORM: ${{ inputs.platform }}
+          APPLE_BUILD: ${{ inputs.apple_build_number }}
+          GOOGLE_VERSION_CODE: ${{ inputs.google_version_code }}
+        run: |
+          set -euo pipefail
+          [[ "$STORE_RC_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          test "$(gh run view "$STORE_RC_RUN_ID" --json conclusion --jq '.conclusion')" = "success"
+          mkdir -p store-rc-source
+          gh run download "$STORE_RC_RUN_ID" \
+            --pattern 'store-rc-*' \
+            --dir store-rc-source
+          shopt -s globstar nullglob
+          requests=(store-rc-source/**/upload-request.json)
+          aabs=(store-rc-source/**/*.aab)
+          ipas=(store-rc-source/**/*.ipa)
+          test "${#requests[@]}" -eq 1
+          test "${#aabs[@]}" -eq 1
+          test "${#ipas[@]}" -eq 1
+          jq -e \
+            --arg app_version "$APP_VERSION" \
+            --arg platform "$PLATFORM" \
+            --arg apple_build "$APPLE_BUILD" \
+            --arg google_code "$GOOGLE_VERSION_CODE" \
+            '.appVersion == $app_version and
+              ($platform == "google" or .iosBuildNumber == $apple_build) and
+              ($platform == "apple" or .androidVersionCode == $google_code) and
+              .googlePlayTrack == "internal"' \
+            "${requests[0]}" >/dev/null
+          gh attestation verify "${aabs[0]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow metadist/synaplan-apps/.github/workflows/store-rc.yml
+          gh attestation verify "${ipas[0]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow metadist/synaplan-apps/.github/workflows/store-rc.yml
+
+      - name: Validate promotion inputs
+        env:
+          OPERATION: ${{ inputs.operation }}
+          PLATFORM: ${{ inputs.platform }}
+          APP_VERSION: ${{ inputs.app_version }}
+          APPLE_BUILD: ${{ inputs.apple_build_number }}
+          GOOGLE_VERSION_CODE: ${{ inputs.google_version_code }}
+          GOOGLE_ROLLOUT_PERCENT: ${{ inputs.google_rollout_percent }}
+        run: |
+          set -euo pipefail
+          [[ "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
+          [[ "$OPERATION" =~ ^(promote|pause|resume|rollback)$ ]]
+          [[ "$PLATFORM" =~ ^(all|apple|google)$ ]]
+          if [[ "$PLATFORM" == "all" || "$PLATFORM" == "apple" ]]; then
+            [[ "$APPLE_BUILD" =~ ^[1-9][0-9]*$ ]]
+          fi
+          if [[ "$PLATFORM" == "all" || "$PLATFORM" == "google" ]]; then
+            [[ "$GOOGLE_VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
+            awk -v value="$GOOGLE_ROLLOUT_PERCENT" \
+              'BEGIN { exit !(value >= 0.01 && value <= 100) }'
+          fi
+
+      - name: Validate protected store credentials
+        if: ${{ ! inputs.dry_run }}
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.platform }}" == "all" || "${{ inputs.platform }}" == "apple" ]]; then
+            test -n "$APP_STORE_CONNECT_KEY_ID"
+            test -n "$APP_STORE_CONNECT_ISSUER_ID"
+            test -n "$APP_STORE_CONNECT_PRIVATE_KEY"
+          fi
+          if [[ "${{ inputs.platform }}" == "all" || "${{ inputs.platform }}" == "google" ]]; then
+            test -n "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
+            printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" |
+              jq -e '.client_email and .private_key' >/dev/null
+          fi
+
+      - name: Create promotion control request
+        env:
+          OPERATION: ${{ inputs.operation }}
+          PLATFORM: ${{ inputs.platform }}
+          APP_VERSION: ${{ inputs.app_version }}
+          APPLE_BUILD: ${{ inputs.apple_build_number }}
+          APPLE_PHASED: ${{ inputs.apple_phased_release }}
+          GOOGLE_VERSION_CODE: ${{ inputs.google_version_code }}
+          GOOGLE_ROLLOUT_PERCENT: ${{ inputs.google_rollout_percent }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          mkdir -p promotion-request
+          jq -n \
+            --arg operation "$OPERATION" \
+            --arg platform "$PLATFORM" \
+            --arg appVersion "$APP_VERSION" \
+            --arg appleBuild "$APPLE_BUILD" \
+            --argjson applePhased "$APPLE_PHASED" \
+            --arg googleVersionCode "$GOOGLE_VERSION_CODE" \
+            --argjson googleRolloutPercent "$GOOGLE_ROLLOUT_PERCENT" \
+            --argjson dryRun "$DRY_RUN" \
+            --arg actor "$GITHUB_ACTOR" \
+            --arg runUrl "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '{
+              operation: $operation,
+              platform: $platform,
+              appVersion: $appVersion,
+              apple: {buildNumber: $appleBuild, phasedRelease: $applePhased},
+              google: {
+                versionCode: $googleVersionCode,
+                managedRolloutPercent: $googleRolloutPercent,
+                track: "production"
+              },
+              dryRun: $dryRun,
+              requestedBy: $actor,
+              runUrl: $runUrl
+            }' > promotion-request/request.json
+          sha256sum promotion-request/request.json > promotion-request/checksums.sha256
+
+      - name: Upload promotion request
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: production-${{ inputs.operation }}-${{ inputs.app_version }}-${{ github.run_id }}
+          path: promotion-request/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Install pinned store promotion tooling
+        if: ${{ ! inputs.dry_run }}
+        run: gem install fastlane --version 2.237.0 --no-document
+
+      - name: Prepare protected store credentials
+        if: ${{ ! inputs.dry_run }}
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.platform }}" == "all" || "${{ inputs.platform }}" == "apple" ]]; then
+            printf '%s' "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/asc-key.p8"
+            jq -n \
+              --arg key_id "$ASC_KEY_ID" \
+              --arg issuer_id "$ASC_ISSUER_ID" \
+              --arg key "$ASC_PRIVATE_KEY" \
+              '{key_id:$key_id, issuer_id:$issuer_id, key:$key, in_house:false}' \
+              > "$RUNNER_TEMP/asc-api-key.json"
+            chmod 600 "$RUNNER_TEMP/asc-key.p8" "$RUNNER_TEMP/asc-api-key.json"
+          fi
+          if [[ "${{ inputs.platform }}" == "all" || "${{ inputs.platform }}" == "google" ]]; then
+            printf '%s' "$PLAY_CREDENTIALS" > "$RUNNER_TEMP/google-play.json"
+            chmod 600 "$RUNNER_TEMP/google-play.json"
+          fi
+
+      - name: Promote Apple build to phased production
+        if: ${{ ! inputs.dry_run && (inputs.platform == 'all' || inputs.platform == 'apple') && inputs.operation == 'promote' }}
+        run: |
+          fastlane deliver \
+            --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
+            --app_identifier com.synaplan.app \
+            --app_version "${{ inputs.app_version }}" \
+            --build_number "${{ inputs.apple_build_number }}" \
+            --submit_for_review true \
+            --automatic_release true \
+            --phased_release "${{ inputs.apple_phased_release }}" \
+            --skip_binary_upload true \
+            --skip_metadata true \
+            --skip_screenshots true \
+            --force true
+
+      - name: Control Apple phased release
+        if: ${{ ! inputs.dry_run && (inputs.platform == 'all' || inputs.platform == 'apple') && inputs.operation != 'promote' }}
+        env:
+          APPLE_PHASED_OPERATION: ${{ inputs.operation }}
+          APP_VERSION: ${{ inputs.app_version }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_FILE: ${{ runner.temp }}/asc-key.p8
+        run: ruby scripts/apple-phased-release.rb
+
+      - name: Promote or control Google staged rollout
+        if: ${{ ! inputs.dry_run && (inputs.platform == 'all' || inputs.platform == 'google') }}
+        env:
+          OPERATION: ${{ inputs.operation }}
+          ROLLOUT_PERCENT: ${{ inputs.google_rollout_percent }}
+        run: |
+          set -euo pipefail
+          rollout_fraction="$(awk -v value="$ROLLOUT_PERCENT" 'BEGIN { printf "%.4f", value / 100 }')"
+          status=inProgress
+          track=production
+          promote_args=()
+          if [[ "$OPERATION" == "promote" ]]; then
+            track=internal
+            promote_args=(--track_promote_to production)
+          fi
+          if [[ "$OPERATION" == "pause" || "$OPERATION" == "rollback" ]]; then
+            status=halted
+          fi
+          fastlane supply \
+            --track "$track" \
+            "${promote_args[@]}" \
+            --version_code "${{ inputs.google_version_code }}" \
+            --release_status "$status" \
+            --rollout "$rollout_fraction" \
+            --json_key "$RUNNER_TEMP/google-play.json" \
+            --skip_upload_metadata true \
+            --skip_upload_images true \
+            --skip_upload_screenshots true \
+            --skip_upload_changelogs true
+
+      - name: Report production result
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "Dry run completed; no production store state was changed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The protected production operation was submitted. Rollback halts an active staged/phased release; stores cannot remove binaries already installed on devices." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Remove store credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc-key.p8" "$RUNNER_TEMP/asc-api-key.json" "$RUNNER_TEMP/google-play.json"

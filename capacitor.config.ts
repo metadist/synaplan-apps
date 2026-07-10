@@ -39,6 +39,33 @@ if (!envIdentity) {
 const appId = `com.synaplan.app${envIdentity.idSuffix}`
 const appName = `Synaplan${envIdentity.nameSuffix}`
 
+// Public build configuration only. Authentication/signing secrets belong to the
+// publisher and are never read here, so they cannot be embedded in native bundles.
+const otaUpdateUrl = process.env.SYNAPLAN_OTA_UPDATE_URL?.trim()
+const otaChannelUrl = process.env.SYNAPLAN_OTA_CHANNEL_URL?.trim()
+const otaStatsUrl = process.env.SYNAPLAN_OTA_STATS_URL?.trim()
+const otaPublicKey = process.env.SYNAPLAN_OTA_PUBLIC_KEY?.trim()
+const otaDefaultChannel = process.env.SYNAPLAN_OTA_DEFAULT_CHANNEL?.trim() || 'production'
+if (!/^[a-z0-9][a-z0-9._-]*$/i.test(otaDefaultChannel)) {
+  throw new Error('SYNAPLAN_OTA_DEFAULT_CHANNEL must be a simple channel name')
+}
+for (const [name, value] of [
+  ['SYNAPLAN_OTA_UPDATE_URL', otaUpdateUrl],
+  ['SYNAPLAN_OTA_CHANNEL_URL', otaChannelUrl],
+  ['SYNAPLAN_OTA_STATS_URL', otaStatsUrl],
+] as const) {
+  if (!value) continue
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error(`${name} must be an absolute URL`)
+  }
+  if (appEnv === 'prod' && url.protocol !== 'https:') {
+    throw new Error(`${name} must use HTTPS for production builds`)
+  }
+}
+
 // ── Dev-only: point the app at a local backend for the Epic 3 spike ───────────
 // When SYNAPLAN_DEV_BACKEND is set at `cap sync` time (e.g. http://10.0.2.2:8000
 // for the Android emulator's host loopback), we relax the WebView so the bundled
@@ -99,10 +126,14 @@ const config: CapacitorConfig = {
     //
     // Code-first: this block is inert until the app is registered with the update
     // server and a bundle is published (no bundle ⇒ the builtin dist/ is used).
-    // Hosting for v4.0 = Capgo Cloud (default updateUrl); migrating to a
-    // self-hosted server later is just an updateUrl/channelUrl override here —
-    // no app code change.
+    // Self-hosted endpoints are selected through public build environment
+    // variables. No publisher token or signing secret is accepted here.
     CapacitorUpdater: {
+      ...(otaUpdateUrl ? { updateUrl: otaUpdateUrl } : {}),
+      ...(otaChannelUrl ? { channelUrl: otaChannelUrl } : {}),
+      ...(otaStatsUrl ? { statsUrl: otaStatsUrl } : {}),
+      ...(otaPublicKey ? { publicKey: otaPublicKey } : {}),
+      defaultChannel: otaDefaultChannel,
       // Chosen behavior: download in the background, apply on the next cold start.
       autoUpdate: true,
       // On a native store update, discard any OTA bundle and fall back to the

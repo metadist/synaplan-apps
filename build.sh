@@ -13,16 +13,42 @@
 #   ./build.sh --web-only # only build the frontend dist/, skip cap sync
 #
 # Environment:
-#   SYNAPLAN_OPENAPI_URL  OpenAPI spec used to generate the frontend's Zod API schemas.
-#                         The generated code (src/generated/) is gitignored in the submodule,
-#                         so it MUST be produced at build time. Defaults to production.
+#   SYNAPLAN_OPENAPI_URL   Remote OpenAPI spec used to generate the frontend Zod schemas.
+#   SYNAPLAN_OPENAPI_FILE  Local OpenAPI spec (required for commit-identical release builds).
+#                          Exactly one source is required; there is no production fallback.
 #
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-SYNAPLAN_OPENAPI_URL="${SYNAPLAN_OPENAPI_URL:-https://web.synaplan.com/api/doc.json}"
+SYNAPLAN_OPENAPI_URL="${SYNAPLAN_OPENAPI_URL:-}"
+SYNAPLAN_OPENAPI_FILE="${SYNAPLAN_OPENAPI_FILE:-}"
+if [[ -n "$SYNAPLAN_OPENAPI_URL" && -n "$SYNAPLAN_OPENAPI_FILE" ]]; then
+  echo "ERROR: Set exactly one of SYNAPLAN_OPENAPI_URL or SYNAPLAN_OPENAPI_FILE." >&2
+  exit 2
+fi
+if [[ -z "$SYNAPLAN_OPENAPI_URL" && -z "$SYNAPLAN_OPENAPI_FILE" ]]; then
+  echo "ERROR: Set exactly one of SYNAPLAN_OPENAPI_URL or SYNAPLAN_OPENAPI_FILE." >&2
+  exit 2
+fi
+if [[ -n "$SYNAPLAN_OPENAPI_FILE" ]]; then
+  if [[ "$SYNAPLAN_OPENAPI_FILE" != /* ]]; then
+    SYNAPLAN_OPENAPI_FILE="$ROOT_DIR/$SYNAPLAN_OPENAPI_FILE"
+  fi
+  if [[ ! -f "$SYNAPLAN_OPENAPI_FILE" ]]; then
+    echo "ERROR: SYNAPLAN_OPENAPI_FILE does not exist: $SYNAPLAN_OPENAPI_FILE" >&2
+    exit 2
+  fi
+  SYNAPLAN_OPENAPI_SOURCE="$SYNAPLAN_OPENAPI_FILE"
+else
+  OPENAPI_TEMP_FILE="$(mktemp "${TMPDIR:-/tmp}/synaplan-openapi.XXXXXX.json")"
+  trap 'rm -f "$OPENAPI_TEMP_FILE"' EXIT
+  curl --fail --silent --show-error --location "$SYNAPLAN_OPENAPI_URL" --output "$OPENAPI_TEMP_FILE"
+  SYNAPLAN_OPENAPI_SOURCE="$OPENAPI_TEMP_FILE"
+fi
+node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$SYNAPLAN_OPENAPI_SOURCE"
+SYNAPLAN_OPENAPI_SHA256="$(shasum -a 256 "$SYNAPLAN_OPENAPI_SOURCE" | awk '{print $1}')"
 
 WEB_ONLY=false
 if [[ "${1:-}" == "--web-only" ]]; then
@@ -44,12 +70,13 @@ fi
 # (generated from the backend OpenAPI spec). Produce it here from the configured spec, then
 # run the submodule's own post-processor (--skip-fetch = no second download) so the Zod v4
 # fixes + readable aliases stay identical to the platform's pipeline.
-echo "    Generating API schemas from: ${SYNAPLAN_OPENAPI_URL}"
+echo "    Generating API schemas from: ${SYNAPLAN_OPENAPI_SOURCE}"
 mkdir -p src/generated
-npx openapi-zod-client "${SYNAPLAN_OPENAPI_URL}" -o src/generated/api-schemas.ts --template schema-template.hbs
+npx openapi-zod-client "${SYNAPLAN_OPENAPI_SOURCE}" -o src/generated/api-schemas.ts --template schema-template.hbs
 node scripts/generate-schemas.js --skip-fetch
 
 npm run build
+printf '%s\n' "$SYNAPLAN_OPENAPI_SHA256" > dist/openapi-contract.sha256
 popd >/dev/null
 echo "    Built: synaplan/frontend/dist/"
 

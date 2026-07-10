@@ -1,0 +1,110 @@
+name: Mobile CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  attestations: read
+  contents: read
+
+jobs:
+  validate:
+    name: Validate and build web bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            synaplan/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run local CI gate
+        run: npm run ci-local
+
+      - name: Locate commit-matching OpenAPI artifact
+        id: openapi
+        env:
+          GH_TOKEN: ${{ secrets.SYNAPLAN_ARTIFACT_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          synaplan_sha="$(git -C synaplan rev-parse HEAD)"
+          synaplan_tag="$(git -C synaplan describe --tags --exact-match HEAD 2>/dev/null || true)"
+          artifact_id=''
+          release_artifact=false
+          if test -n "$synaplan_tag"; then
+            artifact_name="mobile-release-${synaplan_tag}-${synaplan_sha}"
+            artifact_id="$(
+              gh api --method GET repos/metadist/synaplan/actions/artifacts \
+                -f "name=$artifact_name" \
+                --jq '[.artifacts[] | select(.expired == false)] | first | .id // empty'
+            )"
+            if test -n "$artifact_id"; then
+              release_artifact=true
+            fi
+          fi
+          if test -z "$artifact_id"; then
+            run_id="$(
+              gh api "repos/metadist/synaplan/actions/runs?head_sha=${synaplan_sha}&status=success&per_page=50" \
+                --jq '[.workflow_runs[] | select(.name == "CI" and .event == "push")] | first | .id // empty'
+            )"
+            test -n "$run_id"
+            artifact_id="$(
+              gh api "repos/metadist/synaplan/actions/runs/${run_id}/artifacts" \
+                --jq '[.artifacts[] | select(
+                  .expired == false and .name == "openapi-spec"
+                )] | first | .id // empty'
+            )"
+          fi
+          test -n "$artifact_id"
+          mkdir -p "$RUNNER_TEMP/openapi"
+          gh api "repos/metadist/synaplan/actions/artifacts/${artifact_id}/zip" > "$RUNNER_TEMP/openapi.zip"
+          unzip -q "$RUNNER_TEMP/openapi.zip" -d "$RUNNER_TEMP/openapi"
+          if [[ "$release_artifact" == "true" ]]; then
+            (
+              cd "$RUNNER_TEMP/openapi"
+              sha256sum --check checksums.sha256
+            )
+            gh attestation verify "$RUNNER_TEMP/openapi/checksums.sha256" \
+              --repo metadist/synaplan \
+              --signer-workflow metadist/synaplan/.github/workflows/mobile-release-artifacts.yml
+          fi
+          test -s "$RUNNER_TEMP/openapi/openapi-spec.json"
+          echo "file=$RUNNER_TEMP/openapi/openapi-spec.json" >> "$GITHUB_OUTPUT"
+
+      - name: Build web bundle
+        env:
+          SYNAPLAN_OPENAPI_FILE: ${{ steps.openapi.outputs.file }}
+        run: npm run build -- --web-only
+
+      - name: Generate release manifest and check drift
+        run: |
+          node scripts/release-manifest.mjs \
+            --output synaplan/frontend/dist/release-manifest.json
+          node scripts/release-drift.mjs \
+            --manifest synaplan/frontend/dist/release-manifest.json
+
+      - name: Upload web build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mobile-web-${{ github.sha }}
+          path: synaplan/frontend/dist/
+          if-no-files-found: error
+          retention-days: 7

@@ -29,8 +29,11 @@ This is part of **Epic 0 — Preparation & Foundations**. It is read/extended by
 | Android upload keystore (`.keystore`/`.jks`) + key alias + passwords | Android signing (Epic 10) | Generated once, **back up safely** | CI secret store / local (never git) | TODO |
 | Google Play service-account JSON | Play Developer API, Play upload (Epic 5/10) | Google Cloud → IAM service account w/ Play access | CI secret store; backend env for server validation | TODO |
 | Google Cloud Pub/Sub topic + push endpoint auth | Real-time Developer Notifications (Epic 5) | Google Cloud project | Backend env / infra config | TODO |
-| Capgo API token (`CAPGO_TOKEN`) | OTA bundle upload (Epic 8, `npm run ota:upload`) | Capgo Cloud account → Account → API keys (upload scope) | CI secret store / `.env` (never git) | TODO |
-| Capgo OTA signing private key (`.capgo_key_v2`) | Signing/E2E-encrypting OTA bundles at upload (Epic 8) | Generated locally via `npm run ota:key:create` | Local + CI secret store (gitignored); **back up safely** — public key is committed in `capacitor.config.ts` | TODO |
+| Self-hosted Capgo API key (`CAPGO_API_KEY`) | OTA bundle upload (`ota.yml`) | Approved self-hosted deployment, upload-only scope | `canary` / `production` environment secret | TODO |
+| Self-hosted Supabase anonymous key (`CAPGO_SUPA_ANON`) | Routes the pinned Capgo CLI to the self-hosted backend | Approved self-hosted deployment | `canary` / `production` environment secret | TODO |
+| Capgo OTA signing private key (`CAPGO_BUNDLE_PRIVATE_KEY`) | Signing/E2E-encrypting OTA bundles | Generated once with Capgo CLI | Environment secret + encrypted offline backup | TODO |
+| GitHub App credentials (`MOBILE_SYNC_APP_ID`, `MOBILE_SYNC_APP_PRIVATE_KEY`) | Cross-repository sync branch and PR | GitHub App with only required repository permissions | CI secret store | TODO |
+| Synaplan artifact token (`SYNAPLAN_ARTIFACT_TOKEN`) | Read commit-matching artifacts and attestations from `synaplan` | Fine-grained token/App installation with Actions + Attestations read | CI secret store | TODO |
 | Crash-reporting DSN (e.g. Sentry) | Native crash reporting (Epic 10) | Sentry project | App config / `.env` | TODO |
 | Submodule access token or SSH deploy key | `git submodule update` in CI (Epic 0/10) | Git host | CI secret store | TODO (public repo → may be unnecessary) |
 
@@ -42,6 +45,14 @@ This is part of **Epic 0 — Preparation & Foundations**. It is read/extended by
 - **Capgo OTA signing private key (`.capgo_key_v2`)** — if lost, you cannot publish bundles that
   the already-installed apps will accept (they verify against the embedded public key). Store an
   encrypted backup off-machine.
+
+Self-hosted Capgo endpoint details, administrator credentials, internal hostnames, and deployment
+topology are private infrastructure data. Keep them in the approved release environment/runbook,
+not in git or public submodule documentation.
+
+The self-hosted Supabase host, updater/channel/stats URLs, channel name, and public bundle key are
+not credentials, but still belong in protected environment variables so production builds cannot
+silently target an unreviewed deployment.
 
 ## Checklist (fill during Epic 0.1 / 10)
 

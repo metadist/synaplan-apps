@@ -20,9 +20,9 @@ from code.
 
 | # | Account | Unlocks | Cost | Owner | Done |
 |---|---------|---------|------|-------|------|
-| A1 | **Apple Developer Program** | iOS signing, App Store Connect, TestFlight, App Store Server API (IAP) | ~99 €/yr | 👤 | ☐ |
-| A2 | **Google Play Console** developer account | Android upload, Play Internal Testing, Play Developer API (IAP) | ~25 € once | 👤 | ☐ |
-| A3 | **Capgo Cloud** account | OTA bundle hosting + `CAPGO_TOKEN` + signing key (Epic 8) | paid tier / self-host | 👤 | ☐ |
+| A1 | **Apple Developer Program** | iOS signing, App Store Connect, TestFlight, App Store Server API (IAP) | ~99 €/yr | 👤 | ☑ |
+| A2 | **Google Play Console** developer account | Android upload, Play Internal Testing, Play Developer API (IAP) | ~25 € once | 👤 | ☑ |
+| A3 | **Self-hosted Capgo** deployment | OTA bundle hosting, telemetry, rollback, and signing (Epic 8) | self-hosted | 👤 | ☑ |
 | A4 | **Google Cloud project** (Pub/Sub) | Play Real-time Developer Notifications for IAP (Epic 5) | usage-based | 👤 | ☐ |
 | A5 | **Crash-reporting vendor** (e.g. Sentry) project | Native crash reporting + DSN (Epic 10) | free/paid | 👤 | ☐ |
 | A6 | **Stripe** (already exists for web) | confirm web checkout stays the only web payment path | — | 👤 | ☐ |
@@ -41,8 +41,8 @@ ever in git). This is the quick "what must exist before go-live" list.
 
 | Env / file | Purpose | Source | Owner | Done |
 |------------|---------|--------|-------|------|
-| `CAPGO_TOKEN` | OTA bundle upload (`npm run ota:upload`) | Capgo Cloud → API keys (upload scope) | 👤→🤖 | ☐ |
-| `.capgo_key_v2` (private signing key) | sign/encrypt OTA bundles; **public key committed in `capacitor.config.ts`** | `npm run ota:key:create` (generate once, **back up!**) | 🤖→👤 | ☐ |
+| `CAPGO_API_KEY`, `CAPGO_SUPA_ANON` | upload to the approved self-hosted Capgo deployment | deployment API keys (upload scope) | 👤→🤖 | ☐ |
+| `CAPGO_BUNDLE_PRIVATE_KEY` | sign/encrypt OTA bundles; public key is a protected build variable | `npm run ota:key:create` (generate once, **back up!**) | 🤖→👤 | ☐ |
 | Apple distribution cert (`.p12`) + provisioning profiles | iOS signing | App Store Connect / fastlane match | 👤 | ☐ |
 | App Store Connect API key (`.p8`) + Key ID + Issuer ID | TestFlight upload **and** App Store Server API v2 (IAP) | App Store Connect → Integrations | 👤 | ☐ |
 | Android upload keystore (`.jks`) + alias + passwords | Android signing — **back up, unrecoverable if lost** | generated once | 👤 | ☐ |
@@ -74,8 +74,9 @@ each affects launch scope.
 - [ ] **Custom designer 1024px icon** instead of the brand bird? If yes: replace `assets/icon-only.png` (+ foreground/background) and run `npm run assets:generate`. 👤
 
 ### OTA / versioning (Epic 8)
-- [ ] OTA **channel strategy** (prod vs beta) and **staged-rollout percentages**? 👤
-- [ ] **Minimum-version bump policy** — who decides, and when is an app forced to update? 👤
+- [x] OTA strategy: protected **canary → production**, with pause/resume/rollback controls.
+- [x] Minimum-version bump: only after the replacement is available in both stores, with an
+  `UPDATE_ENFORCE_AFTER` grace period and a valid platform store URL.
 
 ### Payments / IAP (Epic 5)
 - [ ] **Yearly IAP products at launch**, or monthly only first? 👤
@@ -87,7 +88,7 @@ each affects launch scope.
 - [ ] **Privacy-Policy + Terms-of-Use**: which legal entity / URLs back them for the SaaS brand vs self-hosted white-label brands? (Needed in-app **and** in store metadata.) 👤
 
 ### Release engineering (Epic 10)
-- [ ] **fastlane now**, or manual signing for the first release? 👤
+- [x] Pinned fastlane automation for TestFlight, Play Internal, and protected staged production.
 - [ ] **Crash-reporting vendor** (Sentry vs Crashlytics vs Bugsnag)? 👤 — **DEFERRED, decide before 10.3 build.** Everything else is already decided: EU SaaS region, capture native + WebView JS (native-gated), opt-out default + privacy disclosure, strict PII scrubbing, prod+staging only, release-tagged via Epic 10.1. See `planning/planning_10` §10.3.
 
 ---
@@ -161,11 +162,13 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 
 ## 6. Capgo OTA go-live follow-ups (explicit pending tail of Epic 8)
 
-1. [ ] 👤 Create the **Capgo Cloud** account (A3).
-2. [ ] 🤖 `npm run ota:key:create` → generate signing key; commit public key in `capacitor.config.ts`; **back up the private key** off-machine.
-3. [ ] 👤 Put **`CAPGO_TOKEN`** in the CI secret store / local `.env`.
-4. [ ] 🤖 Publish the **first OTA bundle** and run the **on-device round-trip + rollback** test (§4).
-5. [ ] 👤 Decide rollout % + min-version bump policy (§3).
+1. [x] 👤 Provision the approved self-hosted Capgo deployment.
+2. [ ] 👤 Configure endpoint/public-key variables and `CAPGO_API_KEY`, `CAPGO_SUPA_ANON`, and
+   `CAPGO_BUNDLE_PRIVATE_KEY` in the protected `canary` / `production` environments.
+3. [ ] 👤 Configure approval rules for both environments.
+4. [ ] 🤖 Publish the first canary bundle and run the on-device round-trip, automatic-revert, and
+   explicit rollback tests (§4).
+5. [ ] 🤖 Promote the verified source to production through the protected workflow.
 
 ---
 

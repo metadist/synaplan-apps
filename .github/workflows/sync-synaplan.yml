@@ -1,0 +1,142 @@
+name: Sync Synaplan Release
+
+on:
+  repository_dispatch:
+    types: [synaplan-mobile-release]
+  workflow_dispatch:
+    inputs:
+      synaplan_ref:
+        description: Exact Synaplan v* tag
+        required: true
+        type: string
+      synaplan_sha:
+        description: Commit SHA resolved by that tag
+        required: true
+        type: string
+
+concurrency:
+  group: sync-synaplan
+  cancel-in-progress: false
+
+permissions:
+  attestations: read
+  contents: read
+
+jobs:
+  sync:
+    name: Open synchronization PR
+    runs-on: ubuntu-latest
+    env:
+      SYNAPLAN_REF: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag || inputs.synaplan_ref }}
+      SYNAPLAN_SHA: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || inputs.synaplan_sha }}
+      SOURCE_RUN_ID: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.source_run_id || '' }}
+    steps:
+      - name: Validate requested release identity
+        run: |
+          set -euo pipefail
+          [[ "$SYNAPLAN_REF" =~ ^v[0-9]+(\.[0-9]+){1,2}([+-][0-9A-Za-z.-]+)?$ ]]
+          [[ "$SYNAPLAN_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Create synchronization bot token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.MOBILE_SYNC_APP_ID }}
+          private-key: ${{ secrets.MOBILE_SYNC_APP_PRIVATE_KEY }}
+
+      - name: Checkout apps repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify source release artifact
+        env:
+          GH_TOKEN: ${{ secrets.SYNAPLAN_ARTIFACT_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          run_id="$SOURCE_RUN_ID"
+          if test -z "$run_id"; then
+            run_id="$(
+              gh api "repos/metadist/synaplan/actions/runs?head_sha=${SYNAPLAN_SHA}&status=success&per_page=50" \
+                --jq '[.workflow_runs[] | select(.name == "Mobile Release Artifacts")] | first | .id // empty'
+            )"
+          fi
+          test -n "$run_id"
+          artifact_id="$(
+            gh api "repos/metadist/synaplan/actions/runs/${run_id}/artifacts" \
+              --jq '[.artifacts[] | select(
+                .expired == false and (.name | startswith("mobile-release-"))
+              )] | first | .id // empty'
+          )"
+          test -n "$artifact_id"
+          mkdir -p "$RUNNER_TEMP/mobile-release"
+          gh api "repos/metadist/synaplan/actions/artifacts/${artifact_id}/zip" > "$RUNNER_TEMP/mobile-release.zip"
+          unzip -q "$RUNNER_TEMP/mobile-release.zip" -d "$RUNNER_TEMP/mobile-release"
+          (
+            cd "$RUNNER_TEMP/mobile-release"
+            sha256sum --check checksums.sha256
+          )
+          gh attestation verify \
+            "$RUNNER_TEMP/mobile-release/checksums.sha256" \
+            --repo metadist/synaplan \
+            --signer-workflow metadist/synaplan/.github/workflows/mobile-release-artifacts.yml
+          jq -e \
+            --arg tag "$SYNAPLAN_REF" \
+            --arg sha "$SYNAPLAN_SHA" \
+            '.tag == $tag and .headSha == $sha and
+              (.classification == "ota-candidate" or .classification == "store-required") and
+              (.apiContractHash | test("^[0-9a-f]{64}$"))' \
+            "$RUNNER_TEMP/mobile-release/mobile-release-manifest.json" >/dev/null
+
+      - name: Synchronize the pinned Synaplan release
+        run: |
+          set -euo pipefail
+          node scripts/sync-synaplan.mjs --ref "$SYNAPLAN_REF"
+          test "$(git -C synaplan rev-parse HEAD)" = "$SYNAPLAN_SHA"
+
+      - name: Create bot branch and commit
+        id: commit
+        run: |
+          set -euo pipefail
+          if test -z "$(git status --porcelain)"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          branch="automation/synaplan-${SYNAPLAN_REF}-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git config user.name "synaplan-mobile-bot"
+          git config user.email "synaplan-mobile-bot@users.noreply.github.com"
+          git add synaplan docs/COMPATIBILITY.md docs/IDENTIFIERS.md
+          git commit -m "chore: sync Synaplan ${SYNAPLAN_REF}"
+          git push origin "HEAD:refs/heads/$branch"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          BRANCH: ${{ steps.commit.outputs.branch }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore: sync Synaplan ${SYNAPLAN_REF}" \
+            --body "Automated synchronization of Synaplan ${SYNAPLAN_REF} at \`${SYNAPLAN_SHA}\`. This pull request is intentionally not auto-merged."
+
+      - name: Report no changes
+        if: steps.commit.outputs.changed == 'false'
+        run: echo "The apps repository already pins the requested Synaplan release." >> "$GITHUB_STEP_SUMMARY"

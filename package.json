@@ -23,12 +23,19 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --test \"tests/*.test.mjs\"",
     "ci-local": "npm run lint && npm run format:check && npm run typecheck && npm run test",
+    "check:release": "node scripts/release-drift.mjs --bootstrap",
+    "check:release:strict": "node scripts/release-drift.mjs",
+    "release:manifest": "node scripts/release-manifest.mjs",
+    "release:drill": "node scripts/release-drill.mjs",
+    "release:sync": "node scripts/sync-synaplan.mjs",
     "e2e": "maestro test .maestro",
     "e2e:dev": "maestro test .maestro -e APP_ID=com.synaplan.app.dev",
     "e2e:staging": "maestro test .maestro -e APP_ID=com.synaplan.app.staging",
     "assets:generate": "capacitor-assets generate --ios --android --iconBackgroundColor '#003fc7' --iconBackgroundColorDark '#003fc7' --splashBackgroundColor '#003fc7' --splashBackgroundColorDark '#003fc7'",
-    "ota:upload": "npx @capgo/cli@latest bundle upload --channel production --path synaplan/frontend/dist --bundle \"$npm_package_version\"",
-    "ota:key:create": "npx @capgo/cli@latest key create"
+    "ota:prepare": "node scripts/ota-prepare.mjs",
+    "ota:prepare:dry-run": "node scripts/ota-prepare.mjs --dry-run",
+    "ota:upload": "node scripts/ota-prepare.mjs",
+    "ota:key:create": "npx --yes @capgo/cli@8.25.10 key create"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
