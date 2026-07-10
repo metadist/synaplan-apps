@@ -38,7 +38,7 @@ is enforced by [Epic 13](../planning/planning_13_synaplan_encapsulation.md) + th
 review. Diff the submodule against the pinned baseline tag; the changed-file set must equal
 the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
 
-The reviewed `v4.0.0-rc.1` baseline contains the approved mobile seams. Diff future platform tags
+The reviewed `v4.0.0-rc.2` baseline contains the approved mobile seams. Diff future platform tags
 against it and re-run both repositories' complete gates before changing the app pin.
 
 ## Per-epic matrix

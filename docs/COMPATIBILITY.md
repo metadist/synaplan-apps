@@ -8,7 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.0 | `v4.0.0-rc.1` | v4 runtime config (`client`, `branding`, `mobile`) | — | _empty (gate off)_ | Reviewed mobile baseline v4.0.0-rc.1 |
+| 4.0.0 | `v4.0.0-rc.2` | v4 runtime config (`client`, `branding`, `mobile`) | — | _empty (gate off)_ | Reviewed mobile baseline v4.0.0-rc.2 |
 
 ## How to read / maintain
 
