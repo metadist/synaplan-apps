@@ -18,7 +18,7 @@
 | Field | Value |
 |-------|-------|
 | App version (`MAJOR.MINOR.PATCH`, UA `Synaplan Mobile Vx.x`) | `4.0.0` |
-| `synaplan` submodule tag the bundle was built from | `v4.0.0-rc.2` |
+| `synaplan` submodule tag the bundle was built from | `v3.9.6` |
 | iOS build (`CFBundleVersion`) / Android (`versionCode`) | `__________` |
 | Crash-reporting vendor decided? | ⬜ (see §6) |
 | Decision date / chair | `__________` |
@@ -51,7 +51,7 @@
 
 ## 2. Aspect default-safety regression — the web must be unchanged (Epic 11.2)
 
-> The reviewed baseline `v4.0.0-rc.2` contains the approved mobile seams. The
+> The reviewed baseline `v3.9.6` contains the approved mobile seams. The
 > non-negotiable platform contract is that an **unconfigured** web/self-host deployment (no branding,
 > no app client, no IAP keys) behaves **identically to pre-v4.0**. Enforced by
 > [`docs/SYNAPLAN_BLAST_RADIUS.md`](SYNAPLAN_BLAST_RADIUS.md) + the AI logic review
@@ -139,7 +139,7 @@
 ---
 
 ## 7. Coordinated tagging & compatibility (Epic 11.4)
-- ✅ 🤖 Tag `v4.0.0-rc.2` created and the app submodule pinned to its exact commit.
+- ✅ 🤖 Tag `v3.9.6` created and the app submodule pinned to its exact commit.
 - ⬜ 🤖 Bump app version + `versionCode`/`CFBundleVersion`.
 - ⬜ 🤖 Add the release row to [`docs/COMPATIBILITY.md`](COMPATIBILITY.md); set `MIN_APP_VERSION` only if there is a breaking API change.
 - ⬜ 🤖 Tag platform + apps consistently; confirm the pinned tag matches the snapshot in §0.
