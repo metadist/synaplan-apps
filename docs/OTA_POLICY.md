@@ -9,7 +9,8 @@
 - ✅ OTA is for **conforming changes only**: UI fixes, copy, styling, non-behavioral bug fixes to
   the bundled web assets (`dist/`).
 - ❌ OTA must **never** change app behavior, feature gating, or **payment/IAP logic**
-  (Apple Guideline 3.2.2 / Google Play policy). Those ship **only** through a store review.
+  (Apple Guideline 2.5.2, Program License Agreement 3.3.2, and Google Play policy). Those ship
+  **only** through a store review.
 - The forced-update gate (Epic 8.2, already implemented) is the complementary lever: when an app
   is too old for the backend contract, the server blocks it with a "please update" screen instead
   of trying to OTA-fix it.
@@ -26,14 +27,18 @@
 - **Any payment / subscription / IAP logic** (purchase, restore, entitlement, channel gating).
 - New features or feature flags that materially change what the reviewed app does.
 - Changes to native capabilities, permissions, or the Capacitor native layer.
-- Anything that alters the app's purpose or circumvents store review (Apple 3.2.2, Google
+- Anything that alters the app's purpose or circumvents store review (Apple 2.5.2/4.2, Google
   "Device and Network Abuse" / deceptive behavior).
 
 ## Why (store rules)
 
-- **Apple App Store Guideline 3.2.2 (vii)** — apps may download code that does not "change the
-  app's primary purpose, provide features different from those reviewed, or download executable
-  code"; interpreted-code updates must remain consistent with the reviewed app.
+- **Apple App Store Review Guideline 2.5.2** — apps must be self-contained and may not download,
+  install, or execute code that introduces or changes app features or functionality.
+- **Apple Developer Program License Agreement 3.3.2** — downloaded interpreted code must stay
+  within Apple's permitted execution model and must not change the app's primary purpose or bypass
+  review.
+- **Apple App Store Review Guideline 4.2** — the submitted app must provide sufficient lasting
+  utility; OTA cannot be used to turn a minimal shell into a materially different product.
 - **Google Play** — updates that significantly deviate from the reviewed app, or that introduce
   payment flows for digital goods outside Play Billing, violate policy.
 
@@ -57,10 +62,10 @@ raise the forced-update minimum version.
 
 ## Status & setup (Capgo)
 
-Decisions taken: **auto-update** behavior, **production-only** channel for now, **signature/E2E
-encryption enabled**, hosting **= Capgo Cloud for the v4.0 launch** with **self-hosted Capgo kept as
-a documented migration path** (switching is just an `updateUrl`/`channelUrl` override in
-`capacitor.config.ts` — no app code change).
+Decisions taken: **auto-update** behavior, native-version-bound **canary** and **production**
+channels, **signature/E2E encryption enabled**, and hosting on the approved **self-hosted Capgo**
+deployment. The native configuration receives `updateUrl`, `channelUrl`, `statsUrl`, the public
+signing key, and the default channel through protected release-environment variables.
 
 ### Done (code-first — inert until an account/bundle exists)
 
@@ -70,29 +75,21 @@ a documented migration path** (switching is just an `updateUrl`/`channelUrl` ove
   `directUpdate: false`, `appReadyTimeout`, auto-delete failed/previous.
 - ✅ The SPA confirms each launch via `notifyAppReady()` (`src/services/otaUpdates.ts`, native-only)
   so Capgo auto-reverts a bad bundle.
-- ✅ npm scripts: `ota:key:create` (signing key) and `ota:upload` (publish a bundle).
+- ✅ `ota.yml` builds from a commit-matching OpenAPI artifact, signs the unique bundle, targets the
+  configured self-hosted Supabase host, and supports publish, pause, resume, and rollback.
+- ✅ npm scripts prepare deterministic manifests/checksums without publishing as a side effect.
 - ✅ Secrets documented (`docs/SECRETS.md`); `.capgo_key_v2` gitignored.
 
 Until the app is registered and a bundle is published, the update check finds nothing and the
 builtin `dist/` bundle is always used — i.e. the wiring is a safe no-op.
 
-### Remaining (needs the Capgo Cloud account — ASK-FIRST follow-up)
+### Environment setup and first release drill
 
-1. **Create/connect the Capgo Cloud account** and register the app:
-   `npx @capgo/cli@latest login <CAPGO_TOKEN>` then `npx @capgo/cli@latest app add com.synaplan.app`.
-2. **Generate the signing key** (writes `publicKey` into `capacitor.config.ts`, keeps the private
-   key as `.capgo_key_v2`): `npm run ota:key:create`. Back up the private key (see `SECRETS.md`).
-3. **Store `CAPGO_TOKEN`** in the CI secret store / local `.env` (never commit).
-4. **Publish a bundle** (conforming changes only): `./build.sh --web-only` then
-   `npm run ota:upload` (uploads `synaplan/frontend/dist` to the `production` channel at the current
-   app version), and record it in `docs/COMPATIBILITY.md`.
-5. **Verify the round-trip** on a device: publish a bundle → reopen the app → new web version loads
-   on next cold start; then test rollback by publishing a deliberately-broken bundle (must
-   auto-revert via `appReadyTimeout`).
-
-## Open questions
-
-- Rollout percentages / staged rollout policy on the production channel?
-- Minimum-version bump policy: who decides, and when does a change require a store build + a
-  forced-update bump instead of an OTA?
-- When (if ever) to introduce a `beta` channel for internal testers.
+1. Configure `CAPGO_SUPA_HOST`, the three updater endpoint URLs, the public signing key, and the
+   channel name as protected environment variables for `canary` and `production`.
+2. Configure `CAPGO_SUPA_ANON`, `CAPGO_API_KEY`, and `CAPGO_BUNDLE_PRIVATE_KEY` as environment
+   secrets. Keep the signing-key backup outside GitHub as well.
+3. Run `ota.yml` in dry-run mode, then publish to `canary` after approval.
+4. Verify cold-start activation and telemetry on physical devices. Publish a deliberately broken
+   canary bundle to prove automatic rollback, then exercise the explicit rollback operation.
+5. Promote the same reviewed source to `production` only through the protected environment.

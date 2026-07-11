@@ -12,12 +12,21 @@
  *      Falls back to the build default (window.__SYNAPLAN_API_BASE_URL_DEFAULT__,
  *      stamped by build.sh) → DEFAULT_SERVER_URL on a fresh install.
  *   2. Expose an app-owned control surface via window.SynaplanServer
- *      (get/getDefault/save/reset/open). The user-facing UI to change the server
- *      now lives INSIDE the SPA (Admin → App server), which calls this API. There
- *      is intentionally NO always-on floating gear anymore.
+ *      (get/getDefault/save/reset/open/reload). The user-facing UI to change the
+ *      server lives INSIDE the SPA (Settings, and Admin → App server for admins),
+ *      which calls this API. There is intentionally NO always-on floating gear
+ *      anymore. `save()`/`reset()` only VALIDATE + PERSIST — they deliberately do
+ *      NOT reload the WebView themselves, so the SPA gets a chance to run its own
+ *      cleanup first (signing the user out of every server, since a server change
+ *      always requires a fresh login). The SPA calls the separate `reload()`
+ *      method once that cleanup is done.
  *   3. RECOVERY ONLY: auto-open a minimal app-owned overlay when the configured
  *      server is unreachable, so the user can always fix a wrong URL or reset to
- *      the default even when the SPA (and thus the Admin panel) can't load.
+ *      the default even when the SPA (and thus its Settings UI) can't load. This
+ *      overlay is a self-contained flow that persists + reloads immediately on
+ *      its own (see `openOverlay()` below) — it does NOT go through
+ *      `window.SynaplanServer.save()/reset()`, so it is unaffected by the
+ *      persist/reload split above.
  *
  * Notes:
  *   - The server URL is NOT a secret, and the bootstrap must read it
@@ -142,10 +151,10 @@
       })
   }
 
-  // Persist a validated server and reload so main.ts re-bootstraps against it
-  // (new API base URL, branding re-fetch, per-server token scope). Switching
-  // servers clears the previous server's in-memory auth simply by reloading;
-  // its token stays in secure storage under that server's scope for later.
+  // Persist a validated server. Callers that go through `window.SynaplanServer`
+  // (the SPA) are responsible for reloading themselves (see the API object
+  // below) once their own cleanup has run; the vanilla recovery overlay below
+  // reloads immediately since it has no SPA-side state to clean up.
   function saveServer(url) {
     try {
       window.localStorage.setItem(STORAGE_KEY, url)
@@ -416,8 +425,14 @@
     }
   }
 
-  // Public API consumed by the SPA's in-app "Admin → App server" panel
+  // Public API consumed by the SPA's Settings / "Admin → App server" UI
   // (synaplan submodule, native-only) and available for debugging.
+  //
+  // `save()`/`reset()` ONLY validate + persist — they never reload on their
+  // own. This gives the SPA a window to run its own cleanup (sign the user out
+  // of every server) before the WebView reloads against the new URL. The SPA
+  // MUST call `reload()` itself once that cleanup has finished; if it doesn't,
+  // the new server simply won't be used until the next natural reload.
   window.SynaplanServer = {
     get: resolveServerUrl,
     getDefault: function () {
@@ -432,13 +447,14 @@
       return probeServer(n).then(function (r) {
         if (r.ok) {
           saveServer(n)
-          reload()
         }
         return r
       })
     },
     reset: function () {
       resetServer()
+    },
+    reload: function () {
       reload()
     },
   }
@@ -497,6 +513,14 @@
       var keyboard = plugins && plugins.Keyboard
       if (!keyboard || typeof keyboard.addListener !== 'function') return
       keyboard.addListener('keyboardWillShow', function (info) {
+        setKeyboardInset(info && info.keyboardHeight)
+      })
+      // Re-assert the inset once the keyboard is FULLY shown. WKWebView can reset
+      // the scroll position during the slide-in animation, so any scroll-assist
+      // that runs on `keyboardWillShow` (animation start) gets undone. Firing the
+      // inset event again here gives the SPA a correctly-timed signal to scroll a
+      // focused input clear of the keyboard (keyboardScrollAssist.ts).
+      keyboard.addListener('keyboardDidShow', function (info) {
         setKeyboardInset(info && info.keyboardHeight)
       })
       keyboard.addListener('keyboardWillHide', function () {

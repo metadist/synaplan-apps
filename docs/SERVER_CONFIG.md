@@ -14,19 +14,35 @@ URL (see [Blast Radius](SYNAPLAN_BLAST_RADIUS.md)).
 | Submodule seam | `synaplan/frontend/src/main.ts` → `nativeRuntime.getNativeApiBaseUrl()` | Reads `window.__SYNAPLAN_API_BASE_URL__`, falls back to `https://web.synaplan.com` |
 | Persistence | `localStorage['synaplan.serverUrl']` | The URL is **not a secret** and must be read synchronously at bootstrap; `localStorage` is persistent in the `capacitor://localhost` / `https://localhost` WebView origin |
 | Validation | `probeServer()` | `GET {url}/api/v1/config/runtime` (public, no auth) must return 200 + a JSON object before saving — no half-applied state |
-| Settings UI | `app/synaplan-native.js` overlay | App-owned vanilla-DOM overlay (NOT the SPA): current server, edit, Save, Reset. Reachable via a discreet gear button and **auto-opens when the configured server is unreachable** |
-| First-run onboarding | `synaplan/frontend/src/components/onboarding/OnboardingServerStep.vue` | Step 2 of the native first-run flow (`/onboarding`): default server preselected, "Use my own server" expert affordance. Probes + persists via the same `window.SynaplanServer.save()` seam; the resulting WebView reload resumes the flow at step 3 (sessionStorage resume step) |
-| Per-server identity | `synaplan/frontend/src/services/api/nativeAuth.ts` | Bearer-token secure-storage keys are suffixed with a hash of the resolved server URL, so A's token is never sent to B and switching back restores A's session |
+| Settings UI (logged in) | `synaplan/frontend/src/components/NativeServerControl.vue` | Shared SPA component embedded in **Settings** (every authenticated user) and **Admin → App server**. Calls `window.SynaplanServer.save()/reset()` (persist only), then signs the user out of every server and calls `window.SynaplanServer.reload()` itself |
+| Settings UI (logged out / recovery) | `app/synaplan-native.js` overlay | App-owned vanilla-DOM overlay (NOT the SPA): current server, edit, Save, Reset. Reachable via `window.SynaplanServer.open()` (guest menu, login/register screens) and **auto-opens when the configured server is unreachable**. Persists + reloads immediately on its own — there is no SPA session to clean up in this flow |
+| First-run onboarding | `synaplan/frontend/src/components/onboarding/OnboardingServerModal.vue` | Own-server modal opened from a quiet "Own server" pill on page 1 of the two-page native first-run flow (`/onboarding`): URL entry replacing the default server. Probes + persists via `window.SynaplanServer.save()`, then reloads explicitly via `window.SynaplanServer.reload()`; the resulting WebView reload resumes the flow at page 1 (sessionStorage resume step) |
+| Per-server identity | `synaplan/frontend/src/services/api/nativeAuth.ts` | Bearer-token secure-storage keys are suffixed with a hash of the resolved server URL, so A's token is never sent to B. This scoping still applies while a session is active, but a deliberate server change (via `NativeServerControl.vue`) now always clears **every** stored token (`clearAllNativeTokens()`) — switching back to a previously-used server no longer auto-restores its session; the user always has to log in again |
 
 ## Switch flow
 
-1. User edits the URL in the overlay and taps **Save**.
-2. The candidate is normalized (`https://` default, trailing slash stripped) and **probed**; an
-   unreachable/non-Synaplan server is rejected with a message and the previous server stays active.
-3. On success the URL is persisted and the app **reloads**. The reload re-bootstraps the SPA
-   against the new server: new API base URL, branding re-fetch (Epic 4), and a fresh per-server
-   token scope (logged-out if that server has no stored token; the previous server's token stays
-   under its own scope for when the user switches back).
+### Logged in (SPA: Settings / Admin → App server)
+
+1. User edits the URL in `NativeServerControl.vue` and taps **Test & save** (or **Reset to
+   default**).
+2. The candidate is normalized and **probed** via `window.SynaplanServer.save()`; an
+   unreachable/non-Synaplan server is rejected with a message and the previous server stays
+   active — nothing else happens.
+3. On success the URL is persisted (`window.SynaplanServer.save()`/`reset()` — persist only, no
+   reload). The SPA then **always** signs the user out (`authStore.logout()`) and clears **every**
+   stored native token (`clearAllNativeTokens()`), regardless of whether the target server was used
+   before.
+4. Only then does the SPA call `window.SynaplanServer.reload()` itself. The reload re-bootstraps
+   against the new server: new API base URL, branding re-fetch (Epic 4), and no restorable
+   session — the user always lands on the login screen.
+
+### Logged out / recovery (native overlay)
+
+1. User edits the URL in the app-owned overlay (`window.SynaplanServer.open()`, or the
+   non-dismissable recovery variant) and taps **Save**.
+2. Same normalize + probe as above.
+3. On success the overlay persists the URL and **reloads immediately itself** — there is no SPA
+   session to clean up in this flow.
 4. **Reset to default** clears the stored URL and reloads against `https://web.synaplan.com`.
 
 ## Security notes
@@ -41,5 +57,5 @@ URL (see [Blast Radius](SYNAPLAN_BLAST_RADIUS.md)).
 - [ ] Spike on a real device/emulator: fresh install → default server → login → chat SSE +
       realtime WS via Bearer (Epic 3 §3.3).
 - [ ] Switch to a second Synaplan server, confirm identity + branding swap, switch back, confirm
-      session restored (per-server identity).
+      the user is signed out and must log in again on **both** servers (no session restoration).
 - [ ] Release/TestFlight build (WKWebView is stricter than Xcode debug, §3.5).

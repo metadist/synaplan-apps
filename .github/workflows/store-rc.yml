@@ -1,0 +1,310 @@
+name: Mobile Store RC
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build signed artifacts without store uploads
+        required: true
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      dry_run:
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      SYNAPLAN_ARTIFACT_TOKEN:
+        required: false
+      ANDROID_KEYSTORE_BASE64:
+        required: true
+      ANDROID_KEYSTORE_PASSWORD:
+        required: true
+      ANDROID_KEY_ALIAS:
+        required: true
+      ANDROID_KEY_PASSWORD:
+        required: true
+      IOS_DISTRIBUTION_CERTIFICATE_BASE64:
+        required: true
+      IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:
+        required: true
+      IOS_PROVISIONING_PROFILE_BASE64:
+        required: true
+      APPLE_TEAM_ID:
+        required: true
+      APP_STORE_CONNECT_KEY_ID:
+        required: true
+      APP_STORE_CONNECT_ISSUER_ID:
+        required: true
+      APP_STORE_CONNECT_PRIVATE_KEY:
+        required: true
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:
+        required: true
+
+concurrency:
+  group: mobile-store-rc
+  cancel-in-progress: false
+
+permissions:
+  attestations: write
+  contents: read
+  id-token: write
+
+jobs:
+  release-candidate:
+    name: Build store release candidate
+    runs-on: [self-hosted, mobile, macOS]
+    environment: store-qa
+    env:
+      SYNAPLAN_ENV: prod
+      SYNAPLAN_BUILD_NUMBER: ${{ github.run_number }}
+      SYNAPLAN_OTA_UPDATE_URL: ${{ vars.CAPGO_UPDATE_URL }}
+      SYNAPLAN_OTA_CHANNEL_URL: ${{ vars.CAPGO_CHANNEL_URL }}
+      SYNAPLAN_OTA_STATS_URL: ${{ vars.CAPGO_STATS_URL }}
+      SYNAPLAN_OTA_PUBLIC_KEY: ${{ vars.CAPGO_BUNDLE_PUBLIC_KEY }}
+      SYNAPLAN_OTA_DEFAULT_CHANNEL: ${{ vars.CAPGO_PRODUCTION_CHANNEL || 'production' }}
+      TESTFLIGHT_INTERNAL_GROUP: ${{ vars.TESTFLIGHT_INTERNAL_GROUP || 'Internal' }}
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Require Xcode 26 or newer
+        run: |
+          set -euo pipefail
+          major="$(xcodebuild -version | awk '/Xcode/{split($2,v,"."); print v[1]}')"
+          test "${major:-0}" -ge 26
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install and validate
+        run: |
+          npm ci
+          npm run ci-local
+
+      - name: Download commit-matching OpenAPI artifact
+        id: openapi
+        env:
+          GH_TOKEN: ${{ secrets.SYNAPLAN_ARTIFACT_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          synaplan_sha="$(git -C synaplan rev-parse HEAD)"
+          synaplan_tag="$(git -C synaplan describe --tags --exact-match HEAD)"
+          artifact_name="mobile-release-${synaplan_tag}-${synaplan_sha}"
+          artifact_id="$(
+            gh api --method GET repos/metadist/synaplan/actions/artifacts \
+              -f "name=$artifact_name" \
+              --jq '[.artifacts[] | select(.expired == false)] | first | .id // empty'
+          )"
+          test -n "$artifact_id"
+          mkdir -p "$RUNNER_TEMP/openapi"
+          gh api "repos/metadist/synaplan/actions/artifacts/${artifact_id}/zip" > "$RUNNER_TEMP/openapi.zip"
+          unzip -q "$RUNNER_TEMP/openapi.zip" -d "$RUNNER_TEMP/openapi"
+          (
+            cd "$RUNNER_TEMP/openapi"
+            sha256sum --check checksums.sha256
+          )
+          gh attestation verify "$RUNNER_TEMP/openapi/checksums.sha256" \
+            --repo metadist/synaplan \
+            --signer-workflow metadist/synaplan/.github/workflows/mobile-release-artifacts.yml
+          test -s "$RUNNER_TEMP/openapi/openapi-spec.json"
+          echo "file=$RUNNER_TEMP/openapi/openapi-spec.json" >> "$GITHUB_OUTPUT"
+
+      - name: Build and synchronize native projects
+        env:
+          SYNAPLAN_OPENAPI_FILE: ${{ steps.openapi.outputs.file }}
+        run: |
+          test -n "$SYNAPLAN_OTA_UPDATE_URL"
+          test -n "$SYNAPLAN_OTA_CHANNEL_URL"
+          test -n "$SYNAPLAN_OTA_STATS_URL"
+          test -n "$SYNAPLAN_OTA_PUBLIC_KEY"
+          npm run build
+          npm run release:manifest
+          npm run check:release:strict
+
+      - name: Import Android signing material
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/android-signing" "$HOME/.gradle"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -D > "$RUNNER_TEMP/android-signing/release.jks"
+          chmod 600 "$RUNNER_TEMP/android-signing/release.jks"
+          {
+            echo "android.injected.signing.store.file=$RUNNER_TEMP/android-signing/release.jks"
+            echo "android.injected.signing.store.password=$KEYSTORE_PASSWORD"
+            echo "android.injected.signing.key.alias=$KEY_ALIAS"
+            echo "android.injected.signing.key.password=$KEY_PASSWORD"
+          } > "$HOME/.gradle/gradle.properties"
+          chmod 600 "$HOME/.gradle/gradle.properties"
+
+      - name: Build signed Android AAB
+        working-directory: android
+        run: ./gradlew --no-daemon bundleRelease
+
+      - name: Import iOS signing material
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/mobile-signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$RUNNER_TEMP/distribution.p12"
+          security import "$RUNNER_TEMP/distribution.p12" -k "$keychain" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$password" "$keychain" >/dev/null
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          printf '%s' "$PROFILE_BASE64" | base64 -D > \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/synaplan.mobileprovision"
+          security cms -D -i \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/synaplan.mobileprovision" \
+            > "$RUNNER_TEMP/profile.plist"
+          profile_name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")"
+          echo "IOS_PROFILE_NAME=$profile_name" >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/distribution.p12"
+
+      - name: Build and export signed iOS archive
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/Synaplan.xcarchive"
+          export_dir="$RUNNER_TEMP/ios-export"
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath "$archive" \
+            -destination "generic/platform=iOS" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$archive" \
+            -exportPath "$export_dir" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Prepare store upload request
+        env:
+          PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "$PLAY_CREDENTIALS"
+          printf '%s' "$PLAY_CREDENTIALS" | jq -e '.client_email and .private_key' >/dev/null
+          mkdir -p "$RUNNER_TEMP/store-rc"
+          cp android/app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/store-rc/"
+          cp "$RUNNER_TEMP"/ios-export/*.ipa "$RUNNER_TEMP/store-rc/"
+          app_version="$(node -p "require('./package.json').version")"
+          jq -n \
+            --arg track internal \
+            --arg apple_group "$TESTFLIGHT_INTERNAL_GROUP" \
+            --arg sha "$GITHUB_SHA" \
+            --arg app_version "$app_version" \
+            --arg build_number "$SYNAPLAN_BUILD_NUMBER" \
+            '{
+              googlePlayTrack:$track,
+              testFlightGroup:$apple_group,
+              commit:$sha,
+              appVersion:$app_version,
+              iosBuildNumber:$build_number,
+              androidVersionCode:$build_number
+            }' \
+            > "$RUNNER_TEMP/store-rc/upload-request.json"
+
+      - name: Attest signed store artifacts
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: |
+            ${{ runner.temp }}/store-rc/*.aab
+            ${{ runner.temp }}/store-rc/*.ipa
+
+      - name: Upload signed store artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: store-rc-${{ github.sha }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/store-rc/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Install pinned store upload tooling
+        if: ${{ ! inputs.dry_run }}
+        run: gem install fastlane --version 2.237.0 --no-document
+
+      - name: Upload to TestFlight Internal
+        if: ${{ ! inputs.dry_run }}
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$ASC_KEY_ID"
+          test -n "$ASC_ISSUER_ID"
+          jq -n \
+            --arg key_id "$ASC_KEY_ID" \
+            --arg issuer_id "$ASC_ISSUER_ID" \
+            --arg key "$ASC_PRIVATE_KEY" \
+            '{key_id:$key_id, issuer_id:$issuer_id, key:$key, in_house:false}' \
+            > "$RUNNER_TEMP/asc-api-key.json"
+          chmod 600 "$RUNNER_TEMP/asc-api-key.json"
+          fastlane pilot upload \
+            --ipa "$RUNNER_TEMP"/store-rc/*.ipa \
+            --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
+            --groups "$TESTFLIGHT_INTERNAL_GROUP" \
+            --skip_waiting_for_build_processing false
+
+      - name: Upload to Google Play Internal
+        if: ${{ ! inputs.dry_run }}
+        env:
+          PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PLAY_CREDENTIALS" > "$RUNNER_TEMP/google-play.json"
+          chmod 600 "$RUNNER_TEMP/google-play.json"
+          fastlane supply \
+            --aab "$RUNNER_TEMP/store-rc/app-release.aab" \
+            --track internal \
+            --json_key "$RUNNER_TEMP/google-play.json" \
+            --skip_upload_metadata true \
+            --skip_upload_images true \
+            --skip_upload_screenshots true \
+            --skip_upload_changelogs true
+
+      - name: Report dry run
+        if: inputs.dry_run
+        run: echo "Dry run completed; neither store was changed." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          rm -f "$HOME/.gradle/gradle.properties"
+          rm -f "$RUNNER_TEMP/asc-api-key.json" "$RUNNER_TEMP/google-play.json"
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/synaplan.mobileprovision"
+          security delete-keychain "$RUNNER_TEMP/mobile-signing.keychain-db" 2>/dev/null || true

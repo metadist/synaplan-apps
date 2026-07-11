@@ -8,7 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| _(unreleased)_ 4.0.0 | _TBD — v4.0 baseline tag_ | v4.0 runtime config (`client`, `branding`, `mobile`) | — | _empty (gate off)_ | First mobile release |
+| 4.0.0 | `v3.9.6` | v4 runtime config (`client`, `branding`, `mobile`) | — | _empty (gate off)_ | Reviewed mobile baseline v3.9.6 |
 
 ## How to read / maintain
 
@@ -19,7 +19,7 @@
 - **Min. backend API contract** notes which backend runtime-config fields the app relies on, so
   a backend deploy never silently breaks a released app.
 - **OTA bundle** is the latest Capgo web-asset bundle shipped on top of this store build
-  (conforming changes only — see `OTA_POLICY.md`, Epic 8).
+  through the self-hosted service (conforming changes only — see `OTA_POLICY.md`, Epic 8).
 - **Min. supported app version** is the value the backend emits in runtime config; apps below it
   get the blocking "please update" screen. _Empty = gate disabled_ (the default), so no install is
   ever blocked until an operator sets a value.
@@ -32,19 +32,24 @@ version it already advertises in the User-Agent.
 - **Config source:** BCONFIG group `MOBILE` (ownerId `0`), editable in Admin → System Config →
   *Mobile App*:
   - `MIN_APP_VERSION` — minimum supported version (e.g. `4.0` or `4.1.2`); empty disables the gate.
+  - `UPDATE_ENFORCE_AFTER` — optional ISO-8601 grace-period deadline; invalid or future values
+    fail open, and empty means immediate enforcement after `MIN_APP_VERSION` is set.
   - `IOS_APP_URL` / `ANDROID_APP_URL` — store links for the update button.
 - **Backend:** `App\Service\Client\MobileVersionService` compares the parsed UA version
   (`ClientContext`, Epic 2) against `MIN_APP_VERSION` with PHP `version_compare`.
 - **Runtime config:** `GET /api/config/runtime-config` returns a `mobile` block:
-  `{ minVersion, updateRequired, iosAppUrl, androidAppUrl }`. `updateRequired` is computed
-  server-side (only ever `true` for a mobile client below the minimum).
+  `{ minVersion, updateRequired, updateEnforceAfter, iosAppUrl, androidAppUrl }`.
+  `updateRequired` is computed server-side only after the grace-period deadline.
 - **Frontend:** `ForceUpdateScreen.vue` shows a blocking overlay when `isNativeApp()` **and**
-  `config.mobile.updateRequired`; the CTA deep-links to the platform store URL.
+  `config.mobile.updateRequired` and a store URL are available; the CTA deep-links to that URL.
 
 ## Update procedure (per release)
 
-1. Tag the `synaplan` platform release.
-2. Pin this app's submodule to that exact tag.
+1. Tag the reviewed `synaplan` platform release.
+2. Confirm that the tag contains the approved mobile seams, then pin this app's submodule to that
+   exact tag.
 3. Bump the app version + `versionCode`/`CFBundleVersion`.
-4. Add a new row here; set the new min-supported version if there is a breaking API change.
-5. Reference this table in `docs/RELEASE_GATE_v4.md` (Epic 11).
+4. Build the app schemas from the same reviewed OpenAPI contract as the pin and verify parity.
+5. Add a new row here. Only after the store version is available, set the minimum version and a
+   grace-period deadline for a genuine security or API incompatibility.
+6. Reference this table in `docs/RELEASE_GATE_v4.md` (Epic 11).

@@ -25,6 +25,10 @@ make -C frontend lint && docker compose exec -T frontend npm run check:types && 
 
 **Legend:** ✅ automated & wired · 🟡 partially automated · 🧪 manual / device-gated · ⏳ not built yet.
 
+For any backend OpenAPI change, regenerate the frontend schemas through the platform path and the
+app build path, then verify that both consume the same reviewed specification. A successful build
+against a different live schema is not parity.
+
 ## Standing regression (applies to every submodule epic)
 
 **Default-safety / blast radius (gates 2 + 5).** An *unconfigured* web/self-host deployment
@@ -33,6 +37,9 @@ pre-program baseline**. This is the non-negotiable test behind every Aspect epic
 is enforced by [Epic 13](../planning/planning_13_synaplan_encapsulation.md) + the AI logic
 review. Diff the submodule against the pinned baseline tag; the changed-file set must equal
 the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
+
+The reviewed `v3.9.6` baseline contains the approved mobile seams. Diff future platform tags
+against it and re-run both repositories' complete gates before changing the app pin.
 
 ## Per-epic matrix
 
@@ -55,15 +62,15 @@ the `docs/SYNAPLAN_BLAST_RADIUS.md` registry — nothing more.
 | **6 Assets (Aspect 4)** | Icon/splash set renders on real devices (incl. Android adaptive, dark); clean clone not missing favicons; brand color consistent | 1,2 | 🧪 device home-screen; 🟡 clean-clone build check |
 | **7 Native features** | Camera/file/mic/download/share on device; permission-denial degrades (no crash); token in Keychain/Keystore; offline recovers | 2,5 | 🧪 device + **security review (token storage, never logged)** |
 | **7 Native features** | iOS purpose strings present (missing → crash/reject); reCAPTCHA works under `capacitor://`; no white screen | 1,3 | ✅ `Info.plist` purpose-string + well-formedness check (`tests/native-manifests.test.mjs`); 🧪 reCAPTCHA/device |
-| **8 OTA / forced update** | OTA bundle delivered + applied on restart; rollback works; min-version gate blocks too-old then allows | 2,5 | 🧪 device rollout + **"no payment/behavior logic via OTA" AI review** |
+| **8 OTA / forced update** | Self-hosted Capgo delivers the OTA bundle; staged rollout + rollback work; min-version gate blocks too-old then allows | 2,5 | 🧪 device rollout + verified self-hosted upload target + **"no payment/behavior logic via OTA" AI review** |
 | **8 OTA** | `COMPATIBILITY.md` current; `OTA_POLICY.md` exists | 4,5 | ✅ docs present |
 | **9 Store compliance** | In-app account deletion (+ web link for Google); anti-steering verified; restore + manage-via-store present | 2,5 | 🧪 reviewer path (9.4/9.5 code-complete) + AI store-policy review |
 | **9 Store compliance** | Build with valid `PrivacyInfo.xcprivacy` (incl. all SDK manifests) passes upload; privacy/data-safety labels accurate | 3 | 🟡 app-level `PrivacyInfo` structure + well-formedness checked (`tests/native-manifests.test.mjs`); 🧪 SDK-manifest completeness + upload-rejection test (device/account-gated) |
 | **10.1 Build env + versioning** | One env switch → correct bundle id + auto-incremented version per env; version single-sourced | 1,3 | ✅ `npm run ci-local` (`tests/app-config.test.mjs`) + verified on Android emu + iOS build settings |
-| **10.2 Signing** | One command per platform → signed build for a chosen env | — | ⏳ account/sign-off-gated |
+| **10.2 Signing** | One command per platform → signed build for a chosen env | 1,3 | ✅ protected `store-rc.yml`; first credentialed run remains account-gated |
 | **10.3 Crash reporting** | Test crash reaches the dashboard | — | ⏳ vendor decision pending (params decided) |
 | **10.4 Store listings** | Metadata + screenshots in de/en/es/tr | 4 | ⏳ assets/account-gated |
-| **10.5 Beta/CI** | Live on TestFlight + Play Internal; auth + IAP green in release tracks | 1–5 | ⏳ gated (CI needs sign-off) |
+| **10.5 Beta/CI** | Live on TestFlight + Play Internal; auth + IAP green in release tracks | 1–5 | ✅ automated upload to TestFlight Internal + Play Internal; device/account smoke remains gated |
 | **11 Stabilization** | Must-fix bugs closed; all four Aspects no-op for web; full gates green; release-gate checklist complete | 1–5 | ⏳ final gate (reads this matrix + `COMPATIBILITY.md`) |
 | **12 Quality gates** | App `ci-local` + submodule make gate cover gates 1–4; AI review recorded on every PR | 1,2,3,4,5 | ✅ app gate (1 lint+typecheck, 3 parse, 4 format); ✅ gate-2 Maestro flows authored + integrity-guarded; Android run **3/3 green**, iOS shell manually verified (Maestro-iOS WebView limit) |
 | **13 Encapsulation** | Blast-radius registry == actual changed files; every seam guarded + default-safe | 5 | ✅ `SYNAPLAN_BLAST_RADIUS.md` + AI review |

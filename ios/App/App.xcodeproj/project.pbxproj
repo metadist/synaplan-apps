@@ -30,6 +30,7 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		7A1F0001AABBCCDD00000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		AF10A7C02E5F00010000AF01 /* Synaplan.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Synaplan.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +73,7 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				7A1F0001AABBCCDD00000001 /* PrivacyInfo.xcprivacy */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
+				AF10A7C02E5F00010000AF01 /* Synaplan.storekit */,
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
@@ -300,7 +302,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 45;
+				CURRENT_PROJECT_VERSION = 67;
+				DEVELOPMENT_TEAM = X9GM4T2MQG;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -322,7 +325,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 45;
+				CURRENT_PROJECT_VERSION = 67;
+				DEVELOPMENT_TEAM = X9GM4T2MQG;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
