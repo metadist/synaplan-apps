@@ -1,0 +1,1 @@
+İlk v4.0 sürümü: yerel iOS uygulaması — önde gelen yapay zeka modelleri ve kendi belgelerinle sohbet, sesli giriş, görsel üretimi, koyu mod ve sunucu bazlı oturum açma.

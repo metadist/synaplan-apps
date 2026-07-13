@@ -1,0 +1,1 @@
+First v4.0 release: chat with leading AI models and your own documents, voice input, image generation, dark mode, and per-server sign-in.

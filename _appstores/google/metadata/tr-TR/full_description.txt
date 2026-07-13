@@ -1,0 +1,26 @@
+Synaplan; önde gelen yapay zeka modelleriyle VE kendi bilginle konuşan özel yapay zeka asistanın.
+
+Soruları günlük dille sor ve yalnızca modelin eğitildiği bilgilere değil, kendi belgelerine
+dayanan yanıtlar al. Dosyaları bilgi klasörlerine yükle ve onlarla sohbet et: raporlar,
+kılavuzlar, notlar, araştırmalar — kaynaklarıyla birlikte.
+
+NEDEN SYNAPLAN
+• Tek asistan, çok model — göreve uygun yapay zekayı seç.
+• Belgelerinle sohbet (RAG): dosya yükle ve hepsine birden sor.
+• Sesli giriş: yazmak yerine dikte et.
+• Görsel üretimi: doğrudan sohbette görsel oluştur.
+• Çalışma şekline uygun araçlar ve bilgi klasörleri.
+• Tasarımı gereği özel: verilerin senin seçtiğin sunucudan geçer.
+
+SENİN İÇİN
+• Synaplan.com'a ya da kendi barındırdığın Synaplan sunucusuna bağlan — verilerinin nerede
+  olacağına sen karar ver.
+• Sade, hızlı, yerel deneyim: koyu mod, çevrimdışı bildirimi, sonuçları paylaş ve kaydet.
+• Türkçe, İngilizce, Almanca ve İspanyolca mevcut.
+
+ABONELİKLER
+Ücretsiz başla. İsteğe bağlı abonelikler daha fazla kullanım ve gelişmiş özellikler açar; Google
+Play hesabın üzerinden faturalandırılır. İstediğin zaman hesap ayarlarından yönet veya iptal et.
+
+Synaplan esnek ve açıktır: platform markalanabilir ve kendi sunucunda barındırılabilir; aynı
+uygulama hem Synaplan.com hem de kendi yapay zeka platformun için çalışır.

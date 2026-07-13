@@ -1,0 +1,28 @@
+Synaplan ist dein privater KI-Assistent, der mit führenden KI-Modellen UND deinem eigenen Wissen
+spricht.
+
+Stelle Fragen in normaler Sprache und erhalte Antworten, die auf deinen eigenen Dokumenten
+beruhen – nicht nur auf dem Trainingswissen des Modells. Lade Dateien in Wissensordner und
+chatte mit ihnen: Berichte, Handbücher, Notizen, Recherchen – inklusive der Quellen.
+
+WARUM SYNAPLAN
+• Ein Assistent, viele Modelle – wähle die KI, die zur Aufgabe passt.
+• Chatte mit deinen Dokumenten (RAG): Dateien hochladen und übergreifend fragen.
+• Spracheingabe: diktieren statt tippen.
+• Bildgenerierung: Visuals direkt im Chat erstellen.
+• Tools & Wissensordner für deine Arbeitsweise.
+• Privat by Design: deine Daten laufen über den Server deiner Wahl.
+
+FÜR DICH GEMACHT
+• Verbinde dich mit Synaplan.com oder deinem eigenen, selbst gehosteten Synaplan-Server – du
+  entscheidest, wo deine Daten liegen.
+• Klar, schnell, nativ: Dark Mode, Offline-Hinweise, Ergebnisse teilen und speichern.
+• Verfügbar auf Deutsch, Englisch, Spanisch und Türkisch.
+
+ABOS
+Kostenlos starten. Optionale Abos schalten mehr Nutzung und erweiterte Funktionen frei,
+abgerechnet über dein Google-Play-Konto. Jederzeit in den Kontoeinstellungen verwalten oder
+kündigen.
+
+Synaplan ist flexibel und offen: Die Plattform ist brandbar und selbst hostbar – dieselbe App
+funktioniert für Synaplan.com und für deine eigene KI-Plattform.

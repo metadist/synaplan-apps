@@ -1,0 +1,1 @@
+Erstes v4.0-Release: chatte mit führenden KI-Modellen und deinen Dokumenten, Spracheingabe, Bildgenerierung, Dark Mode und Anmeldung pro Server.

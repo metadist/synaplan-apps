@@ -1,0 +1,1 @@
+ia,chat,asistente,conocimiento,documentos,rag,notas,voz,imagenes,productividad,buscar,archivos

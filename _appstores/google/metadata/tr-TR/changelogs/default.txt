@@ -1,0 +1,1 @@
+İlk v4.0 sürümü: önde gelen YZ modelleri ve kendi belgelerinle sohbet, sesli giriş, görsel üretimi, koyu mod ve sunucu bazlı oturum açma.

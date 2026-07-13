@@ -183,6 +183,14 @@ android/capacitor-cordova-android-plugins/
 .maestro/artifacts/
 
 # ──────────────────────────────────────────────────────────────────────────
+# App store release area (_appstores/)
+# The public part (icons, screenshots, listing texts) IS committed.
+# _appstores/.local/ holds certificates, keys, passwords, account notes —
+# NEVER committed (see docs/SECRETS.md and _appstores/README.md).
+# ──────────────────────────────────────────────────────────────────────────
+_appstores/.local/
+
+# ──────────────────────────────────────────────────────────────────────────
 # Secrets & signing (NEVER commit — see docs/SECRETS.md)
 # ──────────────────────────────────────────────────────────────────────────
 *.keystore

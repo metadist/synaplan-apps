@@ -1,0 +1,28 @@
+Synaplan es tu asistente de IA privado que habla con los mejores modelos de IA Y con tu propio
+conocimiento.
+
+Haz preguntas en lenguaje natural y obtén respuestas basadas en tus propios documentos, no solo
+en lo que el modelo aprendió. Sube archivos a carpetas de conocimiento y chatea con ellos:
+informes, manuales, notas, investigaciones, con sus fuentes.
+
+POR QUÉ SYNAPLAN
+• Un asistente, muchos modelos: elige la IA adecuada para cada tarea.
+• Chatea con tus documentos (RAG): sube archivos y pregunta sobre todos ellos.
+• Entrada por voz: dicta en lugar de escribir.
+• Generación de imágenes: crea visuales dentro del chat.
+• Herramientas y carpetas de conocimiento para tu forma de trabajar.
+• Privado por diseño: tus datos pasan por el servidor que elijas.
+
+HECHO PARA TI
+• Conéctate a Synaplan.com o a tu propio servidor Synaplan autoalojado: tú decides dónde están
+  tus datos.
+• Experiencia nativa, clara y rápida: modo oscuro, aviso sin conexión, compartir y guardar
+  resultados.
+• Disponible en español, inglés, alemán y turco.
+
+SUSCRIPCIONES
+Empieza gratis. Las suscripciones opcionales desbloquean más uso y funciones avanzadas, con cargo
+a tu cuenta de Google Play. Gestiona o cancela cuando quieras en los ajustes de tu cuenta.
+
+Synaplan es flexible y abierto: la plataforma es personalizable y autoalojable, así que la misma
+app sirve para Synaplan.com y para tu propia plataforma de IA.

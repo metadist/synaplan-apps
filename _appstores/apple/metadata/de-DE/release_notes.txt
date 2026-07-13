@@ -1,0 +1,1 @@
+Erstes v4.0-Release: native iOS-App – chatte mit führenden KI-Modellen und deinen eigenen Dokumenten, Spracheingabe, Bildgenerierung, Dark Mode und Anmeldung pro Server.
