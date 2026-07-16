@@ -56,6 +56,11 @@ The environment is selected at build time (Epic 10) together with the API/WS bas
 
 | Field | Value |
 |-------|-------|
-| Apple Developer Team ID | _TODO_ |
-| Apple App Store Connect app ID (SKU/Apple ID) | _TODO (created in Epic 10)_ |
+| Apple Developer account (legal entity) | metadist data management GmbH |
+| Apple Developer Team ID | `X9GM4T2MQG` |
+| Apple App Store Connect app ID (Apple ID) | `6784278288` |
+| Apple App Store Connect SKU | `synaplanai` |
 | Google Play developer account ID | _TODO_ |
+
+> ASC API key details (Issuer ID, Key ID) and the `.p8` file are secret-adjacent and live only in
+> `_appstores/.local/` per `docs/SECRETS.md` — never in this tracked file.
