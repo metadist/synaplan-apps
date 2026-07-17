@@ -1,0 +1,1 @@
+@keyframes float-a339f3b5{0%,to{transform:translateY(0)}50%{transform:translateY(-20px)}}@keyframes float-delayed-a339f3b5{0%,to{transform:translateY(0)}50%{transform:translateY(20px)}}.animate-float[data-v-a339f3b5]{animation:6s ease-in-out infinite float-a339f3b5}.animate-float-delayed[data-v-a339f3b5]{animation:8s ease-in-out infinite float-delayed-a339f3b5}

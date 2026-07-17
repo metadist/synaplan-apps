@@ -1,0 +1,52 @@
+{
+	"appId": "com.synaplan.app",
+	"appName": "Synaplan",
+	"appendUserAgent": "Synaplan Mobile V4.0",
+	"webDir": "synaplan/frontend/dist",
+	"ios": {
+		"contentInset": "never"
+	},
+	"android": {
+		"allowMixedContent": false
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1500,
+			"launchAutoHide": true,
+			"backgroundColor": "#003fc7",
+			"androidScaleType": "CENTER_CROP",
+			"showSpinner": false,
+			"splashFullScreen": true,
+			"splashImmersive": false
+		},
+		"Keyboard": {
+			"resize": "none",
+			"resizeOnFullScreen": true
+		},
+		"CapacitorUpdater": {
+			"defaultChannel": "production",
+			"autoUpdate": true,
+			"resetWhenUpdate": true,
+			"directUpdate": false,
+			"appReadyTimeout": 10000,
+			"autoDeleteFailed": true,
+			"autoDeletePrevious": true
+		}
+	},
+	"packageClassList": [
+		"BiometricAuthNative",
+		"SecureStorage",
+		"SignInWithApple",
+		"AppPlugin",
+		"CAPBrowserPlugin",
+		"FilesystemPlugin",
+		"HapticsPlugin",
+		"KeyboardPlugin",
+		"CAPNetworkPlugin",
+		"SharePlugin",
+		"SplashScreenPlugin",
+		"StatusBarPlugin",
+		"CapacitorUpdaterPlugin",
+		"CDVPlugin"
+	]
+}

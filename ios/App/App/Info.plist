@@ -22,6 +22,12 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Export compliance: the app uses only standard, exempt encryption (HTTPS/TLS
+	     via the system stack). Declaring this here lets TestFlight/App Store builds
+	     skip the per-build "Missing Compliance" prompt. Set to true only if the app
+	     ever ships proprietary/non-exempt cryptography. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

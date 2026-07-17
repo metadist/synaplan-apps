@@ -1,0 +1,1 @@
+@keyframes bounce-slow-7471918d{0%,to{transform:translateY(0)}50%{transform:translateY(-20px)}}@keyframes float-7471918d{0%,to{transform:translateY(0)rotate(0)}50%{transform:translateY(-15px)rotate(5deg)}}.animate-bounce-slow[data-v-7471918d]{animation:3s ease-in-out infinite bounce-slow-7471918d}.animate-float[data-v-7471918d]{animation:4s ease-in-out infinite float-7471918d}
