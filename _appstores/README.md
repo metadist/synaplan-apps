@@ -76,6 +76,25 @@ Suggested caption flow (≤ ~6 words each, localized — see `docs/STORE_LISTING
 Capture raw shots into `source/raw-screenshots/`, then export framed/captioned finals into the
 per-locale store folders. Screenshots without in-image text can be reused across locales.
 
+### Screenshot naming convention
+
+Store-ready files are named `NN-slug.png` inside their locale/device folder — the alphabetical
+order **is** the App Store display order, so the number prefix controls the storefront sequence
+(fastlane `deliver` uploads in filename order):
+
+```
+apple/screenshots/<locale>/<device>/NN-slug.png
+  NN     two-digit order (01 = first/hero shot, gapless)
+  slug   short kebab-case content tag (chat-home, files, memories, ...)
+
+e.g. apple/screenshots/de-DE/iphone-6.9/01-chat-home.png
+```
+
+Raw, unprocessed captures keep the same `NN-slug` plus their real pixel size so the source
+device class stays obvious: `source/raw-screenshots/<locale>/<capture-set>/NN-slug-WxH.png`.
+Uncategorized one-off captures go to `source/raw-screenshots/unsorted/`. Apple accepts max
+**10 screenshots per locale** — if a folder holds more, the surplus must be dropped before upload.
+
 ## `.local/` — private, never committed
 
 `_appstores/.local/` is excluded via `.gitignore` (plus the repo-wide `*.p8`/`*.p12`/
@@ -91,10 +110,13 @@ is fully ignored, recreate it after a fresh clone with `mkdir -p _appstores/.loc
 
 ## Status / TODO
 
-- [ ] Export `apple/icon/app-store-icon-1024.png` from the master in `assets/`
-- [ ] Export `google/icon/play-icon-512.png` from the master
+- [x] Export `apple/icon/app-store-icon-1024.png` from the master (white bird on `#003fc7`,
+      rendered from `source/masters/single_bird.svg`, 1024×1024 PNG, no alpha)
+- [x] Export `google/icon/play-icon-512.png` from the master (512×512, 32-bit PNG with alpha)
 - [ ] Design `google/feature-graphic/feature-graphic-1024x500.png`
-- [ ] Produce iPhone 6.9" screenshot sets (en, de, es, tr)
+- [x] Produce iPhone 6.9" screenshot set **de-DE** (12 candidates in
+      `apple/screenshots/de-DE/iphone-6.9/` — trim to ≤10 before upload)
+- [ ] Produce iPhone 6.9" screenshot sets (en, es, tr)
 - [ ] Decide iPad support → produce 13" set if yes (see `docs/STORE_LISTINGS.md` open points)
 - [ ] Produce Play phone screenshot sets (en, de, es, tr)
 - [ ] Confirm support / privacy-policy / terms URLs (Epic 9.3) and add them to the metadata
