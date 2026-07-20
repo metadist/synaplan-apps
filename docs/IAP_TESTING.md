@@ -20,8 +20,7 @@ no network calls to Apple.
 | Product IDs (match the backend defaults) | `com.synaplan.app.pro.monthly`, `.team.monthly`, `.business.monthly` |
 
 The `.storekit` prices mirror the server's `appPrice` (web price + the
-`IAP_PRICE_MARKUP_PERCENT` store-commission markup, default 30 %, snapped to
-the nearest x.99 store price point): €25.99 / €64.99 / €129.99. In-app prices
+`IAP_STORE_PRICE_*` EUR catalogue, must match ASC): €24.99 / €64.99 / €129.99. In-app prices
 are ALWAYS the marked-up ones — the plain web price is never shown in the app
 (anti-steering); see `synaplan/docs/PAYMENTS_CHANNELS.md`.
 
