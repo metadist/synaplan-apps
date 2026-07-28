@@ -8,7 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.0 | `v4.0.2` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering | — | _empty (gate off)_ | Apple-compliance baseline (PR #1356). First store-submission pin; supersedes the never-released v3.9.6 baseline. Apple provider is code-complete but stays hidden until the prod `APPLE_*` env is set. |
+| 4.0.0 | `e9f4cb6fca4f28cb658afab9983b60826c97acc4` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering | — | _empty (gate off)_ | Temporary development SHA pin (synaplan PR #1383, auth-first onboarding purchase); replace with the release tag once merged. |
 
 ## How to read / maintain
 
