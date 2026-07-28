@@ -8,7 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.0 | `29e3b8451ead947d90f3fbf11317f5bf1cef4431` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering | — | _empty (gate off)_ | Reviewed mobile baseline 29e3b8451ead947d90f3fbf11317f5bf1cef4431 |
+| 4.0.0 | `adea0218a8472f95f459ff17dbdc2c72b7841f2a` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering | — | _empty (gate off)_ | Reviewed mobile baseline adea0218a8472f95f459ff17dbdc2c72b7841f2a |
 
 ## How to read / maintain
 
