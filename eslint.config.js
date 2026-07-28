@@ -8,7 +8,17 @@ import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
   {
-    ignores: ['ios/**', 'android/**', 'synaplan/**', 'node_modules/**', '**/dist/**'],
+    // `build/` + `build-*/` are local xcodebuild output (archives contain a copy
+    // of the bundled SPA); linting them would drown the gate in generated code.
+    ignores: [
+      'ios/**',
+      'android/**',
+      'synaplan/**',
+      'node_modules/**',
+      '**/dist/**',
+      'build/**',
+      'build-*/**',
+    ],
   },
   js.configs.recommended,
   // TypeScript (light, non type-aware — tsc handles the typecheck in `npm run typecheck`).

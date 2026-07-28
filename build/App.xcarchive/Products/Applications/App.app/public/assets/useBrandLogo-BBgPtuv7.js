@@ -1,1 +1,0 @@
-import{K as e,j as t}from"./vendor-charts-DKarJFL8.js";import{n}from"./config-c_edy8Xn.js";e();function r(e){let r=n();return{logoSrc:t(()=>(e.value?r.branding.logoDarkUrl:r.branding.logoUrl)||`/${e.value?`synaplan-light.svg`:`synaplan-dark.svg`}`)}}export{r as t};

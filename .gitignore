@@ -163,8 +163,12 @@ ios/capacitor-cordova-ios-plugins/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 
-# Local xcodebuild -derivedDataPath output (e.g. build-sim/, build-device/)
+# Local xcodebuild output: -derivedDataPath (build-sim/, build-device/) and the
+# archive/export directory. Release archives are built in CI under RUNNER_TEMP;
+# a local .xcarchive carries the signed binary, dSYMs and the signing identity
+# and must never be committed.
 build-*/
+build/
 
 # Android
 android/.gradle/
