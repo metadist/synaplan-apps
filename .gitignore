@@ -212,3 +212,4 @@ keystore.properties
 # Capgo OTA signing private key (Epic 8) — public key is committed in capacitor.config.ts
 .capgo_key
 .capgo_key_v2
+ios/App/App.xcodeproj/project.pbxproj
