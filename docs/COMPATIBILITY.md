@@ -10,6 +10,20 @@
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
 | 4.0.0 | `adea0218a8472f95f459ff17dbdc2c72b7841f2a` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering | — | _empty (gate off)_ | Reviewed mobile baseline adea0218a8472f95f459ff17dbdc2c72b7841f2a |
 
+## Pending pin change
+
+The first-run onboarding is reduced to the welcome page: the "get started" CTA enters the chat as
+a guest, and the plans (paywall), account and purchase steps are removed. Purchasing and the
+Apple-required "Restore purchases" path stay on `/subscription`.
+
+- Platform change: [metadist/synaplan#1405](https://github.com/metadist/synaplan/pull/1405),
+  branched off `main` (`v4.0.6-18-ga3673ba8c`).
+- Release classification: **store-required** — the IAP entry point and purchase behavior change,
+  so this must never ship as an OTA bundle.
+- The pin stays at the baseline above until that pull request is merged. Moving to the merged
+  `main` state also picks up the platform work landed since `v4.0.2-29`, so the submodule diff and
+  its `MOBILE-APP SEAM` markers need a full review before the pin moves, followed by a new row here.
+
 ## How to read / maintain
 
 - **App version** is the human `MAJOR.MINOR.PATCH` carried in the WebView User-Agent (Epic 2)

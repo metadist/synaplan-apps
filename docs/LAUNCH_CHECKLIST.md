@@ -117,7 +117,7 @@ Requires real iOS + Android devices (and beta tracks). Cannot be done from the e
 - [ ] 🧪 Confirm OTA cannot/does not alter IAP/payment flows (policy check).
 
 ### Payments / IAP (Epic 5)
-- [x] 🤖 **5.3 native IAP frontend — code done.** `cordova-plugin-purchase` + `cordova-plugin-purchase-storekit2` installed and synced (SPM); the SPA's `nativeIap.ts` wires purchase + "Restore purchases" into `SubscriptionView.vue` and store prices into onboarding, all verified via `POST /api/v1/iap/verify`. **iOS Simulator testing works today** with the checked-in StoreKit config (`ios/App/App/Synaplan.storekit` + shared `App` scheme + backend `IAP_APPLE_ENVIRONMENT=Xcode`) — see `docs/IAP_TESTING.md`. Device/sandbox QA below still needs real store products.
+- [x] 🤖 **5.3 native IAP frontend — code done.** `cordova-plugin-purchase` + `cordova-plugin-purchase-storekit2` installed and synced (SPM); the SPA's `nativeIap.ts` wires purchase + "Restore purchases" into `SubscriptionView.vue`, all verified via `POST /api/v1/iap/verify`. The first-run onboarding no longer offers plans or a restore affordance — both live on the subscription page. **iOS Simulator testing works today** with the checked-in StoreKit config (`ios/App/App/Synaplan.storekit` + shared `App` scheme + backend `IAP_APPLE_ENVIRONMENT=Xcode`) — see `docs/IAP_TESTING.md`. Device/sandbox QA below still needs real store products.
 - [ ] 🧪 Sandbox IAP purchase grants tier **only after server validation**, bound to the user.
 - [ ] 🧪 "Restore purchases" + "manage subscription" work.
 - [ ] 🧪 **Cross-channel block**: active Stripe-web user cannot buy via IAP, and vice-versa.
