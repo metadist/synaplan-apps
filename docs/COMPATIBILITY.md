@@ -8,22 +8,30 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.0 | `0a833bb0667e7b86559fcfcc9f1132f51dc5c108` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering | — | _empty (gate off)_ | **Development pin, not releasable** — single-page onboarding under review (see below). Previous reviewed baseline: adea0218a8472f95f459ff17dbdc2c72b7841f2a |
+| 4.0.0 | `b62f1b563bc79b8a3d331c292e40bb95864c45f3` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | **Development pin, not releasable** — single-page onboarding + subscription paywall under review (see below). Previous reviewed baseline: adea0218a8472f95f459ff17dbdc2c72b7841f2a |
 
 ## Temporary development pin — NOT releasable
 
-The pin currently points at `0a833bb0667e7b86559fcfcc9f1132f51dc5c108`
-(`v4.0.6-19-g0a833bb06`), the head of the unmerged branch `feat/onboarding-single-page`. It exists
+The pin currently points at `b62f1b563bc79b8a3d331c292e40bb95864c45f3`
+(`v4.0.6-23-gb62f1b563`), the head of the unmerged branch `feat/onboarding-single-page`. It exists
 so the change can be verified on a local simulator and **must not** be used for a store build.
 
-The first-run onboarding is reduced to the welcome page: the "get started" CTA enters the chat as
-a guest, and the plans (paywall), account and purchase steps are removed. Purchasing and the
-Apple-required "Restore purchases" path stay on `/subscription`.
+It carries two changes:
+
+1. The first-run onboarding is reduced to the welcome page: the "get started" CTA enters the chat
+   as a guest, and the plans, account and purchase steps are removed.
+2. A subscription paywall opens when an allowance is spent — the guest trial, or a monthly quota
+   for a paying tier — and as a reminder for guests and free accounts at most once every 24 hours.
+   It is full-screen in the app and centered on the web, always dismissable, and shows only store
+   prices with IAP purchase and a "Restore purchases" entry inside the app.
 
 - Platform change: [metadist/synaplan#1405](https://github.com/metadist/synaplan/pull/1405),
   branched off `main` (`v4.0.6-18-ga3673ba8c`).
-- Release classification: **store-required** — the IAP entry point and purchase behavior change,
+- Release classification: **store-required** — the IAP entry points and purchase behavior change,
   so this must never ship as an OTA bundle.
+- Guests can now reach the plan catalogue before signing in, so the app calls the public
+  `GET /api/v1/subscription/plans` without a Bearer token. A purchase still requires an account:
+  the paywall routes a guest through sign-up and resumes on `/subscription?plan=<tier>`.
 - This pin also moves the platform state forward from the `v4.0.2-29` baseline, so the submodule
   diff and its `MOBILE-APP SEAM` markers still need a full review.
 - Before a release: merge the pull request, re-pin to the reviewed tag or merge commit, and add a

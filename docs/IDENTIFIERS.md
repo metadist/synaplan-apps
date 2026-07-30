@@ -50,7 +50,7 @@ The environment is selected at build time (Epic 10) together with the API/WS bas
 
 - **Repo:** `synaplan` (public) via **HTTPS** (`https://github.com/metadist/synaplan.git`).
 - **Path:** `./synaplan`
-- **Current development pin:** `0a833bb0667e7b86559fcfcc9f1132f51dc5c108` (exact SHA; never a moving
+- **Current development pin:** `b62f1b563bc79b8a3d331c292e40bb95864c45f3` (exact SHA; never a moving
   branch). Temporary — the head of the unmerged single-page onboarding branch, kept only for local
   verification. Re-pin to the reviewed tag before a release; see `docs/COMPATIBILITY.md`.
 
