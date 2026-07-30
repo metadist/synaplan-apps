@@ -8,7 +8,33 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.0 | `adea0218a8472f95f459ff17dbdc2c72b7841f2a` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering | — | _empty (gate off)_ | Reviewed mobile baseline adea0218a8472f95f459ff17dbdc2c72b7841f2a |
+| 4.0.0 | `d09c21d137cb80fd77899307e475443be595c9e7` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Single-page onboarding + subscription paywall, merged to `synaplan` `main` (see below). Not yet tagged, so **not releasable** as-is. Previous reviewed baseline: adea0218a8472f95f459ff17dbdc2c72b7841f2a |
+
+## Untagged `main` pin — review complete, release still pending
+
+The pin points at `d09c21d137cb80fd77899307e475443be595c9e7` (`v4.0.6-19-gd09c21d13`), the merge of
+[metadist/synaplan#1405](https://github.com/metadist/synaplan/pull/1405) on `main`. The change is
+reviewed and merged, so this is no longer a moving development pin — but it carries no release tag
+yet, and `AGENTS.md` requires a reviewed tag for a store build.
+
+It carries two changes:
+
+1. The first-run onboarding is reduced to the welcome page: the "get started" CTA enters the chat
+   as a guest, and the plans, account and purchase steps are removed.
+2. A subscription paywall opens when an allowance is spent — the guest trial, or a monthly quota
+   for a paying tier — and as a reminder for guests and free accounts at most once every 24 hours.
+   It is full-screen in the app and centered on the web, always dismissable, and shows only store
+   prices with IAP purchase and a "Restore purchases" entry inside the app.
+
+- Release classification: **store-required** — the IAP entry points and purchase behavior change,
+  so this must never ship as an OTA bundle.
+- Guests can now reach the plan catalogue before signing in, so the app calls the public
+  `GET /api/v1/subscription/plans` without a Bearer token. A purchase still requires an account:
+  the paywall routes a guest through sign-up and resumes on `/subscription?plan=<tier>`.
+- This pin also moves the platform state forward from the `v4.0.2-29` baseline, so the submodule
+  diff and its `MOBILE-APP SEAM` markers still need a full review.
+- Before a release: tag the reviewed `synaplan` release, re-pin to that tag, and add a new matrix
+  row above.
 
 ## How to read / maintain
 
