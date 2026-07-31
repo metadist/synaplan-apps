@@ -100,12 +100,22 @@ Create the environments `canary`, `production` and `store-qa` under
 <https://github.com/metadist/synaplan-apps/settings/environments> and fill them with the names
 listed in [`AUTOMATION.md`](./AUTOMATION.md#3-environments-in-synaplan-apps).
 
-Three things are easy to get wrong there:
+Our own deployment splits across three hostnames — the console you log into is not the API:
+
+| Purpose | Host |
+|---------|------|
+| Console (browser only) | `capgo.<domain>` |
+| Plugin API — `updates`, `stats`, `channel_self`, `statistics` | `api.capgo.<domain>` |
+| Supabase/Kong, the CLI's `--supa-host` | `sb.capgo.<domain>` |
+
+Four things are easy to get wrong there:
 
 - `CAPGO_CHANNEL` must be spelled exactly like the environment it sits in (`canary` or
   `production`). `ota.yml` refuses a mismatch.
-- `CAPGO_STATS_URL` and `CAPGO_STATS_API_URL` are different endpoints. The first is where the app
-  reports to, the second is where the health check reads from.
+- `CAPGO_STATS_URL` and `CAPGO_STATS_API_URL` are different endpoints. The first is `/stats`, where
+  the app reports to; the second is `/statistics`, where the health check reads from.
+- `CAPGO_API_KEY` needs **both** scopes in practice: uploading is a write operation, while
+  `/statistics` requires a read-scoped key. A pure upload key makes the health check fail.
 - The upload and statistics endpoints must answer from the public internet. The workflows run on
   GitHub-hosted machines, so an endpoint reachable only inside a private network will fail there.
 

@@ -83,13 +83,13 @@ the upload waits.
 | `CAPGO_API_KEY` | secret | Upload-scoped key of the self-hosted deployment |
 | `CAPGO_SUPA_ANON` | secret | Anonymous key that routes the CLI to the self-hosted backend |
 | `CAPGO_BUNDLE_PRIVATE_KEY` | secret | Bundle signing key; keep an encrypted offline backup |
-| `CAPGO_SUPA_HOST` | variable | Self-hosted Supabase host |
+| `CAPGO_SUPA_HOST` | variable | Self-hosted Supabase host, e.g. `https://sb.capgo.<domain>` |
 | `CAPGO_CHANNEL` | variable | **Must equal the environment name** — `ota.yml` refuses a mismatch |
-| `CAPGO_UPDATE_URL` | variable | Updater endpoint, HTTPS |
-| `CAPGO_CHANNEL_URL` | variable | Channel endpoint, HTTPS |
-| `CAPGO_STATS_URL` | variable | Statistics ingest endpoint the app reports to, HTTPS |
+| `CAPGO_UPDATE_URL` | variable | Updater endpoint, HTTPS, e.g. `https://api.capgo.<domain>/updates` |
+| `CAPGO_CHANNEL_URL` | variable | Channel endpoint, HTTPS, e.g. `https://api.capgo.<domain>/channel_self` |
+| `CAPGO_STATS_URL` | variable | Statistics ingest endpoint the app reports to, e.g. `https://api.capgo.<domain>/stats` |
 | `CAPGO_BUNDLE_PUBLIC_KEY` | variable | Counterpart of the signing key, compiled into the binary |
-| `CAPGO_STATS_API_URL` | variable | Statistics **query** endpoint for `ota-health.yml`; supports `{appId}` and `{bundle}` placeholders |
+| `CAPGO_STATS_API_URL` | variable | Statistics **query** root for `ota-health.yml`, e.g. `https://api.capgo.<domain>/statistics`; needs a read-scoped key. A value containing `{appId}` or `{bundle}` is used verbatim instead |
 
 `store-qa` (used by `store-rc.yml`):
 

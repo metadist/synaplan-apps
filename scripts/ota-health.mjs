@@ -3,76 +3,113 @@ import { fileURLToPath } from 'node:url'
 
 export const APP_ID = 'com.synaplan.app'
 
-const INSTALL_FIELDS = ['install', 'installs', 'success', 'succeeded']
-const FAILURE_FIELDS = ['fail', 'fails', 'failed', 'failures']
+/**
+ * Observes a published OTA bundle through Capgo's self-hosted statistics API.
+ *
+ * What that API can and cannot tell us decides the whole design here. The only
+ * per-bundle series it exposes is `GET /app/{appId}/bundle_usage`, built from
+ * the `daily_version` rollup: one row per day and version, counting the devices
+ * that reported in. There is no failure counter anywhere in the public API, and
+ * the granularity is a day, not a minute.
+ *
+ * So this module measures ADOPTION — how many devices actually run a bundle —
+ * and never claims to have measured a failure rate. That is still meaningful: a
+ * device that cannot start a bundle reverts itself within `appReadyTimeout` and
+ * reports the PREVIOUS version again. A bundle whose adoption stays at zero
+ * while other versions keep reporting is therefore the observable signature of a
+ * broken rollout.
+ *
+ * It is deliberately not the signature of a *slow* rollout being distinguished
+ * from a broken one: devices only check in when the app is foregrounded, so low
+ * adoption shortly after publishing is normal. `evaluateOtaHealth` only reaches
+ * `unhealthy` once enough devices reported on the observed day, which is why the
+ * workflow treats withdrawal as opt-in rather than the default.
+ */
 
-const sumField = (entry, fields) => {
-  for (const field of fields) {
-    const value = entry?.[field]
-    if (typeof value === 'number' && Number.isFinite(value)) return value
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Widest window the rollup can answer for; `from`/`to` are required by the API. */
+export function observationWindow(now = new Date(), days = 2) {
+  const to = new Date(now)
+  const from = new Date(now.getTime() - days * DAY_MS)
+  return { from: from.toISOString(), to: to.toISOString() }
+}
+
+/**
+ * Builds the statistics request.
+ *
+ * `base` is the statistics function root (for our deployment
+ * `https://api.<domain>/statistics`). A base carrying `{appId}` or `{bundle}` is
+ * substituted verbatim instead, so a deployment with a different API shape can
+ * be pointed at without changing this file.
+ */
+export function statisticsUrl(base, bundle, appId = APP_ID, window = observationWindow()) {
+  if (base.includes('{bundle}') || base.includes('{appId}')) {
+    return base.replaceAll('{bundle}', encodeURIComponent(bundle)).replaceAll('{appId}', appId)
+  }
+  const url = new URL(`${base.replace(/\/$/, '')}/app/${encodeURIComponent(appId)}/bundle_usage`)
+  url.searchParams.set('from', window.from)
+  url.searchParams.set('to', window.to)
+  return url.toString()
+}
+
+const lastPositive = (values) => {
+  if (!Array.isArray(values)) return 0
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    const value = values[index]
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
   }
   return 0
 }
 
-// The self-hosted statistics endpoint may answer with a single object or with a
-// row per day. Both are reduced to one pair of counters.
-export function extractCounts(payload) {
-  const rows = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.data)
-      ? payload.data
-      : [payload]
-  return rows.reduce(
-    (totals, row) => ({
-      installs: totals.installs + sumField(row, INSTALL_FIELDS),
-      failures: totals.failures + sumField(row, FAILURE_FIELDS),
-    }),
-    { installs: 0, failures: 0 }
-  )
+/**
+ * Reduces the Chart.js-shaped payload to "devices on the observed bundle" versus
+ * "devices reporting any version". `metaCounts` carries device counts; `data`
+ * carries percentages, so the counts are what we read.
+ */
+export function extractAdoption(payload, bundle) {
+  const datasets = Array.isArray(payload?.datasets) ? payload.datasets : []
+  let onBundle = 0
+  let total = 0
+  for (const dataset of datasets) {
+    const devices = lastPositive(dataset?.metaCounts)
+    total += devices
+    if (dataset?.label === bundle) onBundle += devices
+  }
+  return { onBundle, total }
 }
 
-export function evaluateOtaHealth({ installs, failures, minInstalls = 25, maxFailureRate = 0.05 }) {
-  const attempts = installs + failures
-  const failureRate = attempts === 0 ? 0 : failures / attempts
-  if (attempts < minInstalls) {
+export function evaluateOtaHealth({ onBundle, total, minDevices = 25 }) {
+  const share = total === 0 ? 0 : onBundle / total
+  if (total < minDevices) {
     return {
       status: 'inconclusive',
-      failureRate,
-      reason: `Only ${attempts} of ${minInstalls} update attempts observed so far.`,
+      share,
+      reason: `Only ${total} of ${minDevices} devices reported in so far; the rollup is daily, so this is expected shortly after publishing.`,
     }
   }
-  if (failureRate > maxFailureRate) {
+  if (onBundle === 0) {
     return {
       status: 'unhealthy',
-      failureRate,
-      reason: `${failures} of ${attempts} update attempts failed (${(failureRate * 100).toFixed(1)}%).`,
+      share,
+      reason: `${total} devices reported in and not one of them runs the bundle, which is what an on-device revert looks like.`,
     }
   }
   return {
     status: 'healthy',
-    failureRate,
-    reason: `${failures} of ${attempts} update attempts failed, within the accepted rate.`,
+    share,
+    reason: `${onBundle} of ${total} reporting devices run the bundle (${(share * 100).toFixed(1)}%).`,
   }
 }
 
-export function statisticsUrl(base, bundle, appId = APP_ID) {
-  if (base.includes('{bundle}')) {
-    return base.replaceAll('{bundle}', encodeURIComponent(bundle)).replaceAll('{appId}', appId)
-  }
-  const url = new URL(base)
-  url.searchParams.set('app_id', appId)
-  url.searchParams.set('version', bundle)
-  return url.toString()
-}
-
-async function fetchCounts({ base, bundle, apiKey }) {
+async function fetchAdoption({ base, bundle, apiKey }) {
   const response = await fetch(statisticsUrl(base, bundle), {
     headers: { authorization: apiKey, accept: 'application/json' },
   })
   if (!response.ok) {
     throw new Error(`Statistics endpoint answered ${response.status}`)
   }
-  return extractCounts(await response.json())
+  return extractAdoption(await response.json(), bundle)
 }
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
@@ -88,10 +125,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const bundle = value('bundle')
   const deadlineMinutes = Number(value('deadline-minutes', '20'))
   const intervalSeconds = Number(value('interval-seconds', '120'))
-  const options = {
-    minInstalls: Number(value('min-installs', '25')),
-    maxFailureRate: Number(value('max-failure-rate', '0.05')),
-  }
+  const options = { minDevices: Number(value('min-devices', '25')) }
 
   // Fail loudly instead of reporting a green health check nobody measured.
   if (!base || !apiKey || !bundle) {
@@ -102,23 +136,30 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
 
   const deadline = Date.now() + deadlineMinutes * 60_000
-  let result = { status: 'inconclusive', failureRate: 0, reason: 'No observation completed.' }
-  let counts = { installs: 0, failures: 0 }
+  let verdict = {
+    status: 'inconclusive',
+    share: 0,
+    reason: 'No statistics were returned within the observation window.',
+  }
 
   while (Date.now() < deadline) {
     try {
-      counts = await fetchCounts({ base, bundle, apiKey })
-      result = evaluateOtaHealth({ ...counts, ...options })
-      if (result.status !== 'inconclusive') break
+      verdict = evaluateOtaHealth({
+        ...(await fetchAdoption({ base, bundle, apiKey })),
+        ...options,
+      })
     } catch (error) {
-      result = { status: 'unknown', failureRate: 0, reason: error.message }
+      verdict = {
+        status: 'inconclusive',
+        share: 0,
+        reason: `Statistics unavailable: ${error.message}`,
+      }
     }
+    if (verdict.status !== 'inconclusive') break
     await sleep(intervalSeconds * 1000)
   }
 
-  console.log(`status=${result.status}`)
-  console.log(`installs=${counts.installs}`)
-  console.log(`failures=${counts.failures}`)
-  console.log(`failure_rate=${result.failureRate.toFixed(4)}`)
-  console.log(`reason=${result.reason}`)
+  console.log(`status=${verdict.status}`)
+  console.log(`share=${verdict.share.toFixed(4)}`)
+  console.log(`reason=${verdict.reason}`)
 }

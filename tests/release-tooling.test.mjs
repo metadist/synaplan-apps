@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { evaluateOtaHealth, extractCounts, statisticsUrl } from '../scripts/ota-health.mjs'
+import { evaluateOtaHealth, extractAdoption, statisticsUrl } from '../scripts/ota-health.mjs'
 import { collectDrift, scanNativeServerUrl } from '../scripts/release-drift.mjs'
 import { createReleaseRoute, readReleaseRoute } from '../scripts/release-route.mjs'
 import { classifyReleaseRoute, runReleaseDrill } from '../scripts/release-drill.mjs'
@@ -202,33 +202,52 @@ test('a native config that points at a dev server fails the release check', () =
   }
 })
 
-test('OTA health only withdraws a release on a measured failure rate', () => {
-  assert.equal(evaluateOtaHealth({ installs: 4, failures: 4 }).status, 'inconclusive')
-  assert.equal(evaluateOtaHealth({ installs: 100, failures: 1 }).status, 'healthy')
-  assert.equal(evaluateOtaHealth({ installs: 100, failures: 40 }).status, 'unhealthy')
+test('OTA health reads bundle adoption from the statistics rollup', () => {
+  // A quiet channel must never look like a verdict: the rollup is daily, so an
+  // empty result shortly after publishing is the normal case, not a failure.
+  assert.equal(evaluateOtaHealth({ onBundle: 0, total: 4 }).status, 'inconclusive')
+  assert.equal(evaluateOtaHealth({ onBundle: 90, total: 100 }).status, 'healthy')
+  assert.equal(evaluateOtaHealth({ onBundle: 0, total: 100 }).status, 'unhealthy')
   assert.equal(
-    evaluateOtaHealth({ installs: 30, failures: 5, maxFailureRate: 0.5 }).status,
-    'healthy'
+    evaluateOtaHealth({ onBundle: 0, total: 30, minDevices: 100 }).status,
+    'inconclusive'
   )
+
+  // `data` carries percentages and `metaCounts` the device counts, so only the
+  // latter may be summed. The last reported day wins over earlier zeroes.
   assert.deepEqual(
-    extractCounts([
-      { install: 10, fail: 1 },
-      { installs: 5, failures: 2 },
-    ]),
-    {
-      installs: 15,
-      failures: 3,
-    }
+    extractAdoption(
+      {
+        labels: ['2026-07-29', '2026-07-30'],
+        datasets: [
+          { label: '4.0.0-synaplan.abc', data: [0, 25], metaCounts: [0, 30] },
+          { label: '4.0.0-synaplan.old', data: [100, 75], metaCounts: [120, 90] },
+        ],
+      },
+      '4.0.0-synaplan.abc'
+    ),
+    { onBundle: 30, total: 120 }
   )
-  assert.deepEqual(extractCounts({ data: [{ success: 7 }] }), { installs: 7, failures: 0 })
+  assert.deepEqual(extractAdoption({}, '4.0.0'), { onBundle: 0, total: 0 })
+
+  const window = { from: '2026-07-28T00:00:00.000Z', to: '2026-07-30T00:00:00.000Z' }
   assert.equal(
-    statisticsUrl('https://stats.example.test/bundles', '4.0.0-synaplan.abc'),
-    'https://stats.example.test/bundles?app_id=com.synaplan.app&version=4.0.0-synaplan.abc'
+    statisticsUrl('https://api.example.test/statistics', '4.0.0-synaplan.abc', undefined, window),
+    'https://api.example.test/statistics/app/com.synaplan.app/bundle_usage' +
+      '?from=2026-07-28T00%3A00%3A00.000Z&to=2026-07-30T00%3A00%3A00.000Z'
   )
   assert.equal(
     statisticsUrl('https://stats.example.test/{appId}/{bundle}', '4.0.0'),
     'https://stats.example.test/com.synaplan.app/4.0.0'
   )
+})
+
+test('OTA withdrawal stays opt-in while the failure signal is unmeasurable', () => {
+  const workflow = read('.github/workflows/ota-health.yml')
+  assert.match(workflow, /withdraw_on_unhealthy:\n\s+required: false\n\s+default: false/)
+  assert.match(workflow, /"\$STATUS" != "unhealthy" \|\| "\$WITHDRAW" != "true"/)
+  // An unhealthy observation must still turn the run red, withdrawal or not.
+  assert.match(workflow, /STATUS" == "unhealthy"/)
 })
 
 test('build source selection is exclusive and shell syntax remains valid', () => {

@@ -56,8 +56,17 @@ OTA bundles are published automatically once an `ota-candidate` synchronization 
   `store-required`. That file is the single gate protecting every rule above, so a change to it is
   a change to this policy.
 - `ota.yml` refuses any class other than `ota-candidate`, whoever starts it.
-- `ota-health.yml` observes every published bundle and withdraws it without a human when the
-  failure rate exceeds the configured threshold.
+- `ota-health.yml` observes every published bundle and turns the run red when no device picks it up.
+
+The immediate protection against a broken bundle is on the device and needs no workflow: a bundle
+that does not call `notifyAppReady()` within `appReadyTimeout` is reverted locally and the device
+reports the previous version again.
+
+Automatic **withdrawal** from the channel is opt-in (`withdraw_on_unhealthy`) because of what the
+statistics API can measure. It reports device counts per bundle from a daily rollup and exposes no
+failure counter at all, so shortly after publishing "no device runs the new bundle yet" and "the
+rollout is still reaching devices" look identical. Enabling withdrawal on a channel that is too
+quiet would remove healthy releases.
 
 The manual `pause`, `resume` and `rollback` operations remain available at all times and are the
 kill switch for the automation.

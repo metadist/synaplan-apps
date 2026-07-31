@@ -1,9 +1,15 @@
 name: Mobile OTA Health
 
-# Watches a freshly published bundle and recovers without a human. The device
-# already protects itself: a bundle that does not report ready within
-# `appReadyTimeout` is reverted locally. This workflow protects everyone else by
-# taking the bad bundle off the channel.
+# Watches a freshly published bundle. The immediate protection is on the device:
+# a bundle that does not report ready within `appReadyTimeout` is reverted
+# locally, without this workflow being involved.
+#
+# Withdrawal from the channel is opt-in because of what the statistics API can
+# measure. It exposes device counts per bundle from a daily rollup and no failure
+# counter at all, so "nobody runs the new bundle yet" cannot be told apart from
+# "the rollout is still reaching devices" in the minutes after publishing.
+# Observing and reporting is therefore the default; set `withdraw_on_unhealthy`
+# once a channel has enough devices for the signal to be trustworthy.
 
 on:
   workflow_call:
@@ -22,6 +28,10 @@ on:
         required: false
         default: 20
         type: number
+      withdraw_on_unhealthy:
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       channel:
@@ -43,6 +53,11 @@ on:
         required: false
         default: 20
         type: number
+      withdraw_on_unhealthy:
+        description: Take the bundle off the channel when no device runs it
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: mobile-ota-health-${{ inputs.channel }}
@@ -90,9 +105,10 @@ jobs:
         env:
           STATUS: ${{ steps.observe.outputs.status }}
           ROLLBACK_TO: ${{ inputs.rollback_to }}
+          WITHDRAW: ${{ inputs.withdraw_on_unhealthy }}
         run: |
           set -euo pipefail
-          if [[ "$STATUS" != "unhealthy" ]]; then
+          if [[ "$STATUS" != "unhealthy" || "$WITHDRAW" != "true" ]]; then
             echo "recovery=none" >> "$GITHUB_OUTPUT"
             exit 0
           fi
