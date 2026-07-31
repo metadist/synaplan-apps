@@ -120,3 +120,56 @@ builtin `dist/` bundle is always used — i.e. the wiring is a safe no-op.
 4. Verify cold-start activation and telemetry on physical devices. Publish a deliberately broken
    canary bundle to prove automatic rollback, then exercise the explicit rollback operation.
 5. Promote the same reviewed source to `production` only through the protected environment.
+
+### Self-hosted instance runbook (operator)
+
+Every item below was found the hard way during the first real publish (July 2026). A freshly
+deployed self-hosted Capgo does **not** work out of the box for CLI publishing; apply these once
+per deployment and re-check them after a Capgo/Supabase upgrade.
+
+1. **Grant RPC execute rights.** The deployment shipped without `EXECUTE` for the `anon` role on
+   several `public.*` functions the CLI calls (`get_user_id`, `get_orgs_v7`, `get_org_members`,
+   `has_2fa_enabled`, ...). Symptom: the CLI reports *"Invalid API key or insufficient
+   permissions"* even with a valid admin key; PostgREST returns error `42501`. Fix on the database
+   host (idempotent — it only grants what is missing):
+
+   ```bash
+   docker exec supabase-db psql -U postgres -d postgres -Atc "
+   SELECT format('GRANT EXECUTE ON FUNCTION public.%I(%s) TO anon, authenticated;',
+                 p.proname, pg_get_function_identity_arguments(p.oid))
+   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public'
+     AND NOT has_function_privilege('anon', p.oid, 'execute');" \
+   | docker exec -i supabase-db psql -U postgres -d postgres
+   ```
+
+2. **Mark the organization as paid.** The seeded organization starts on a 14-day trial; after it
+   expires every upload fails with *"Plan upgrade required"*. A self-hosted instance has no Stripe,
+   so set the plan directly (adjust the `customer_id`):
+
+   ```sql
+   UPDATE public.stripe_info
+   SET status = 'succeeded', paid_at = now(),
+       trial_at = now() + interval '99 years',
+       product_id = (SELECT stripe_id FROM public.plans WHERE name = 'Enterprise'),
+       subscription_anchor_start = now(),
+       subscription_anchor_end = now() + interval '99 years',
+       is_good_plan = true
+   WHERE customer_id = '<customer_id from public.orgs>';
+   ```
+
+3. **Let devices reach the channel.** The app requests the `production` channel itself
+   (`defaultChannel` in `capacitor.config.ts`), which the server only honors when the channel has
+   **"Allow devices to self dissociate/associate"** enabled (or the channel is the app-wide
+   default). Symptom: update checks answer `no_channel` and devices stay on the builtin bundle.
+   Keep **"Disable auto downgrade under native"** enabled — bundle versions are deliberately
+   next-patch prereleases (`4.0.1-synaplan...` on a native `4.0.0`, see
+   `scripts/release-lib.mjs`), so the guard passes them while still blocking stale bundles after
+   a store update.
+
+4. **CLI routing quirks (already codified, do not undo).** The Capgo CLI silently falls back to
+   the Capgo **cloud** (`api./files.capgo.app`) for file uploads unless `localApi`/`localApiFiles`
+   are set in the `CapacitorUpdater` plugin config — `capacitor.config.ts` pins both to the update
+   endpoint's origin. Direct (signed-URL) uploads return HTTP 403 on this deployment, so `ota.yml`
+   uploads with `--tus`. The pinned CLI must stay ≥ 8.31.x; older versions cannot authenticate
+   with the hashed API keys this instance issues.
