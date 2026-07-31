@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { collectDrift } from '../scripts/release-drift.mjs'
+import { evaluateOtaHealth, extractCounts, statisticsUrl } from '../scripts/ota-health.mjs'
+import { collectDrift, scanNativeServerUrl } from '../scripts/release-drift.mjs'
+import { createReleaseRoute, readReleaseRoute } from '../scripts/release-route.mjs'
 import { classifyReleaseRoute, runReleaseDrill } from '../scripts/release-drill.mjs'
 import {
   ROOT,
@@ -156,6 +158,79 @@ test('sync rejects moving main branches and updates release records deterministi
   assert.equal(read('docs/IDENTIFIERS.md'), identifiersBefore)
 })
 
+test('a release route only accepts an immutable delivery decision', () => {
+  const route = createReleaseRoute({
+    tag: 'v4.0.7',
+    sha: 'b'.repeat(40),
+    classification: 'ota-candidate',
+    recordedAt: '2026-07-10T08:00:00.000Z',
+  })
+  assert.equal(route.schemaVersion, 1)
+  assert.equal(route.recordedAt, '2026-07-10T08:00:00.000Z')
+
+  const base = { tag: 'v4.0.7', sha: 'b'.repeat(40), classification: 'ota-candidate' }
+  assert.throws(() => createReleaseRoute({ ...base, tag: 'main' }), /exact release tag/)
+  assert.throws(() => createReleaseRoute({ ...base, sha: 'b'.repeat(12) }), /full commit SHA/)
+  assert.throws(
+    () => createReleaseRoute({ ...base, classification: 'backend-only' }),
+    /unknown delivery route/
+  )
+
+  const directory = mkdtempSync(join(tmpdir(), 'synaplan-route-'))
+  try {
+    const path = join(directory, 'release-route.json')
+    writeFileSync(path, JSON.stringify({ ...route, classification: 'no-app-impact' }))
+    assert.throws(() => readReleaseRoute(path), /unknown delivery route/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('a native config that points at a dev server fails the release check', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'synaplan-native-'))
+  try {
+    const configPath = join(directory, 'ios', 'App', 'App', 'capacitor.config.json')
+    mkdirSync(join(directory, 'ios', 'App', 'App'), { recursive: true })
+    writeFileSync(configPath, JSON.stringify({ server: { url: 'http://192.168.1.20:5174' } }))
+    assert.deepEqual(scanNativeServerUrl(directory), [
+      'ios/App/App/capacitor.config.json points the WebView at a remote server: http://192.168.1.20:5174',
+    ])
+    writeFileSync(configPath, JSON.stringify({ server: { cleartext: true } }))
+    assert.deepEqual(scanNativeServerUrl(directory), [])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('OTA health only withdraws a release on a measured failure rate', () => {
+  assert.equal(evaluateOtaHealth({ installs: 4, failures: 4 }).status, 'inconclusive')
+  assert.equal(evaluateOtaHealth({ installs: 100, failures: 1 }).status, 'healthy')
+  assert.equal(evaluateOtaHealth({ installs: 100, failures: 40 }).status, 'unhealthy')
+  assert.equal(
+    evaluateOtaHealth({ installs: 30, failures: 5, maxFailureRate: 0.5 }).status,
+    'healthy'
+  )
+  assert.deepEqual(
+    extractCounts([
+      { install: 10, fail: 1 },
+      { installs: 5, failures: 2 },
+    ]),
+    {
+      installs: 15,
+      failures: 3,
+    }
+  )
+  assert.deepEqual(extractCounts({ data: [{ success: 7 }] }), { installs: 7, failures: 0 })
+  assert.equal(
+    statisticsUrl('https://stats.example.test/bundles', '4.0.0-synaplan.abc'),
+    'https://stats.example.test/bundles?app_id=com.synaplan.app&version=4.0.0-synaplan.abc'
+  )
+  assert.equal(
+    statisticsUrl('https://stats.example.test/{appId}/{bundle}', '4.0.0'),
+    'https://stats.example.test/com.synaplan.app/4.0.0'
+  )
+})
+
 test('build source selection is exclusive and shell syntax remains valid', () => {
   const build = read('build.sh')
   assert.match(build, /SYNAPLAN_OPENAPI_FILE/)
@@ -203,4 +278,17 @@ test('Capacitor config exposes only public self-hosted OTA settings', () => {
   for (const safetySetting of ['autoUpdate', 'resetWhenUpdate', 'appReadyTimeout']) {
     assert.match(config, new RegExp(`${safetySetting}:`))
   }
+})
+
+test('Capacitor config applies updates immediately and refuses a dev server in prod', () => {
+  const config = read('capacitor.config.ts')
+  assert.match(config, /autoUpdate: 'always'/)
+  assert.match(config, /autoSplashscreen: true/)
+  assert.match(config, /autoSplashscreenTimeout: \d+/)
+  assert.match(config, /periodCheckDelay: \d+/)
+  // The updater hides the splash screen itself; auto-hide would flash the old UI.
+  assert.match(config, /launchAutoHide: false/)
+  // Deprecated in favour of the autoUpdate string modes.
+  assert.doesNotMatch(config, /directUpdate:/)
+  assert.match(config, /SYNAPLAN_DEV_SERVER must not be set for a prod build/)
 })

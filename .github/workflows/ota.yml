@@ -29,20 +29,81 @@ on:
         required: true
         default: true
         type: boolean
+  # Called by release-dispatch.yml after an automated synchronization merges.
+  # The policy guard below is unchanged for this path: only `ota-candidate` is
+  # ever accepted, whoever the caller is.
+  workflow_call:
+    inputs:
+      operation:
+        required: false
+        default: publish
+        type: string
+      class:
+        required: true
+        type: string
+      rollback_bundle:
+        required: false
+        default: ''
+        type: string
+      channel:
+        required: true
+        type: string
+      dry_run:
+        required: false
+        default: true
+        type: boolean
+    outputs:
+      bundle_version:
+        description: The bundle version that was built and published
+        value: ${{ jobs.bundle.outputs.bundle-version }}
+      previous_bundle_version:
+        description: The bundle the channel served before this run, empty when unknown
+        value: ${{ jobs.bundle.outputs.previous-bundle-version }}
 
 concurrency:
   group: mobile-ota-${{ inputs.channel }}
   cancel-in-progress: false
 
 permissions:
+  actions: read
   attestations: read
   contents: read
 
 jobs:
+  # The bundle job runs on the self-hosted mobile runner. A queued job that no
+  # runner picks up looks identical to a healthy pipeline, so this watchdog turns
+  # an offline runner into a visible failure instead of silence.
+  runner-watchdog:
+    name: Verify a mobile runner picks the build up
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for the bundle job to start
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEADLINE_MINUTES: '15'
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 "$DEADLINE_MINUTES"); do
+            status="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+                --jq '[.jobs[] | select(.name | contains("Build signed OTA bundle"))] | first | .status // "queued"'
+            )"
+            if [[ "$status" == "in_progress" || "$status" == "completed" ]]; then
+              exit 0
+            fi
+            sleep 60
+          done
+          echo "::error::No self-hosted mobile runner started the OTA build within ${DEADLINE_MINUTES} minutes."
+          exit 1
+
   bundle:
     name: Build signed OTA bundle
     runs-on: [self-hosted, mobile]
     environment: ${{ inputs.channel }}
+    timeout-minutes: 60
+    outputs:
+      bundle-version: ${{ steps.bundle.outputs.version }}
+      previous-bundle-version: ${{ steps.previous.outputs.bundle }}
     env:
       CAPGO_SUPA_HOST: ${{ vars.CAPGO_SUPA_HOST }}
       CAPGO_CHANNEL: ${{ vars.CAPGO_CHANNEL }}
@@ -126,6 +187,9 @@ jobs:
         if: inputs.operation == 'publish'
         id: bundle
         env:
+          # Binds the bundle version to this run, so two publishes from the same
+          # commit cannot collide on a version the updater would then ignore.
+          SYNAPLAN_BUILD_NUMBER: ${{ github.run_number }}
           OTA_SIGNING_KEY: ${{ secrets.CAPGO_BUNDLE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
@@ -142,7 +206,13 @@ jobs:
             -out "$RUNNER_TEMP/$bundle.sig" "$RUNNER_TEMP/$bundle"
           sha256sum "$RUNNER_TEMP/$bundle" > "$RUNNER_TEMP/$bundle.sha256"
           rm -f "$RUNNER_TEMP/ota-signing-key.pem"
-          version="$(node -p "require('./package.json').version")"
+          # The publish plan carries the bundleVersion that release-lib derived
+          # from app version, pinned Synaplan ref and build number. The package
+          # version alone repeats for every release and would collide.
+          plans=(artifacts/ota/*.publish.json)
+          test -e "${plans[0]}"
+          version="$(jq -r '.bundleVersion' "${plans[0]}")"
+          test "$version" = "${bundle%.zip}"
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -171,6 +241,33 @@ jobs:
           test -n "$CAPGO_CHANNEL"
           test "$CAPGO_CHANNEL" = "${{ inputs.channel }}"
 
+      # Captured before publishing so an automatic rollback has an exact target
+      # instead of guessing the previous version from a bundle listing.
+      - name: Record the currently served bundle
+        if: ${{ ! inputs.dry_run && inputs.operation == 'publish' }}
+        id: previous
+        continue-on-error: true
+        env:
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+          CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
+        run: |
+          set -uo pipefail
+          current="$(
+            npx --yes @capgo/cli@8.25.10 channel currentBundle "$CAPGO_CHANNEL" com.synaplan.app \
+              --apikey "$CAPGO_API_KEY" \
+              --supa-host "$CAPGO_SUPA_HOST" \
+              --supa-anon "$CAPGO_SUPA_ANON" 2>/dev/null |
+              tr -d '[:space:]' |
+              grep -Eo '[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*' |
+              tail -n 1
+          )" || current=''
+          echo "bundle=$current" >> "$GITHUB_OUTPUT"
+          if test -n "$current"; then
+            echo "Channel \`$CAPGO_CHANNEL\` currently serves \`$current\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No previous bundle could be determined; a failing release will pause the channel instead of rolling back." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Publish OTA bundle
         if: ${{ ! inputs.dry_run && inputs.operation == 'publish' }}
         env:
@@ -185,8 +282,8 @@ jobs:
             --channel "$CAPGO_CHANNEL" \
             --path synaplan/frontend/dist \
             --bundle "${{ steps.bundle.outputs.version }}" \
-            --key-data-v2 "$CAPGO_KEY" \
-            --version-exists-ok
+            --key-data-v2 "$CAPGO_KEY"
+          echo "Published bundle \`${{ steps.bundle.outputs.version }}\` to channel \`$CAPGO_CHANNEL\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Pause, resume, or roll back OTA channel
         if: ${{ ! inputs.dry_run && inputs.operation != 'publish' }}

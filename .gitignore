@@ -186,6 +186,10 @@ android/capacitor-cordova-android-plugins/
 # The flows themselves (.maestro/*.yaml) ARE committed; their output is not.
 .maestro/artifacts/
 
+# Release build output: signed OTA bundles + publish plans (scripts/ota-prepare.mjs)
+# and fetched OpenAPI contracts (scripts/fetch-openapi.mjs).
+artifacts/
+
 # ──────────────────────────────────────────────────────────────────────────
 # App store release area (_appstores/)
 # The public part (icons, screenshots, listing texts) IS committed.

@@ -18,6 +18,26 @@ import {
   validatePublicOtaConfig,
 } from './release-lib.mjs'
 
+export const NATIVE_CAPACITOR_CONFIGS = [
+  join('ios', 'App', 'App', 'capacitor.config.json'),
+  join('android', 'app', 'src', 'main', 'assets', 'capacitor.config.json'),
+]
+
+// The live-reload dev server (SYNAPLAN_DEV_SERVER) writes server.url into the
+// synced native configuration. A binary that loads its UI from a developer
+// machine would break for every user and would not survive store review, so the
+// synced files are checked directly rather than trusting the build environment.
+export function scanNativeServerUrl(root = ROOT) {
+  const findings = []
+  for (const relativePath of NATIVE_CAPACITOR_CONFIGS) {
+    const path = join(root, relativePath)
+    if (!existsSync(path)) continue
+    const url = readJson(path).server?.url
+    if (url) findings.push(`${relativePath} points the WebView at a remote server: ${url}`)
+  }
+  return findings
+}
+
 export function collectDrift({ bootstrap = false, manifestPath = DEFAULT_MANIFEST } = {}) {
   const errors = []
   const warnings = []
@@ -115,6 +135,8 @@ export function collectDrift({ bootstrap = false, manifestPath = DEFAULT_MANIFES
       errors.push(`COMPATIBILITY OTA bundle ${row.otaBundle} differs from the release manifest`)
     }
   }
+
+  for (const finding of scanNativeServerUrl()) errors.push(finding)
 
   const serviceWorkers = scanServiceWorkerGuard(join(ROOT, 'synaplan', 'frontend', 'src'))
   for (const file of serviceWorkers.unguardedFiles) {

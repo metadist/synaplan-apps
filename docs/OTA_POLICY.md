@@ -45,6 +45,23 @@
 Bottom line: OTA fixes the *presentation* of already-approved behavior. It never introduces or
 changes *behavior*, and **never** touches money.
 
+## Unattended publishing
+
+OTA bundles are published automatically once an `ota-candidate` synchronization merges — see
+[`AUTOMATION.md`](./AUTOMATION.md) for the full chain. Nothing in this policy is relaxed by that:
+
+- The classification that decides `ota-candidate` versus `store-required` is produced by
+  `.github/mobile-impact-policy.json` in the source repository and is **fail-closed**: any path
+  that is not explicitly allow-listed, and any file that can carry executable code, is
+  `store-required`. That file is the single gate protecting every rule above, so a change to it is
+  a change to this policy.
+- `ota.yml` refuses any class other than `ota-candidate`, whoever starts it.
+- `ota-health.yml` observes every published bundle and withdraws it without a human when the
+  failure rate exceeds the configured threshold.
+
+The manual `pause`, `resume` and `rollback` operations remain available at all times and are the
+kill switch for the automation.
+
 ## Safety mechanisms (required for any OTA rollout)
 
 - **Signature verification** on every bundle (reject unsigned / tampered bundles).
@@ -71,8 +88,9 @@ signing key, and the default channel through protected release-environment varia
 
 - ✅ `@capgo/capacitor-updater` added to `package.json` (native plugin) **and** the shared frontend
   `synaplan/frontend/package.json` (so the SPA can call `notifyAppReady()`).
-- ✅ `CapacitorUpdater` configured in `capacitor.config.ts`: `autoUpdate`, `resetWhenUpdate`,
-  `directUpdate: false`, `appReadyTimeout`, auto-delete failed/previous.
+- ✅ `CapacitorUpdater` configured in `capacitor.config.ts`: `autoUpdate: 'always'` with
+  `autoSplashscreen`, `periodCheckDelay`, `resetWhenUpdate`, `appReadyTimeout`, auto-delete
+  failed/previous. A published bundle is applied on the next foreground, not the next cold start.
 - ✅ The SPA confirms each launch via `notifyAppReady()` (`src/services/otaUpdates.ts`, native-only)
   so Capgo auto-reverts a bad bundle.
 - ✅ `ota.yml` builds from a commit-matching OpenAPI artifact, signs the unique bundle, targets the

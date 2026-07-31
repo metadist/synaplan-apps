@@ -73,6 +73,29 @@ for (const [name, value] of [
 // is OFF by default — production stays strict (no cleartext, no mixed content).
 const devBackendUrl = process.env.SYNAPLAN_DEV_BACKEND?.trim()
 
+// ── Dev-only: live reload against the Vite dev server ────────────────────────
+// SYNAPLAN_DEV_SERVER points the WebView at a running `npm run dev` instead of
+// the bundled dist/, so a change is visible on reload rather than after a full
+// Vue build, `cap sync` and native build. Refused for prod identities: a release
+// binary that loads its UI from a developer machine would be both broken and a
+// review violation. scripts/release-drift.mjs asserts the same for release builds.
+const devServerUrl = process.env.SYNAPLAN_DEV_SERVER?.trim()
+if (devServerUrl) {
+  if (appEnv === 'prod') {
+    throw new Error('SYNAPLAN_DEV_SERVER must not be set for a prod build — use SYNAPLAN_ENV=dev')
+  }
+  let url: URL
+  try {
+    url = new URL(devServerUrl)
+  } catch {
+    throw new Error('SYNAPLAN_DEV_SERVER must be an absolute URL, e.g. http://192.168.1.20:5173')
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('SYNAPLAN_DEV_SERVER must use http or https')
+  }
+}
+const usesLocalHttp = Boolean(devBackendUrl) || Boolean(devServerUrl)
+
 const config: CapacitorConfig = {
   appId,
   appName,
@@ -95,14 +118,20 @@ const config: CapacitorConfig = {
   },
   android: {
     // Allow http only for local dev tooling; production talks to https. Hardened in Epic 7.
-    allowMixedContent: Boolean(devBackendUrl),
+    allowMixedContent: usesLocalHttp,
   },
-  // Dev spike only: allow cleartext so the emulator can reach the local backend.
-  ...(devBackendUrl ? { server: { cleartext: true } } : {}),
+  // Dev spike only: allow cleartext so the emulator can reach the local backend
+  // and, with SYNAPLAN_DEV_SERVER, load the SPA from the Vite dev server.
+  ...(usesLocalHttp
+    ? { server: { cleartext: true, ...(devServerUrl ? { url: devServerUrl } : {}) } }
+    : {}),
   plugins: {
     SplashScreen: {
       launchShowDuration: 1500,
-      launchAutoHide: true,
+      // The updater hides the splash screen itself (autoSplashscreen below).
+      // With auto-hide the old UI would flash for a moment before an update is
+      // swapped in, which reads as a glitch rather than an update.
+      launchAutoHide: false,
       backgroundColor: '#003fc7',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
@@ -134,16 +163,30 @@ const config: CapacitorConfig = {
       ...(otaStatsUrl ? { statsUrl: otaStatsUrl } : {}),
       ...(otaPublicKey ? { publicKey: otaPublicKey } : {}),
       defaultChannel: otaDefaultChannel,
-      // Chosen behavior: download in the background, apply on the next cold start.
-      autoUpdate: true,
+      // Chosen behavior: check on every auto-update run and install directly, so
+      // a published fix reaches the device on the next foreground instead of the
+      // next cold start. Replaces the deprecated directUpdate option, which the
+      // string modes now cover.
+      autoUpdate: 'always',
+      // Holds the splash screen while a downloaded bundle is applied, and hides
+      // it once the app is ready or no update is pending. Requires
+      // SplashScreen.launchAutoHide to be false.
+      autoSplashscreen: true,
+      // Hard ceiling on how long a start may wait for an update. When it fires,
+      // the download continues in the background and is installed on the next
+      // launch, so a slow network delays a fix but never blocks the app.
+      autoSplashscreenTimeout: 5000,
+      // Seconds between checks while the app stays in the foreground; the plugin
+      // rejects anything below 600. Without it a permanently open session would
+      // only see updates after a background/foreground cycle.
+      periodCheckDelay: 600,
       // On a native store update, discard any OTA bundle and fall back to the
       // freshly shipped builtin bundle so an old OTA bundle never shadows new
       // native code.
       resetWhenUpdate: true,
-      // Apply downloaded bundles on the next app start, not mid-session.
-      directUpdate: false,
       // Safety: if a freshly applied bundle does not call notifyAppReady() within
-      // this window, Capgo auto-reverts to the previous good bundle.
+      // this window, Capgo auto-reverts to the previous good bundle. This is the
+      // guard that makes unattended publishing survivable.
       appReadyTimeout: 10000,
       autoDeleteFailed: true,
       autoDeletePrevious: true,
