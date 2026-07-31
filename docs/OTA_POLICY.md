@@ -167,7 +167,24 @@ per deployment and re-check them after a Capgo/Supabase upgrade.
    `scripts/release-lib.mjs`), so the guard passes them while still blocking stale bundles after
    a store update.
 
-4. **CLI routing quirks (already codified, do not undo).** The Capgo CLI silently falls back to
+4. **Make device downloads verifiable.** The updater answers update checks with a presigned S3
+   URL. Three defaults break that URL on a fresh deployment (symptom: the update check succeeds
+   but the download returns `403 SignatureDoesNotMatch`, or the URL is plain `http://...:8000`
+   which iOS ATS refuses):
+   - `S3_ENDPOINT` for the Capgo edge functions must be the **public HTTPS** storage endpoint
+     including the scheme (`https://sb.<domain>/storage/v1/s3`), not the internal
+     `kong:8000/...` one — the host is part of the AWS signature, and Kong overwrites the
+     `X-Forwarded-*` headers the code would otherwise guess it from.
+   - The `storage` service needs `STORAGE_PUBLIC_URL: https://sb.<domain>` so it validates
+     signatures against the public host instead of the internal `storage:5000` one.
+   - `S3_REGION` of the edge functions must equal the storage service's `REGION` (here `stub`);
+     the region is part of the signing key and storage only accepts `auto`, `us-east-1`, or its
+     own region.
+   Both files live in `/opt/capgo` (`supabase/docker-compose.override.yml` and `functions.env`);
+   recreate the `functions` and `storage` containers afterwards
+   (`docker compose up -d --force-recreate functions storage`).
+
+5. **CLI routing quirks (already codified, do not undo).** The Capgo CLI silently falls back to
    the Capgo **cloud** (`api./files.capgo.app`) for file uploads unless `localApi`/`localApiFiles`
    are set in the `CapacitorUpdater` plugin config — `capacitor.config.ts` pins both to the update
    endpoint's origin. Direct (signed-URL) uploads return HTTP 403 on this deployment, so `ota.yml`
