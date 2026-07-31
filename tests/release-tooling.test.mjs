@@ -298,6 +298,16 @@ test('a store release candidate can target one store while the other is unpublis
   assert.match(promotion, /\$PLATFORM" != "apple" \]\]; then test "\$\{#aabs\[@\]\}" -eq 1/)
 })
 
+test('a store build number stays above what the stores already accepted', () => {
+  const workflow = read('.github/workflows/store-rc.yml')
+  // A workflow run counter restarts low and would collide with the builds that
+  // reached TestFlight from Xcode before this automation existed.
+  assert.doesNotMatch(workflow, /SYNAPLAN_BUILD_NUMBER: \$\{\{ github\.run_number \}\}/)
+  assert.match(workflow, /build_number="\$\(git rev-list --count HEAD\)"/)
+  // Counting commits needs the full history, not the default shallow checkout.
+  assert.match(workflow, /fetch-depth: 0/)
+})
+
 test('store binaries stay tied to the run that built them', () => {
   // Signed provenance needs GitHub Enterprise Cloud for a private repository,
   // so the integrity of a promoted binary rests on recorded checksums.
