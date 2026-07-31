@@ -99,14 +99,6 @@ jobs:
           if [[ "${{ inputs.operation }}" == "rollback" ]]; then
             test -n "${{ inputs.rollback_bundle }}"
           fi
-          # We sign every bundle, so the app must be able to verify one. An empty
-          # public key disables verification silently: the config simply omits
-          # `publicKey` and the updater then accepts any bundle. Entering the key
-          # as a secret instead of a variable produces exactly that empty value.
-          if [[ "${{ inputs.operation }}" == "publish" && -z "$SYNAPLAN_OTA_PUBLIC_KEY" ]]; then
-            echo "::error::CAPGO_BUNDLE_PUBLIC_KEY is empty. It must be an environment VARIABLE (not a secret) of ${{ inputs.channel }}, otherwise the app cannot verify the signed bundle."
-            exit 1
-          fi
           echo "Store-required and payment-impacting releases are not accepted by this workflow." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout with submodules
@@ -114,6 +106,14 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      # We sign every bundle, so the app must be able to verify one. An empty key
+      # disables verification silently: the config omits `publicKey` and the
+      # updater accepts any bundle. Entering the key as a secret instead of a
+      # variable produces exactly that empty value.
+      - name: Require a verifiable OTA configuration
+        if: inputs.operation == 'publish'
+        run: node scripts/ota-key.mjs
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6

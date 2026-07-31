@@ -44,7 +44,10 @@ const appName = `Synaplan${envIdentity.nameSuffix}`
 const otaUpdateUrl = process.env.SYNAPLAN_OTA_UPDATE_URL?.trim()
 const otaChannelUrl = process.env.SYNAPLAN_OTA_CHANNEL_URL?.trim()
 const otaStatsUrl = process.env.SYNAPLAN_OTA_STATS_URL?.trim()
-const otaPublicKey = process.env.SYNAPLAN_OTA_PUBLIC_KEY?.trim()
+// Carriage returns have to go: a browser submits a textarea with CRLF, so a key
+// pasted into a web form carries them. The updater plugin strips line feeds but
+// not carriage returns, fails to decode the key, and aborts the app at launch.
+const otaPublicKey = process.env.SYNAPLAN_OTA_PUBLIC_KEY?.replace(/\r/g, '').trim()
 const otaDefaultChannel = process.env.SYNAPLAN_OTA_DEFAULT_CHANNEL?.trim() || 'production'
 if (!/^[a-z0-9][a-z0-9._-]*$/i.test(otaDefaultChannel)) {
   throw new Error('SYNAPLAN_OTA_DEFAULT_CHANNEL must be a simple channel name')
