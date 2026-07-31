@@ -36,12 +36,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Unlimited messages and advanced AI models.",
+              "description" : "15x more usage than the free plan.",
               "displayName" : "Pro",
               "locale" : "en_US"
             },
             {
-              "description" : "Unbegrenzte Nachrichten und fortgeschrittene KI-Modelle.",
+              "description" : "15x mehr Nutzung als im Free-Plan.",
               "displayName" : "Pro",
               "locale" : "de_DE"
             }
@@ -69,12 +69,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Everything in Pro plus team collaboration.",
+              "description" : "Everything in Pro, 40x more usage.",
               "displayName" : "Team",
               "locale" : "en_US"
             },
             {
-              "description" : "Alles aus Pro plus Team-Zusammenarbeit.",
+              "description" : "Alles aus Pro, 40x mehr Nutzung.",
               "displayName" : "Team",
               "locale" : "de_DE"
             }
@@ -102,12 +102,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Everything in Team plus API access and SSO.",
+              "description" : "Everything in Team, 80x more usage.",
               "displayName" : "Business",
               "locale" : "en_US"
             },
             {
-              "description" : "Alles aus Team plus API-Zugang und SSO.",
+              "description" : "Alles aus Team, 80x mehr Nutzung.",
               "displayName" : "Business",
               "locale" : "de_DE"
             }
