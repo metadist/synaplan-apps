@@ -33,9 +33,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  attestations: write
+  attestations: read
   contents: read
-  id-token: write
 
 jobs:
   release-candidate:
@@ -221,15 +220,15 @@ jobs:
           set -euo pipefail
           archive="$RUNNER_TEMP/Synaplan.xcarchive"
           export_dir="$RUNNER_TEMP/ios-export"
+          node scripts/ios-signing.mjs
           xcodebuild archive \
             -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
             -archivePath "$archive" \
-            -destination "generic/platform=iOS" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME"
+            -destination "generic/platform=iOS"
+          bundle_id="$(/usr/libexec/PlistBuddy -c \
+            'Print :ApplicationProperties:CFBundleIdentifier' "$archive/Info.plist")"
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -237,9 +236,13 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>teamID</key><string>${APPLE_TEAM_ID}</string>
             <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict><key>${bundle_id}</key><string>${IOS_PROFILE_NAME}</string></dict>
             <key>uploadSymbols</key><true/>
           </dict></plist>
           EOF
+          echo "Exporting ${bundle_id} with profile ${IOS_PROFILE_NAME}."
           xcodebuild -exportArchive \
             -archivePath "$archive" \
             -exportPath "$export_dir" \
@@ -281,19 +284,25 @@ jobs:
             }' \
             > "$RUNNER_TEMP/store-rc/upload-request.json"
 
-      # Attested per store, because the action fails on a subject path that
-      # matches nothing and only the selected artifact exists.
-      - name: Attest the signed iOS artifact
-        if: steps.platforms.outputs.ios == 'true'
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
-        with:
-          subject-path: ${{ runner.temp }}/store-rc/*.ipa
-
-      - name: Attest the signed Android artifact
-        if: steps.platforms.outputs.android == 'true'
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
-        with:
-          subject-path: ${{ runner.temp }}/store-rc/*.aab
+      # Signed provenance would need GitHub Enterprise Cloud for a private
+      # repository, so the artifacts carry checksums that the promotion
+      # re-verifies against the run they were built in.
+      - name: Record store artifact checksums
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/store-rc"
+          # Only the selected stores produce a binary, so an absent pattern has
+          # to disappear rather than reach shasum as a literal name.
+          shopt -s nullglob
+          shasum -a 256 *.ipa *.aab > checksums.sha256
+          test -s checksums.sha256
+          shasum -a 256 --check checksums.sha256
+          {
+            echo '### Signed store artifacts'
+            echo '```'
+            cat checksums.sha256
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload signed store artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

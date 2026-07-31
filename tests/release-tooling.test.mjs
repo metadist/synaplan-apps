@@ -16,6 +16,7 @@ import {
   validatePublicOtaConfig,
 } from '../scripts/release-lib.mjs'
 import { createReleaseManifest } from '../scripts/release-manifest.mjs'
+import { stampReleaseSigning } from '../scripts/ios-signing.mjs'
 import { rejectMovingBranch, updateReleaseRecords } from '../scripts/sync-synaplan.mjs'
 
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
@@ -290,10 +291,55 @@ test('a store release candidate can target one store while the other is unpublis
   // Uploading is gated separately, so a dry run cannot reach a store either.
   assert.match(workflow, /! inputs\.dry_run && steps\.platforms\.outputs\.ios == 'true'/)
   assert.match(workflow, /! inputs\.dry_run && steps\.platforms\.outputs\.android == 'true'/)
-  // Attesting a glob that matches nothing fails the action, so each artifact
-  // carries its own step rather than one step naming both.
-  assert.match(workflow, /Attest the signed iOS artifact/)
-  assert.match(workflow, /Attest the signed Android artifact/)
+  // Promotion has to accept a candidate that only carries the store it was
+  // built for, rather than insisting on both binaries.
+  const promotion = read('.github/workflows/production-promotion.yml')
+  assert.match(promotion, /\$PLATFORM" != "google" \]\]; then test "\$\{#ipas\[@\]\}" -eq 1/)
+  assert.match(promotion, /\$PLATFORM" != "apple" \]\]; then test "\$\{#aabs\[@\]\}" -eq 1/)
+})
+
+test('store binaries stay tied to the run that built them', () => {
+  // Signed provenance needs GitHub Enterprise Cloud for a private repository,
+  // so the integrity of a promoted binary rests on recorded checksums.
+  const workflow = read('.github/workflows/store-rc.yml')
+  assert.match(workflow, /shasum -a 256 \*\.ipa \*\.aab > checksums\.sha256/)
+  assert.match(workflow, /shasum -a 256 --check checksums\.sha256/)
+  assert.doesNotMatch(workflow, /attest-build-provenance/)
+
+  const promotion = read('.github/workflows/production-promotion.yml')
+  assert.match(promotion, /shasum -a 256 --check checksums\.sha256/)
+  assert.doesNotMatch(promotion, /gh attestation verify "\$\{(aabs|ipas)\[0\]\}"/)
+  // Every downloaded binary must be named in the checksum record, so an extra
+  // artifact cannot ride along unverified.
+  assert.match(promotion, /grep -qF "\$\(basename "\$binary"\)"/)
+})
+
+test('release signing reaches the app target without touching Swift packages', () => {
+  const configurations = (pbx) =>
+    pbx
+      .split('isa = XCBuildConfiguration;')
+      .filter((block) => /PRODUCT_BUNDLE_IDENTIFIER/.test(block))
+  const stamped = configurations(
+    stampReleaseSigning(read('ios/App/App.xcodeproj/project.pbxproj'), {
+      team: 'TEAMID1234',
+      identity: 'Apple Distribution',
+      profile: 'Synaplan App Store Distribution',
+    })
+  )
+  const release = stamped.find((block) => /name = Release;/.test(block))
+  assert.match(release, /CODE_SIGN_STYLE = Manual;/)
+  assert.match(release, /CODE_SIGN_IDENTITY = "Apple Distribution";/)
+  assert.match(release, /DEVELOPMENT_TEAM = TEAMID1234;/)
+  assert.match(release, /PROVISIONING_PROFILE_SPECIFIER = "Synaplan App Store Distribution";/)
+  // A local build must keep working without a distribution key in the keychain.
+  const debug = stamped.find((block) => /name = Debug;/.test(block))
+  assert.match(debug, /CODE_SIGN_STYLE = Automatic;/)
+  assert.doesNotMatch(debug, /PROVISIONING_PROFILE_SPECIFIER/)
+  // xcodebuild passes command-line build settings to every target, and the
+  // Swift package targets abort the archive once they are handed a profile.
+  const workflow = read('.github/workflows/store-rc.yml')
+  assert.match(workflow, /node scripts\/ios-signing\.mjs/)
+  assert.doesNotMatch(workflow, /PROVISIONING_PROFILE_SPECIFIER="\$IOS_PROFILE_NAME"/)
 })
 
 test('OTA withdrawal stays opt-in while the failure signal is unmeasurable', () => {

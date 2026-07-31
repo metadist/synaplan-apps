@@ -53,7 +53,6 @@ concurrency:
 
 permissions:
   actions: read
-  attestations: read
   contents: read
 
 jobs:
@@ -86,8 +85,9 @@ jobs:
           aabs=(store-rc-source/**/*.aab)
           ipas=(store-rc-source/**/*.ipa)
           test "${#requests[@]}" -eq 1
-          test "${#aabs[@]}" -eq 1
-          test "${#ipas[@]}" -eq 1
+          # A release candidate only carries the stores it was built for.
+          if [[ "$PLATFORM" != "google" ]]; then test "${#ipas[@]}" -eq 1; fi
+          if [[ "$PLATFORM" != "apple" ]]; then test "${#aabs[@]}" -eq 1; fi
           jq -e \
             --arg app_version "$APP_VERSION" \
             --arg platform "$PLATFORM" \
@@ -98,12 +98,15 @@ jobs:
               ($platform == "apple" or .androidVersionCode == $google_code) and
               .googlePlayTrack == "internal"' \
             "${requests[0]}" >/dev/null
-          gh attestation verify "${aabs[0]}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow metadist/synaplan-apps/.github/workflows/store-rc.yml
-          gh attestation verify "${ipas[0]}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow metadist/synaplan-apps/.github/workflows/store-rc.yml
+          # Signed provenance needs GitHub Enterprise Cloud for a private
+          # repository. The binaries instead have to match the checksums that
+          # the release candidate recorded, so a swapped artifact is rejected.
+          sums=(store-rc-source/**/checksums.sha256)
+          test "${#sums[@]}" -eq 1
+          ( cd "$(dirname "${sums[0]}")" && shasum -a 256 --check checksums.sha256 )
+          for binary in "${ipas[@]}" "${aabs[@]}"; do
+            grep -qF "$(basename "$binary")" "${sums[0]}"
+          done
 
       - name: Validate promotion inputs
         env:
