@@ -101,6 +101,22 @@ jobs:
           fi
           echo "Store-required and payment-impacting releases are not accepted by this workflow." >> "$GITHUB_STEP_SUMMARY"
 
+      # TEMPORARY: the same Capgo credentials authenticate from a workstation but
+      # are rejected from a GitHub-hosted runner. Length and a short digest tell
+      # a mistyped secret apart from an origin-based block without revealing
+      # either value. Remove once the cause is known.
+      - name: Fingerprint the Capgo credentials
+        env:
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+          CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
+        run: |
+          set -euo pipefail
+          for name in CAPGO_API_KEY CAPGO_SUPA_ANON; do
+            value="${!name}"
+            printf '%s: %s chars, digest %s\n' \
+              "$name" "${#value}" "$(printf '%s' "$value" | sha256sum | cut -c1-12)"
+          done
+
       - name: Checkout with submodules
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
