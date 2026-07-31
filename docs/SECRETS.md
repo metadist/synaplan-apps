@@ -19,6 +19,9 @@ This is part of **Epic 0 — Preparation & Foundations**. It is read/extended by
 - **Backend runtime (`synaplan` submodule):** the platform reads its secrets from its own
   environment (`backend/.env`), which is out of scope for this repo.
 
+`docs/STORE_SETUP.md` is the click-by-click path to obtaining the Apple and Google credentials
+below and naming them as `store-rc.yml` expects.
+
 ## Secret inventory
 
 | Secret | Used by | Owner / source | Storage (where it lives) | Status |

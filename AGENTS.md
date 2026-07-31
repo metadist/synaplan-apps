@@ -160,6 +160,7 @@ fail-closed classification produced in the source repository and records it in
 
 - `docs/AUTOMATION.md` — the automated release chain, its setup, and the kill switch
 - `docs/AUTOMATION_SETUP.md` — step-by-step activation of the automation credentials
+- `docs/STORE_SETUP.md` — obtaining the Apple and Google signing and upload credentials
 - `docs/DEVELOPMENT.md` — local build, simulator live reload, and OpenAPI schema generation
 - `docs/QUALITY_GATES.md` — automated and device-gated test matrix
 - `docs/RELEASE_GATE_v4.md` — coordinated release decision
