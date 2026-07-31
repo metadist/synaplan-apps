@@ -17,6 +17,7 @@ import {
 } from '../scripts/release-lib.mjs'
 import { createReleaseManifest } from '../scripts/release-manifest.mjs'
 import { stampReleaseSigning } from '../scripts/ios-signing.mjs'
+import { normalizePublicKey, publicKeyProblem } from '../scripts/ota-key.mjs'
 import { rejectMovingBranch, updateReleaseRecords } from '../scripts/sync-synaplan.mjs'
 
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
@@ -260,10 +261,14 @@ test('a build refuses to ship without the OTA verification key', () => {
   // without any error. Both paths that reach a device must reject that.
   for (const workflow of ['.github/workflows/ota.yml', '.github/workflows/store-rc.yml']) {
     const content = read(workflow)
-    assert.match(content, /SYNAPLAN_OTA_PUBLIC_KEY/)
-    assert.match(content, /CAPGO_BUNDLE_PUBLIC_KEY is empty/)
-    assert.match(content, /-z "\$SYNAPLAN_OTA_PUBLIC_KEY"/)
+    assert.match(
+      content,
+      /SYNAPLAN_OTA_PUBLIC_KEY: \$\{\{ vars\.CAPGO_BUNDLE_PUBLIC_KEY \}\}/,
+      workflow
+    )
+    assert.match(content, /node scripts\/ota-key\.mjs/, workflow)
   }
+  assert.match(publicKeyProblem(undefined), /empty/)
 })
 
 test('a store release candidate can target one store while the other is unpublished', () => {
@@ -296,6 +301,41 @@ test('a store release candidate can target one store while the other is unpublis
   const promotion = read('.github/workflows/production-promotion.yml')
   assert.match(promotion, /\$PLATFORM" != "google" \]\]; then test "\$\{#ipas\[@\]\}" -eq 1/)
   assert.match(promotion, /\$PLATFORM" != "apple" \]\]; then test "\$\{#aabs\[@\]\}" -eq 1/)
+})
+
+test('an unusable OTA verification key fails the build instead of the app', () => {
+  // A browser submits a textarea with CRLF, so a key pasted into the GitHub web
+  // interface carries carriage returns. The updater plugin removes line feeds
+  // but not carriage returns, cannot decode the key, and calls `fatalError` —
+  // the shipped app died at launch on every device.
+  const body = [
+    'MIIBCgKCAQEAq5W3GA2yafbg7M4jrh0KIjmKAn5s473RDJpmwre6Xxv8Km9LB84r',
+    'Fh8NveQb3U5rYEe8T+42rUH3vjkOdy8DA+SGBMYadIzGkM0otT2jhZQlVZnK23F5',
+    'hYlI1sSJFzIYK+imIkqt5q6oUMSZG2Q/EPp0oVUEGy55jhxrjPYmVPVadZWUdk1c',
+    'uBQm0Fole+Y93XazRr6URRbBKAIYi7mxEh9eWZfuN8OdtRNaAefFRS8QVHOuqWT0',
+    'pyztAq+EfTMm3nNTXtPRU4F2m7T8xqI3HuQL9zQ903UJ+g0S2fTMAUJav/999aNK',
+    'J6+5nSs8Ey1tFIkvtEsKEpTtwOQPbv1lvQIDAQAB',
+  ]
+  const pem = ['-----BEGIN RSA PUBLIC KEY-----', ...body, '-----END RSA PUBLIC KEY-----']
+  assert.equal(publicKeyProblem(pem.join('\n')), null)
+  assert.equal(publicKeyProblem(pem.join('\r\n')), null, 'carriage returns are removed')
+  assert.equal(normalizePublicKey(pem.join('\r\n')), pem.join('\n'))
+  assert.match(publicKeyProblem(''), /empty/)
+  assert.match(publicKeyProblem(pem.join('\n').replace('MIIB', 'MI!B')), /base64/)
+  // A syntactically clean but truncated key still has to be rejected.
+  assert.match(
+    publicKeyProblem(
+      ['-----BEGIN RSA PUBLIC KEY-----', 'MIIBCgKC', '-----END RSA PUBLIC KEY-----'].join('\n')
+    ),
+    /DER/
+  )
+
+  // The app strips the carriage returns itself, and both release paths refuse
+  // to ship a key that cannot be parsed.
+  assert.match(read('capacitor.config.ts'), /SYNAPLAN_OTA_PUBLIC_KEY\?\.replace\(\/\\r\/g, ''\)/)
+  for (const workflow of ['.github/workflows/ota.yml', '.github/workflows/store-rc.yml']) {
+    assert.match(read(workflow), /node scripts\/ota-key\.mjs/, workflow)
+  }
 })
 
 test('a TestFlight upload does not assign the build to an internal group', () => {

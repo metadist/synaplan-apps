@@ -106,11 +106,9 @@ jobs:
           # The public key is compiled into the binary and is the only thing that
           # lets a shipped app reject a tampered bundle. An empty value drops
           # `publicKey` from the config without any error, so a release built that
-          # way would trust every bundle for the lifetime of the install.
-          if test -z "$SYNAPLAN_OTA_PUBLIC_KEY"; then
-            echo "::error::CAPGO_BUNDLE_PUBLIC_KEY is empty. It must be an environment VARIABLE (not a secret) of store-qa, otherwise the shipped app accepts unverified OTA bundles."
-            exit 1
-          fi
+          # way would trust every bundle for the lifetime of the install, and a
+          # malformed one aborts the app at launch on every device.
+          node scripts/ota-key.mjs
 
       - name: Require Xcode 26 or newer
         run: |
