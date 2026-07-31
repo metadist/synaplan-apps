@@ -344,10 +344,12 @@ jobs:
             '{key_id:$key_id, issuer_id:$issuer_id, key:$key, in_house:false}' \
             > "$RUNNER_TEMP/asc-api-key.json"
           chmod 600 "$RUNNER_TEMP/asc-api-key.json"
+          # App Store Connect hands a processed build to the internal testers on
+          # its own and rejects an attempt to assign one to an internal group,
+          # so the group is recorded for the promotion but not passed here.
           fastlane pilot upload \
             --ipa "$RUNNER_TEMP"/store-rc/*.ipa \
             --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
-            --groups "$TESTFLIGHT_INTERNAL_GROUP" \
             --skip_waiting_for_build_processing false
 
       - name: Upload to Google Play Internal
