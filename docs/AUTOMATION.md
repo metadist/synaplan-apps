@@ -161,7 +161,22 @@ To stop the automation entirely, disable `auto-tag.yml` in `synaplan`. No tag me
 
 ## Operational dependencies
 
-`ota.yml` and `store-rc.yml` run on the self-hosted `mobile` runner. If it is offline the chain
-stops silently after the sync PR merges. `ota.yml` fails fast with an explicit message when no
-runner picks the job up within the configured timeout, so the failure is visible instead of a queued
-job nobody notices.
+Every workflow runs on GitHub-hosted machines. There is no build machine to maintain, and **no
+contributor ever needs a runner**: cloning the repository and following [`DEVELOPMENT.md`](./DEVELOPMENT.md)
+is the whole setup. Release infrastructure is deliberately not part of a development environment —
+a runner executes workflow code with repository secrets, which does not belong on a personal laptop.
+
+Two consequences follow from that choice:
+
+- **The Capgo endpoints must be reachable from the public internet.** `ota.yml` and `ota-health.yml`
+  run on `ubuntu-latest`, so an upload or statistics endpoint that only answers inside a private
+  network would fail there. The updater endpoint is public by necessity anyway, since installed apps
+  fetch from it.
+- **`store-rc.yml` is pinned to `macos-26`, not `macos-latest`.** A signed release must not silently
+  move to a new operating system and Xcode default. The image carries the required Xcode and the
+  Android SDK, so a single job produces both artifacts. macOS minutes are billed at ten times the
+  Linux rate; store builds are rare enough for that to be cheaper than owning a Mac, but it is the
+  reason the frequent OTA path stays on Linux.
+
+When the pinned image is retired, the explicit Xcode assertion in the workflow fails loudly rather
+than producing a build against an unreviewed toolchain.

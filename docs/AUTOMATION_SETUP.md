@@ -100,12 +100,14 @@ Create the environments `canary`, `production` and `store-qa` under
 <https://github.com/metadist/synaplan-apps/settings/environments> and fill them with the names
 listed in [`AUTOMATION.md`](./AUTOMATION.md#3-environments-in-synaplan-apps).
 
-Two things are easy to get wrong there:
+Three things are easy to get wrong there:
 
 - `CAPGO_CHANNEL` must be spelled exactly like the environment it sits in (`canary` or
   `production`). `ota.yml` refuses a mismatch.
 - `CAPGO_STATS_URL` and `CAPGO_STATS_API_URL` are different endpoints. The first is where the app
   reports to, the second is where the health check reads from.
+- The upload and statistics endpoints must answer from the public internet. The workflows run on
+  GitHub-hosted machines, so an endpoint reachable only inside a private network will fail there.
 
 Do not add required reviewers to `canary` or `production` — that is exactly the manual approval
 this automation removes. `store-qa` may keep reviewers: the build still runs automatically, only

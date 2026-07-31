@@ -31,7 +31,10 @@ permissions:
 jobs:
   release-candidate:
     name: Build store release candidate
-    runs-on: [self-hosted, mobile, macOS]
+    # Pinned rather than macos-latest: a signed release must not silently move to
+    # a new operating system and Xcode default. The image carries both the Xcode
+    # the step below requires and the Android SDK, so one job covers both stores.
+    runs-on: macos-26
     environment: store-qa
     env:
       SYNAPLAN_ENV: prod
@@ -86,7 +89,7 @@ jobs:
           unzip -q "$RUNNER_TEMP/openapi.zip" -d "$RUNNER_TEMP/openapi"
           (
             cd "$RUNNER_TEMP/openapi"
-            sha256sum --check checksums.sha256
+            shasum -a 256 --check checksums.sha256
           )
           gh attestation verify "$RUNNER_TEMP/openapi/checksums.sha256" \
             --repo metadist/synaplan \

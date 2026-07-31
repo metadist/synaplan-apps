@@ -56,9 +56,9 @@ permissions:
 jobs:
   observe:
     name: Observe the published bundle
-    # Same runner as the publish job: the self-hosted statistics endpoint is not
-    # assumed to be reachable from GitHub-hosted runners.
-    runs-on: [self-hosted, mobile]
+    # Same runner as the publish job. The statistics endpoint of the self-hosted
+    # deployment must therefore be reachable from GitHub-hosted runners.
+    runs-on: ubuntu-latest
     environment: ${{ inputs.channel }}
     timeout-minutes: 60
     outputs:

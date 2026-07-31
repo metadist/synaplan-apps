@@ -70,35 +70,12 @@ permissions:
   contents: read
 
 jobs:
-  # The bundle job runs on the self-hosted mobile runner. A queued job that no
-  # runner picks up looks identical to a healthy pipeline, so this watchdog turns
-  # an offline runner into a visible failure instead of silence.
-  runner-watchdog:
-    name: Verify a mobile runner picks the build up
-    runs-on: ubuntu-latest
-    steps:
-      - name: Wait for the bundle job to start
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DEADLINE_MINUTES: '15'
-        run: |
-          set -euo pipefail
-          for _ in $(seq 1 "$DEADLINE_MINUTES"); do
-            status="$(
-              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
-                --jq '[.jobs[] | select(.name | contains("Build signed OTA bundle"))] | first | .status // "queued"'
-            )"
-            if [[ "$status" == "in_progress" || "$status" == "completed" ]]; then
-              exit 0
-            fi
-            sleep 60
-          done
-          echo "::error::No self-hosted mobile runner started the OTA build within ${DEADLINE_MINUTES} minutes."
-          exit 1
-
   bundle:
     name: Build signed OTA bundle
-    runs-on: [self-hosted, mobile]
+    # An OTA bundle is web assets only, so this needs no macOS and no machine of
+    # our own. It does require the configured Capgo endpoints to be reachable
+    # from GitHub-hosted runners.
+    runs-on: ubuntu-latest
     environment: ${{ inputs.channel }}
     timeout-minutes: 60
     outputs:
