@@ -155,6 +155,10 @@ itself.
   `appReadyTimeout` is discarded and the previous bundle is restored.
 - **The channel is watched.** `ota-health.yml` polls the published bundle and rolls back
   automatically when the healthy share stays below the configured threshold.
+- **Store binaries stay tied to their build.** `store-rc.yml` records a SHA-256 for every signed
+  artifact and `production-promotion.yml` re-checks it before touching a rollout. Signed provenance
+  would be the stronger guarantee, but GitHub only offers it for private repositories on Enterprise
+  Cloud; the OpenAPI artifact from the public `synaplan` repository is still attested and verified.
 
 ## Stopping a rollout
 

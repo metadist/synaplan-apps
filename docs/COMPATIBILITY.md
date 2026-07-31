@@ -8,14 +8,13 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.0 | `d09c21d137cb80fd77899307e475443be595c9e7` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Single-page onboarding + subscription paywall, merged to `synaplan` `main` (see below). Not yet tagged, so **not releasable** as-is. Previous reviewed baseline: adea0218a8472f95f459ff17dbdc2c72b7841f2a |
+| 4.0.0 | `v4.0.7` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Reviewed mobile baseline v4.0.7 |
 
-## Untagged `main` pin — review complete, release still pending
+## What the `v4.0.7` pin carries
 
-The pin points at `d09c21d137cb80fd77899307e475443be595c9e7` (`v4.0.6-19-gd09c21d13`), the merge of
-[metadist/synaplan#1405](https://github.com/metadist/synaplan/pull/1405) on `main`. The change is
-reviewed and merged, so this is no longer a moving development pin — but it carries no release tag
-yet, and `AGENTS.md` requires a reviewed tag for a store build.
+The pin points at the `v4.0.7` release tag (`89c23b16585b6ca023ce003d0c5afe76adaec4f7`), which
+includes the merge of
+[metadist/synaplan#1405](https://github.com/metadist/synaplan/pull/1405).
 
 It carries two changes:
 
@@ -33,8 +32,8 @@ It carries two changes:
   the paywall routes a guest through sign-up and resumes on `/subscription?plan=<tier>`.
 - This pin also moves the platform state forward from the `v4.0.2-29` baseline, so the submodule
   diff and its `MOBILE-APP SEAM` markers still need a full review.
-- Before a release: tag the reviewed `synaplan` release, re-pin to that tag, and add a new matrix
-  row above.
+- Before the next release: re-pin to the new reviewed `synaplan` release tag and add a matrix row
+  above.
 
 ## How to read / maintain
 

@@ -50,9 +50,7 @@ The environment is selected at build time (Epic 10) together with the API/WS bas
 
 - **Repo:** `synaplan` (public) via **HTTPS** (`https://github.com/metadist/synaplan.git`).
 - **Path:** `./synaplan`
-- **Current pin:** `d09c21d137cb80fd77899307e475443be595c9e7` (exact SHA; never a moving branch) —
-  the `main` merge of the single-page onboarding and subscription paywall. Reviewed but not tagged,
-  so re-pin to the release tag before a store build; see `docs/COMPATIBILITY.md`.
+- **Current pin:** `v4.0.7` (exact release tag/SHA; never a moving branch).
 
 ## Apple / Google account identifiers (fill in Epic 0.1)
 

@@ -143,8 +143,8 @@
 - ⬜ 🤖 Bump app version + `versionCode`/`CFBundleVersion`.
 - ⬜ 🤖 Add the release row to [`docs/COMPATIBILITY.md`](COMPATIBILITY.md); set `MIN_APP_VERSION` only if there is a breaking API change.
 - ⬜ 🤖 Tag platform + apps consistently; confirm the pinned tag matches the snapshot in §0.
-- ⬜ 🤖 The protected production workflow references a successful Store-RC run and verifies the
-  attested AAB/IPA identity before changing either staged rollout.
+- ⬜ 🤖 The protected production workflow references a successful Store-RC run and re-checks the
+  recorded AAB/IPA checksums before changing either staged rollout.
 
 ---
 
