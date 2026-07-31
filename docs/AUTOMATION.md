@@ -1,7 +1,9 @@
-# Zero-Touch Release Automation
+# Release Automation
 
-> How a merge into `metadist/synaplan` `main` reaches an installed app without a manual step,
-> what the guard rails are, and how to stop a rollout.
+> How a release of `metadist/synaplan` reaches an installed app, what the guard rails are, and how
+> to stop a rollout.
+>
+> Cutting the release is the one deliberate step; everything after the tag is unattended.
 
 Related: [`OTA_POLICY.md`](./OTA_POLICY.md) for what may ship over the air,
 [`COMPATIBILITY.md`](./COMPATIBILITY.md) for the pin record, [`SECRETS.md`](./SECRETS.md) for the
@@ -11,7 +13,8 @@ credentials this chain needs.
 
 | # | Where | Workflow | What it does |
 |---|-------|----------|--------------|
-| 1 | `synaplan` | `auto-tag.yml` | Classifies the merge with `scripts/mobile-impact.mjs`. Only `ota-candidate` and `store-required` get an automatic patch tag `vX.Y.Z`. |
+| 0 | `synaplan` | — | A maintainer starts `release-tag.yml` when a release is due. This is the only manual step. |
+| 1 | `synaplan` | `release-tag.yml` | Classifies everything merged since the previous release tag with `scripts/mobile-impact.mjs`. Only `ota-candidate` and `store-required` get a patch tag `vX.Y.Z`. Refuses a commit without a successful CI run. |
 | 2 | `synaplan` | `ci.yml` | Runs on the new tag. |
 | 3 | `synaplan` | `mobile-release-artifacts.yml` | Publishes the attested `mobile-release-<tag>-<sha>` artifact and dispatches `synaplan-mobile-release` to this repository. |
 | 4 | `synaplan-apps` | `sync-synaplan.yml` | Verifies the artifact and its attestation, moves the submodule pin, updates `COMPATIBILITY.md` and `IDENTIFIERS.md`, opens a PR and enables auto-merge. |
@@ -24,8 +27,24 @@ credentials this chain needs.
 The classification is written to `.github/release-route.json` by the sync workflow, so step 6 routes
 on a value that was verified against the signed source manifest instead of re-deriving it.
 
+## Cutting a release
+
+```bash
+# Preview: reports the classification and the tag without creating it
+gh workflow run release-tag.yml -R metadist/synaplan -f dry_run=true
+
+# Release
+gh workflow run release-tag.yml -R metadist/synaplan
+```
+
+Releasing is deliberate rather than per-merge for two reasons. The classifier is fail-closed, so a
+large share of merges lands on the store path, and tagging each one would produce a stream of review
+candidates. And a tag triggers a second full CI run on the same commit, because `ci.yml` builds the
+version-tagged images on `v*` — acceptable once per release, wasteful once per merge.
+
 ## What is still manual
 
+- Deciding when to cut a release.
 - Submitting a store build for App Store review and answering review questions. Everything up to
   the TestFlight and Play internal builds is automatic.
 - The one-time credential setup below.
@@ -157,7 +176,8 @@ gh workflow run ota.yml -R metadist/synaplan-apps \
 Published bundle versions are recorded in the run summary of `ota.yml` and in the
 `Current OTA bundle` column of [`COMPATIBILITY.md`](./COMPATIBILITY.md).
 
-To stop the automation entirely, disable `auto-tag.yml` in `synaplan`. No tag means no chain.
+To stop the automation entirely, stop cutting releases — or disable `release-tag.yml` in `synaplan`
+so nobody can. No tag means no chain.
 
 ## Operational dependencies
 

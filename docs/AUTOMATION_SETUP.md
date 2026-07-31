@@ -5,9 +5,9 @@
 >
 > Reference for what all of this does: [`AUTOMATION.md`](./AUTOMATION.md).
 
-Nothing here is destructive. Until the credentials exist the chain stays inert: `auto-tag.yml`
-reports "Automatic tagging is inactive" and `mobile-release-artifacts.yml` reports a skipped
-dispatch. You can merge the automation first and set it up afterwards.
+Nothing here is destructive. Until the credentials exist the chain stays inert: `release-tag.yml`
+reports "Tagging is inactive" and `mobile-release-artifacts.yml` reports a skipped dispatch. You can
+merge the automation first and set it up afterwards.
 
 ## Part 1 — Three GitHub Apps
 
