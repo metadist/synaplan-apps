@@ -17,7 +17,12 @@ no network calls to Apple.
 | ----- | ----- |
 | StoreKit config file with the 3 subscriptions | `ios/App/App/Synaplan.storekit` |
 | Shared scheme that loads it on launch | `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` |
-| Product IDs (match the backend defaults) | `com.synaplan.app.pro.monthly`, `.team.monthly`, `.business.monthly` |
+| Product IDs (must match `IAP_PRODUCT_*` on the server) | `com.synaplan.app.pro.monthly`, `.team.monthly.v2`, `.business.monthly.v2` |
+
+> The backend has **no** built-in product IDs — `IAP_PRODUCT_PRO` / `_TEAM` / `_BUSINESS` are empty
+> by default and every environment sets its own. Team and Business carry the `.v2` suffix because
+> the original products were created with Family Sharing enabled, which Apple cannot switch off
+> again (see the launch plan); the replacements have it disabled.
 
 The `.storekit` prices mirror the server's `appPrice` (web price + the
 `IAP_STORE_PRICE_*` EUR catalogue, must match ASC): €24.99 / €64.99 / €129.99. In-app prices
@@ -93,6 +98,50 @@ Useful Xcode menus while the app runs:
    `IAP_APPLE_ROOT_CERTS_DIR`, `IAP_APPLE_APP_APPLE_ID` set.
 4. Configure the App Store Server Notifications V2 URL (sandbox) to
    `https://<server>/api/v1/iap/apple/notifications`.
+
+### Persist the Apple root certificates (production hosts)
+
+`IAP_APPLE_ROOT_CERTS_DIR` (usually `var/apple-roots`) lives **inside the backend
+container** unless you mount it. A `docker compose up -d --force-recreate
+backend` (or any image rebuild) **wipes the directory**, `/iap/verify` returns
+503 again, and every purchase fails until the cert is re-downloaded.
+
+On production (`synweb100` / `synaplan-compose`), do **one** of:
+
+1. **Preferred:** mount a host path into the backend (and worker, if present)
+   service, e.g. `./data/apple-roots:/app/var/apple-roots`, then download once
+   onto that volume; or
+2. Add the `curl … AppleRootCA-G3.cer` step to the deploy / entrypoint so every
+   container start re-creates the file.
+
+After every backend recreate, sanity-check:
+
+```bash
+docker compose exec backend sh -c 'ls -l var/apple-roots && openssl x509 -inform der -in var/apple-roots/AppleRootCA-G3.cer -noout -subject'
+```
+
+Keep the file as Apple ships it (**DER** `.cer`). Do not convert to PEM.
+
+## Flip Sandbox → Production (go-live only)
+
+Keep `IAP_APPLE_ENVIRONMENT=Sandbox` through **TestFlight QA and App Review**.
+TestFlight purchases and Apple's reviewer purchases are always Sandbox; with
+`Production` they fail and the review is rejected.
+
+Flip **only after Apple approves**, immediately before you manually release the
+version (or right after approval if you chose automatic release):
+
+1. Set `IAP_APPLE_ENVIRONMENT=Production` on the production backend (and worker).
+2. Restart: `docker compose up -d backend` (and worker if applicable).
+3. In App Store Connect → App → App Information → **App Store Server
+   Notifications V2**: switch the URL from the Sandbox endpoint to Production
+   (same path: `https://web.synaplan.com/api/v1/iap/apple/notifications`).
+4. Confirm `var/apple-roots` still has `AppleRootCA-G3.cer` (see above).
+5. Smoke-test **one real purchase** on a production App Store account (real
+   money — refund via App Store Connect if needed).
+
+Do **not** leave production on Sandbox after go-live: real store receipts would
+then fail verification.
 
 ## Android (Play Billing)
 
