@@ -99,6 +99,14 @@ if (devServerUrl) {
 }
 const usesLocalHttp = Boolean(devBackendUrl) || Boolean(devServerUrl)
 
+// The Capgo CLI resolves its management API and file-storage hosts from the
+// `localApi`/`localApiFiles` plugin keys and silently falls back to the
+// official cloud (api./files.capgo.app) when they are absent. A self-hosted
+// publish must land on the same instance the app updates from, so both are
+// pinned to the update endpoint's origin. The native plugin ignores these
+// keys; only the publishing CLI reads them.
+const otaApiOrigin = otaUpdateUrl ? new URL(otaUpdateUrl).origin : undefined
+
 const config: CapacitorConfig = {
   appId,
   appName,
@@ -164,6 +172,7 @@ const config: CapacitorConfig = {
       ...(otaUpdateUrl ? { updateUrl: otaUpdateUrl } : {}),
       ...(otaChannelUrl ? { channelUrl: otaChannelUrl } : {}),
       ...(otaStatsUrl ? { statsUrl: otaStatsUrl } : {}),
+      ...(otaApiOrigin ? { localApi: otaApiOrigin, localApiFiles: otaApiOrigin } : {}),
       ...(otaPublicKey ? { publicKey: otaPublicKey } : {}),
       defaultChannel: otaDefaultChannel,
       // Chosen behavior: check on every auto-update run and install directly, so
