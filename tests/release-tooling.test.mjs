@@ -265,6 +265,37 @@ test('a build refuses to ship without the OTA verification key', () => {
   }
 })
 
+test('a store release candidate can target one store while the other is unpublished', () => {
+  const workflow = read('.github/workflows/store-rc.yml')
+  // Android is built first, so an unconfigured second store must not be able to
+  // fail the job before the store that is actually being shipped is reached.
+  assert.match(
+    workflow,
+    /SELECTED: \$\{\{ inputs\.platforms \|\| vars\.STORE_PLATFORMS \|\| 'ios,android' \}\}/
+  )
+  for (const step of ['Import Android signing material', 'Build signed Android AAB']) {
+    assert.match(
+      workflow,
+      new RegExp(`${step}\\n\\s+if: steps\\.platforms\\.outputs\\.android == 'true'`),
+      step
+    )
+  }
+  for (const step of ['Import iOS signing material', 'Build and export signed iOS archive']) {
+    assert.match(
+      workflow,
+      new RegExp(`${step}\\n\\s+if: steps\\.platforms\\.outputs\\.ios == 'true'`),
+      step
+    )
+  }
+  // Uploading is gated separately, so a dry run cannot reach a store either.
+  assert.match(workflow, /! inputs\.dry_run && steps\.platforms\.outputs\.ios == 'true'/)
+  assert.match(workflow, /! inputs\.dry_run && steps\.platforms\.outputs\.android == 'true'/)
+  // Attesting a glob that matches nothing fails the action, so each artifact
+  // carries its own step rather than one step naming both.
+  assert.match(workflow, /Attest the signed iOS artifact/)
+  assert.match(workflow, /Attest the signed Android artifact/)
+})
+
 test('OTA withdrawal stays opt-in while the failure signal is unmeasurable', () => {
   const workflow = read('.github/workflows/ota-health.yml')
   assert.match(workflow, /withdraw_on_unhealthy:\n\s+required: false\n\s+default: false/)

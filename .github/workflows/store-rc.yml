@@ -3,6 +3,11 @@ name: Mobile Store RC
 on:
   workflow_dispatch:
     inputs:
+      platforms:
+        description: Stores to build for, or empty for the STORE_PLATFORMS variable
+        required: false
+        default: ''
+        type: string
       dry_run:
         description: Build signed artifacts without store uploads
         required: true
@@ -14,6 +19,10 @@ on:
   # passes, and a caller job without that environment cannot see them at all.
   workflow_call:
     inputs:
+      platforms:
+        required: false
+        default: ''
+        type: string
       dry_run:
         required: false
         default: true
@@ -46,6 +55,35 @@ jobs:
       SYNAPLAN_OTA_DEFAULT_CHANNEL: ${{ vars.CAPGO_PRODUCTION_CHANNEL || 'production' }}
       TESTFLIGHT_INTERNAL_GROUP: ${{ vars.TESTFLIGHT_INTERNAL_GROUP || 'Internal' }}
     steps:
+      # A store is only reachable once its signing material and store account
+      # exist. Selecting them keeps a release possible while the second store is
+      # still being set up, without carrying a half-configured build.
+      - name: Resolve target stores
+        id: platforms
+        env:
+          SELECTED: ${{ inputs.platforms || vars.STORE_PLATFORMS || 'ios,android' }}
+        run: |
+          set -euo pipefail
+          ios=false
+          android=false
+          for store in ${SELECTED//,/ }; do
+            case "$store" in
+              ios) ios=true ;;
+              android) android=true ;;
+              *)
+                echo "::error::Unknown store '${store}' — use ios, android, or both."
+                exit 1
+                ;;
+            esac
+          done
+          if [ "$ios" = false ] && [ "$android" = false ]; then
+            echo "::error::Select at least one store."
+            exit 1
+          fi
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
+          echo "android=$android" >> "$GITHUB_OUTPUT"
+          echo "Building a release candidate for: ${SELECTED}." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout with submodules
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -122,6 +160,7 @@ jobs:
           npm run check:release:strict
 
       - name: Import Android signing material
+        if: steps.platforms.outputs.android == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -141,10 +180,12 @@ jobs:
           chmod 600 "$HOME/.gradle/gradle.properties"
 
       - name: Build signed Android AAB
+        if: steps.platforms.outputs.android == 'true'
         working-directory: android
         run: ./gradlew --no-daemon bundleRelease
 
       - name: Import iOS signing material
+        if: steps.platforms.outputs.ios == 'true'
         env:
           CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
@@ -173,6 +214,7 @@ jobs:
           rm -f "$RUNNER_TEMP/distribution.p12"
 
       - name: Build and export signed iOS archive
+        if: steps.platforms.outputs.ios == 'true'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
@@ -206,13 +248,19 @@ jobs:
       - name: Prepare store upload request
         env:
           PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          BUILD_IOS: ${{ steps.platforms.outputs.ios }}
+          BUILD_ANDROID: ${{ steps.platforms.outputs.android }}
         run: |
           set -euo pipefail
-          test -n "$PLAY_CREDENTIALS"
-          printf '%s' "$PLAY_CREDENTIALS" | jq -e '.client_email and .private_key' >/dev/null
           mkdir -p "$RUNNER_TEMP/store-rc"
-          cp android/app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/store-rc/"
-          cp "$RUNNER_TEMP"/ios-export/*.ipa "$RUNNER_TEMP/store-rc/"
+          if [ "$BUILD_ANDROID" = 'true' ]; then
+            test -n "$PLAY_CREDENTIALS"
+            printf '%s' "$PLAY_CREDENTIALS" | jq -e '.client_email and .private_key' >/dev/null
+            cp android/app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/store-rc/"
+          fi
+          if [ "$BUILD_IOS" = 'true' ]; then
+            cp "$RUNNER_TEMP"/ios-export/*.ipa "$RUNNER_TEMP/store-rc/"
+          fi
           app_version="$(node -p "require('./package.json').version")"
           jq -n \
             --arg track internal \
@@ -220,22 +268,32 @@ jobs:
             --arg sha "$GITHUB_SHA" \
             --arg app_version "$app_version" \
             --arg build_number "$SYNAPLAN_BUILD_NUMBER" \
+            --argjson ios "$BUILD_IOS" \
+            --argjson android "$BUILD_ANDROID" \
             '{
               googlePlayTrack:$track,
               testFlightGroup:$apple_group,
               commit:$sha,
               appVersion:$app_version,
               iosBuildNumber:$build_number,
-              androidVersionCode:$build_number
+              androidVersionCode:$build_number,
+              stores:{ios:$ios, android:$android}
             }' \
             > "$RUNNER_TEMP/store-rc/upload-request.json"
 
-      - name: Attest signed store artifacts
+      # Attested per store, because the action fails on a subject path that
+      # matches nothing and only the selected artifact exists.
+      - name: Attest the signed iOS artifact
+        if: steps.platforms.outputs.ios == 'true'
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          subject-path: |
-            ${{ runner.temp }}/store-rc/*.aab
-            ${{ runner.temp }}/store-rc/*.ipa
+          subject-path: ${{ runner.temp }}/store-rc/*.ipa
+
+      - name: Attest the signed Android artifact
+        if: steps.platforms.outputs.android == 'true'
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ runner.temp }}/store-rc/*.aab
 
       - name: Upload signed store artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -250,7 +308,7 @@ jobs:
         run: gem install fastlane --version 2.237.0 --no-document
 
       - name: Upload to TestFlight Internal
-        if: ${{ ! inputs.dry_run }}
+        if: ${{ ! inputs.dry_run && steps.platforms.outputs.ios == 'true' }}
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -273,7 +331,7 @@ jobs:
             --skip_waiting_for_build_processing false
 
       - name: Upload to Google Play Internal
-        if: ${{ ! inputs.dry_run }}
+        if: ${{ ! inputs.dry_run && steps.platforms.outputs.android == 'true' }}
         env:
           PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
