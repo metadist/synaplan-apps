@@ -99,6 +99,14 @@ jobs:
           if [[ "${{ inputs.operation }}" == "rollback" ]]; then
             test -n "${{ inputs.rollback_bundle }}"
           fi
+          # We sign every bundle, so the app must be able to verify one. An empty
+          # public key disables verification silently: the config simply omits
+          # `publicKey` and the updater then accepts any bundle. Entering the key
+          # as a secret instead of a variable produces exactly that empty value.
+          if [[ "${{ inputs.operation }}" == "publish" && -z "$SYNAPLAN_OTA_PUBLIC_KEY" ]]; then
+            echo "::error::CAPGO_BUNDLE_PUBLIC_KEY is empty. It must be an environment VARIABLE (not a secret) of ${{ inputs.channel }}, otherwise the app cannot verify the signed bundle."
+            exit 1
+          fi
           echo "Store-required and payment-impacting releases are not accepted by this workflow." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout with submodules

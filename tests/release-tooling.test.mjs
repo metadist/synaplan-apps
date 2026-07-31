@@ -242,6 +242,18 @@ test('OTA health reads bundle adoption from the statistics rollup', () => {
   )
 })
 
+test('a build refuses to ship without the OTA verification key', () => {
+  // Entering the key as a secret leaves `vars.CAPGO_BUNDLE_PUBLIC_KEY` empty,
+  // which drops `publicKey` from the config and disables signature verification
+  // without any error. Both paths that reach a device must reject that.
+  for (const workflow of ['.github/workflows/ota.yml', '.github/workflows/store-rc.yml']) {
+    const content = read(workflow)
+    assert.match(content, /SYNAPLAN_OTA_PUBLIC_KEY/)
+    assert.match(content, /CAPGO_BUNDLE_PUBLIC_KEY is empty/)
+    assert.match(content, /-z "\$SYNAPLAN_OTA_PUBLIC_KEY"/)
+  }
+})
+
 test('OTA withdrawal stays opt-in while the failure signal is unmeasurable', () => {
   const workflow = read('.github/workflows/ota-health.yml')
   assert.match(workflow, /withdraw_on_unhealthy:\n\s+required: false\n\s+default: false/)
