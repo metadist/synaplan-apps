@@ -298,6 +298,15 @@ test('a store release candidate can target one store while the other is unpublis
   assert.match(promotion, /\$PLATFORM" != "apple" \]\]; then test "\$\{#aabs\[@\]\}" -eq 1/)
 })
 
+test('a TestFlight upload does not assign the build to an internal group', () => {
+  const workflow = read('.github/workflows/store-rc.yml')
+  // App Store Connect distributes to internal testers itself and answers
+  // "Cannot add internal group to a build", which failed the run after the
+  // binary had already been accepted.
+  assert.doesNotMatch(workflow, /--groups "\$TESTFLIGHT_INTERNAL_GROUP"/)
+  assert.match(workflow, /fastlane pilot upload/)
+})
+
 test('a store build number stays above what the stores already accepted', () => {
   const workflow = read('.github/workflows/store-rc.yml')
   // A workflow run counter restarts low and would collide with the builds that
