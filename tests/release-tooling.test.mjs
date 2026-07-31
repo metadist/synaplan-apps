@@ -35,8 +35,11 @@ test('bundle versions bind app, Synaplan ref/SHA, and CI build', () => {
     tag: 'v4.0.0',
     build: '101',
   })
-  assert.equal(first, '4.0.0-synaplan.4-0-0.aaaaaaaaaaaa.ci.100')
+  // The base is the NEXT patch: a prerelease of the app version itself would
+  // sort below the native binary and Capgo would refuse it as a downgrade.
+  assert.equal(first, '4.0.1-synaplan.4-0-0.aaaaaaaaaaaa.ci.100')
   assert.notEqual(first, second)
+  assert.throws(() => bundleVersion({ version: '4.0', sha: 'a'.repeat(40), build: '1' }))
 })
 
 test('production self-hosted OTA endpoints require HTTPS', () => {

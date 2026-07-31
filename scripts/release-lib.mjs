@@ -41,13 +41,25 @@ export function submoduleIdentity() {
 }
 
 export function bundleVersion({ version, sha, tag, build }) {
+  // Capgo compares bundle and native versions by semver and (correctly)
+  // refuses anything at or below the installed binary. A prerelease of the
+  // app version itself (4.0.0-synaplan...) sorts BELOW 4.0.0, so the server
+  // answered every update check with "cannot revert under native version".
+  // Basing the prerelease on the next patch keeps the downgrade guard active:
+  // 4.0.0 < 4.0.1-synaplan... < 4.0.1, so the bundle wins over the current
+  // store build and still yields to the next one.
+  const parts = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
+  if (!parts) {
+    throw new Error(`App version ${version} is not plain semver (major.minor.patch)`)
+  }
+  const base = `${parts[1]}.${parts[2]}.${Number(parts[3]) + 1}`
   const ref = tag
     ?.replace(/^v/, '')
     .replace(/[^0-9A-Za-z-]+/g, '-')
     .replace(/^-|-$/g, '')
   const ci = String(build).replace(/[^0-9A-Za-z-]+/g, '-')
   const source = ref ? `${ref}.${sha.slice(0, 12)}` : sha.slice(0, 12)
-  return `${version}-synaplan.${source}.ci.${ci}`
+  return `${base}-synaplan.${source}.ci.${ci}`
 }
 
 export function sha256File(path) {
