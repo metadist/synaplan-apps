@@ -267,7 +267,8 @@ jobs:
             --channel "$CAPGO_CHANNEL" \
             --path synaplan/frontend/dist \
             --bundle "${{ steps.bundle.outputs.version }}" \
-            --key-data-v2 "$CAPGO_KEY"
+            --key-data-v2 "$CAPGO_KEY" \
+            --tus
           echo "Published bundle \`${{ steps.bundle.outputs.version }}\` to channel \`$CAPGO_CHANNEL\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Pause, resume, or roll back OTA channel
