@@ -242,6 +242,17 @@ test('OTA health reads bundle adoption from the statistics rollup', () => {
   )
 })
 
+test('the public source repository cannot be granted write access here', () => {
+  // Creating a repository dispatch event requires Contents write on this private
+  // repository, and the caller's key is a secret of the PUBLIC source repository.
+  // Being started as a workflow keeps that key at Actions write, so a leak cannot
+  // push code here.
+  const workflow = read('.github/workflows/sync-synaplan.yml')
+  assert.doesNotMatch(workflow, /repository_dispatch/)
+  assert.match(workflow, /workflow_dispatch:/)
+  assert.match(workflow, /source_run_id:/)
+})
+
 test('a build refuses to ship without the OTA verification key', () => {
   // Entering the key as a secret leaves `vars.CAPGO_BUNDLE_PUBLIC_KEY` empty,
   // which drops `publicKey` from the config and disables signature verification

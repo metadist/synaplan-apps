@@ -1,8 +1,13 @@
 name: Sync Synaplan Release
 
+# Started by `mobile-release-artifacts.yml` in the source repository, and by hand
+# when a synchronization needs repeating.
+#
+# Deliberately a workflow dispatch rather than a repository dispatch: the caller
+# lives in the PUBLIC source repository, and creating a repository dispatch event
+# requires Contents write, which would give a leaked key push access to this
+# private repository. Starting a workflow only needs Actions write.
 on:
-  repository_dispatch:
-    types: [synaplan-mobile-release]
   workflow_dispatch:
     inputs:
       synaplan_ref:
@@ -12,6 +17,11 @@ on:
       synaplan_sha:
         description: Commit SHA resolved by that tag
         required: true
+        type: string
+      source_run_id:
+        description: Run that published the release artifact, used to verify it
+        required: false
+        default: ''
         type: string
 
 concurrency:
@@ -27,9 +37,9 @@ jobs:
     name: Open synchronization PR
     runs-on: ubuntu-latest
     env:
-      SYNAPLAN_REF: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag || inputs.synaplan_ref }}
-      SYNAPLAN_SHA: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || inputs.synaplan_sha }}
-      SOURCE_RUN_ID: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.source_run_id || '' }}
+      SYNAPLAN_REF: ${{ inputs.synaplan_ref }}
+      SYNAPLAN_SHA: ${{ inputs.synaplan_sha }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
     steps:
       - name: Validate requested release identity
         run: |

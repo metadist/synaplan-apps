@@ -58,7 +58,7 @@ Same four steps, with these values:
 | | |
 |---|---|
 | Name | `synaplan-mobile-dispatch` |
-| Permissions | **Contents: Read-only** |
+| Permissions | **Actions: Read and write** (no Contents permission at all) |
 | Install on | `synaplan-apps` |
 | Secrets go into | `metadist/synaplan` |
 | Secret names | `MOBILE_APPS_APP_ID`, `MOBILE_APPS_APP_PRIVATE_KEY` |
@@ -76,8 +76,11 @@ Same four steps again:
 | Secret names | `MOBILE_SYNC_APP_ID`, `MOBILE_SYNC_APP_PRIVATE_KEY` |
 
 > Why three apps and not one: a tag created with the built-in `GITHUB_TOKEN` does not start any
-> workflow, so the tagger needs its own credentials. The write scope for the app repository is kept
-> out of the public repository, which is why the dispatcher is read-only and separate.
+> workflow, so the tagger needs its own credentials. The dispatcher is separate and deliberately
+> carries no Contents permission, because its private key lives in the **public** repository — with
+> write access there, a leak would mean push access to this private one. Starting a workflow needs
+> only Actions write, which is why the source repository calls the synchronization workflow instead
+> of sending a repository dispatch (that API is gated on Contents write).
 
 ## Part 2 — One checkbox
 

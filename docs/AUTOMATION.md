@@ -16,7 +16,7 @@ credentials this chain needs.
 | 0 | `synaplan` | — | A maintainer starts `release-tag.yml` when a release is due. This is the only manual step. |
 | 1 | `synaplan` | `release-tag.yml` | Classifies everything merged since the previous release tag with `scripts/mobile-impact.mjs`. Only `ota-candidate` and `store-required` get a patch tag `vX.Y.Z`. Refuses a commit without a successful CI run. |
 | 2 | `synaplan` | `ci.yml` | Runs on the new tag. |
-| 3 | `synaplan` | `mobile-release-artifacts.yml` | Publishes the attested `mobile-release-<tag>-<sha>` artifact and dispatches `synaplan-mobile-release` to this repository. |
+| 3 | `synaplan` | `mobile-release-artifacts.yml` | Publishes the attested `mobile-release-<tag>-<sha>` artifact and starts `sync-synaplan.yml` in this repository. |
 | 4 | `synaplan-apps` | `sync-synaplan.yml` | Verifies the artifact and its attestation, moves the submodule pin, updates `COMPATIBILITY.md` and `IDENTIFIERS.md`, opens a PR and enables auto-merge. |
 | 5 | `synaplan-apps` | `ci.yml` | Builds the web bundle and runs the drift gate on the PR. Green means the auto-merge fires. |
 | 6 | `synaplan-apps` | `release-dispatch.yml` | Reads the classification recorded by the sync PR and routes it: `ota-candidate` to `ota.yml`, `store-required` to `store-rc.yml`. |
@@ -64,7 +64,7 @@ and `mobile-release-artifacts.yml` reports a skipped dispatch.
 | App | Installed on | Repository permissions | Secrets stored in |
 |-----|--------------|------------------------|-------------------|
 | Release tagger | `metadist/synaplan` | Contents: read and write | `synaplan`: `MOBILE_TAG_APP_ID`, `MOBILE_TAG_APP_PRIVATE_KEY` |
-| Dispatcher | `metadist/synaplan-apps` | Contents: read-only | `synaplan`: `MOBILE_APPS_APP_ID`, `MOBILE_APPS_APP_PRIVATE_KEY` |
+| Dispatcher | `metadist/synaplan-apps` | Actions: read and write, **no Contents** | `synaplan`: `MOBILE_APPS_APP_ID`, `MOBILE_APPS_APP_PRIVATE_KEY` |
 | Synchronizer | `metadist/synaplan-apps` | Contents + Pull requests: read and write | `synaplan-apps`: `MOBILE_SYNC_APP_ID`, `MOBILE_SYNC_APP_PRIVATE_KEY` |
 
 App tokens are required rather than the default `GITHUB_TOKEN` in two places: a tag created with
