@@ -238,7 +238,7 @@ jobs:
         run: |
           set -uo pipefail
           current="$(
-            npx --yes @capgo/cli@8.25.10 channel currentBundle "$CAPGO_CHANNEL" com.synaplan.app \
+            npx --yes @capgo/cli@8.31.3 channel currentBundle "$CAPGO_CHANNEL" com.synaplan.app \
               --apikey "$CAPGO_API_KEY" \
               --supa-host "$CAPGO_SUPA_HOST" \
               --supa-anon "$CAPGO_SUPA_ANON" 2>/dev/null |
@@ -260,14 +260,15 @@ jobs:
           CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
           CAPGO_KEY: ${{ secrets.CAPGO_BUNDLE_PRIVATE_KEY }}
         run: |
-          npx --yes @capgo/cli@8.25.10 bundle upload com.synaplan.app \
+          npx --yes @capgo/cli@8.31.3 bundle upload com.synaplan.app \
             --apikey "$CAPGO_API_KEY" \
             --supa-host "$CAPGO_SUPA_HOST" \
             --supa-anon "$CAPGO_SUPA_ANON" \
             --channel "$CAPGO_CHANNEL" \
             --path synaplan/frontend/dist \
             --bundle "${{ steps.bundle.outputs.version }}" \
-            --key-data-v2 "$CAPGO_KEY"
+            --key-data-v2 "$CAPGO_KEY" \
+            --tus
           echo "Published bundle \`${{ steps.bundle.outputs.version }}\` to channel \`$CAPGO_CHANNEL\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Pause, resume, or roll back OTA channel
@@ -287,20 +288,20 @@ jobs:
           )
           case "${{ inputs.operation }}" in
             pause)
-              npx --yes @capgo/cli@8.25.10 channel set "${common[@]}" \
+              npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
                 --no-prod --no-dev --no-emulator --no-device
               ;;
             resume)
               if [[ "$CAPGO_CHANNEL" == "production" ]]; then
-                npx --yes @capgo/cli@8.25.10 channel set "${common[@]}" \
+                npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
                   --prod --device --no-dev --no-emulator
               else
-                npx --yes @capgo/cli@8.25.10 channel set "${common[@]}" \
+                npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
                   --dev --device --no-prod --no-emulator
               fi
               ;;
             rollback)
-              npx --yes @capgo/cli@8.25.10 channel set "${common[@]}" \
+              npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
                 --bundle "$ROLLBACK_BUNDLE" --downgrade
               ;;
           esac

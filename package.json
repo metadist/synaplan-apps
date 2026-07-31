@@ -38,7 +38,7 @@
     "ota:prepare": "node scripts/ota-prepare.mjs",
     "ota:prepare:dry-run": "node scripts/ota-prepare.mjs --dry-run",
     "ota:upload": "node scripts/ota-prepare.mjs",
-    "ota:key:create": "npx --yes @capgo/cli@8.25.10 key create"
+    "ota:key:create": "npx --yes @capgo/cli@8.31.3 key create"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
