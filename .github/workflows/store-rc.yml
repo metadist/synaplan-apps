@@ -8,39 +8,16 @@ on:
         required: true
         default: true
         type: boolean
+  # No `secrets:` declaration on purpose. The signing and store credentials live
+  # in the `store-qa` environment that the job below selects. Declaring them as
+  # call inputs would shadow the environment values with whatever the caller
+  # passes, and a caller job without that environment cannot see them at all.
   workflow_call:
     inputs:
       dry_run:
         required: false
         default: true
         type: boolean
-    secrets:
-      SYNAPLAN_ARTIFACT_TOKEN:
-        required: false
-      ANDROID_KEYSTORE_BASE64:
-        required: true
-      ANDROID_KEYSTORE_PASSWORD:
-        required: true
-      ANDROID_KEY_ALIAS:
-        required: true
-      ANDROID_KEY_PASSWORD:
-        required: true
-      IOS_DISTRIBUTION_CERTIFICATE_BASE64:
-        required: true
-      IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:
-        required: true
-      IOS_PROVISIONING_PROFILE_BASE64:
-        required: true
-      APPLE_TEAM_ID:
-        required: true
-      APP_STORE_CONNECT_KEY_ID:
-        required: true
-      APP_STORE_CONNECT_ISSUER_ID:
-        required: true
-      APP_STORE_CONNECT_PRIVATE_KEY:
-        required: true
-      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:
-        required: true
 
 concurrency:
   group: mobile-store-rc
@@ -54,7 +31,10 @@ permissions:
 jobs:
   release-candidate:
     name: Build store release candidate
-    runs-on: [self-hosted, mobile, macOS]
+    # Pinned rather than macos-latest: a signed release must not silently move to
+    # a new operating system and Xcode default. The image carries both the Xcode
+    # the step below requires and the Android SDK, so one job covers both stores.
+    runs-on: macos-26
     environment: store-qa
     env:
       SYNAPLAN_ENV: prod
@@ -71,6 +51,18 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - name: Require a verifiable OTA configuration
+        run: |
+          set -euo pipefail
+          # The public key is compiled into the binary and is the only thing that
+          # lets a shipped app reject a tampered bundle. An empty value drops
+          # `publicKey` from the config without any error, so a release built that
+          # way would trust every bundle for the lifetime of the install.
+          if test -z "$SYNAPLAN_OTA_PUBLIC_KEY"; then
+            echo "::error::CAPGO_BUNDLE_PUBLIC_KEY is empty. It must be an environment VARIABLE (not a secret) of store-qa, otherwise the shipped app accepts unverified OTA bundles."
+            exit 1
+          fi
 
       - name: Require Xcode 26 or newer
         run: |
@@ -109,7 +101,7 @@ jobs:
           unzip -q "$RUNNER_TEMP/openapi.zip" -d "$RUNNER_TEMP/openapi"
           (
             cd "$RUNNER_TEMP/openapi"
-            sha256sum --check checksums.sha256
+            shasum -a 256 --check checksums.sha256
           )
           gh attestation verify "$RUNNER_TEMP/openapi/checksums.sha256" \
             --repo metadist/synaplan \

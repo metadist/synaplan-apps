@@ -94,6 +94,11 @@ Classify each change before choosing a release path:
 OTA releases originate only here, use the self-hosted Capgo service, and must follow
 `docs/OTA_POLICY.md`. Ambiguous changes are store-required.
 
+The classification, the submodule pin, and the delivery are automated end to end
+(`docs/AUTOMATION.md`). The automation never widens what may ship over the air: it routes on the
+fail-closed classification produced in the source repository and records it in
+`.github/release-route.json`. Treat that policy file and this routing as release-critical code.
+
 ## Native and Store Rules
 
 ### Plugins, Permissions, and Privacy
@@ -153,7 +158,9 @@ OTA releases originate only here, use the self-hosted Capgo service, and must fo
 
 ## Detailed Documentation
 
-- `docs/DEVELOPMENT.md` — local build and OpenAPI schema generation
+- `docs/AUTOMATION.md` — the automated release chain, its setup, and the kill switch
+- `docs/AUTOMATION_SETUP.md` — step-by-step activation of the automation credentials
+- `docs/DEVELOPMENT.md` — local build, simulator live reload, and OpenAPI schema generation
 - `docs/QUALITY_GATES.md` — automated and device-gated test matrix
 - `docs/RELEASE_GATE_v4.md` — coordinated release decision
 - `docs/COMPATIBILITY.md` — app, platform pin, API, and OTA compatibility

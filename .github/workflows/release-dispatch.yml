@@ -1,0 +1,76 @@
+name: Mobile Release Dispatch
+
+# Runs after an automated synchronization pull request merges and routes the
+# release. The route is read from the file that sync-synaplan.yml wrote from the
+# attested source manifest, so no classification is re-derived here.
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/release-route.json']
+
+concurrency:
+  group: mobile-release-dispatch
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  attestations: read
+  contents: read
+
+jobs:
+  route:
+    name: Read the recorded release route
+    runs-on: ubuntu-latest
+    outputs:
+      classification: ${{ steps.route.outputs.classification }}
+      tag: ${{ steps.route.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      - name: Verify the route against the pinned submodule
+        id: route
+        run: node scripts/release-route.mjs --verify >> "$GITHUB_OUTPUT"
+
+      - name: Report the route
+        run: |
+          echo "Routing \`${{ steps.route.outputs.tag }}\` as \`${{ steps.route.outputs.classification }}\`." \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  ota:
+    name: Publish over the air
+    needs: route
+    if: needs.route.outputs.classification == 'ota-candidate'
+    uses: ./.github/workflows/ota.yml
+    with:
+      operation: publish
+      class: ota-candidate
+      channel: production
+      dry_run: false
+    secrets: inherit
+
+  health:
+    name: Watch the published bundle
+    needs: [route, ota]
+    if: needs.route.outputs.classification == 'ota-candidate'
+    uses: ./.github/workflows/ota-health.yml
+    with:
+      channel: production
+      bundle_version: ${{ needs.ota.outputs.bundle_version }}
+      rollback_to: ${{ needs.ota.outputs.previous_bundle_version }}
+    secrets: inherit
+
+  store:
+    name: Build a store release candidate
+    needs: route
+    if: needs.route.outputs.classification == 'store-required'
+    uses: ./.github/workflows/store-rc.yml
+    with:
+      dry_run: false
+    secrets: inherit

@@ -32,12 +32,29 @@ from the backend OpenAPI spec). The platform normally generates it from `http://
 Docker. For a standalone app build we generate it from a reachable spec instead:
 
 ```bash
-SYNAPLAN_OPENAPI_URL=https://web.synaplan.com/api/doc.json ./build.sh --web-only
+SYNAPLAN_OPENAPI_URL=http://localhost:8000/api/doc.json ./build.sh --web-only
 ```
 
-`SYNAPLAN_OPENAPI_URL` defaults to production. `build.sh` runs `openapi-zod-client` then the
-submodule's own `scripts/generate-schemas.js --skip-fetch` post-processor, so the generated
-schemas are identical to the platform's pipeline (no submodule edits required).
+There is **no default**. `build.sh` requires exactly one of `SYNAPLAN_OPENAPI_URL` or
+`SYNAPLAN_OPENAPI_FILE` and exits with code 2 otherwise, because a silent production fallback
+would hide a mismatch between the app schemas and the pinned commit.
+
+`scripts/fetch-openapi.mjs` resolves the two legitimate sources:
+
+```bash
+# From a running local backend (default http://localhost:8000/api/doc.json)
+SYNAPLAN_OPENAPI_FILE="$(npm run --silent openapi:fetch)" ./build.sh
+
+# From the attested artifact of the currently pinned Synaplan commit (needs gh)
+SYNAPLAN_OPENAPI_FILE="$(npm run --silent openapi:fetch -- --from-release)" ./build.sh
+```
+
+`build.sh` runs `openapi-zod-client` then the submodule's own
+`scripts/generate-schemas.js --skip-fetch` post-processor, so the generated schemas are identical
+to the platform's pipeline (no submodule edits required).
+
+> If the Docker stack runs in a non-default context (for example `m4`), the backend is not on
+> `localhost` — use that machine's address for both the spec URL and `SYNAPLAN_API_BASE_URL`.
 
 ## Run on device / simulator
 
@@ -48,6 +65,79 @@ npm run cap:android     # build + run Android (needs Java + Android SDK)
 npm run cap:open:ios    # open ios/App in Xcode
 npm run cap:open:android# open android/ in Android Studio
 ```
+
+## Testing an unmerged Synaplan change in the simulator
+
+Local testing has **nothing to do with the submodule pin**. The simulator only ever shows what is
+in `synaplan/frontend` — commit, branch and uncommitted edits included. The submodule worktree is a
+full clone with its own `origin`, so work directly in it:
+
+```bash
+cd synaplan && git checkout -b my-feature && cd ..
+```
+
+### Full build (what actually ships)
+
+Produces a standalone `com.synaplan.app.dev` app with a DEV badge that installs next to the
+production app.
+
+```bash
+SYNAPLAN_ENV=dev \
+SYNAPLAN_OPENAPI_URL=http://localhost:8000/api/doc.json \
+SYNAPLAN_API_BASE_URL=http://192.168.1.20:8000 \
+./build.sh
+npm run cap:ios
+```
+
+`NSAllowsLocalNetworking` in `ios/App/App/Info.plist` permits the LAN address. The Android
+emulator reaches the host through `10.0.2.2`, so use `SYNAPLAN_DEV_BACKEND=http://10.0.2.2:8000`
+there instead.
+
+### Live reload (what you want while iterating)
+
+Skips the Vue build, `cap sync` and the native build for every change. Three terminals:
+
+```bash
+# 1) The SPA dev server, reachable from the simulator
+cd synaplan/frontend && npm run dev -- --host
+
+# 2) The app-owned bootstrap in front of it. Vite serves the submodule's own
+#    index.html, which has no /synaplan-env.js and no /synaplan-native.js — this
+#    proxy injects both, so window.__SYNAPLAN_API_BASE_URL__ and the in-app
+#    server switcher work exactly like in a bundled build.
+SYNAPLAN_API_BASE_URL=http://192.168.1.20:8000 npm run dev:shell
+
+# 3) Point the WebView at the proxy and run
+SYNAPLAN_ENV=dev SYNAPLAN_DEV_SERVER=http://192.168.1.20:5174 npx cap sync ios
+npm run cap:ios
+```
+
+Use your own LAN address, not `localhost`: an iOS device resolves `localhost` to itself. Hot module
+replacement is proxied, so a save is visible without a rebuild.
+
+`SYNAPLAN_DEV_SERVER` is refused for `SYNAPLAN_ENV=prod`, and `scripts/release-drift.mjs` fails the
+release check if a synced native config still carries a `server.url` — a release binary can never
+load its UI from a developer machine.
+
+### Before committing in this repository
+
+`build.sh` writes the resolved identity into the iOS project, so a dev build leaves the `.dev`
+bundle id behind. Reset it first:
+
+```bash
+SYNAPLAN_ENV=prod SYNAPLAN_BUILD_NUMBER=1 npm run config:app
+```
+
+### Pinning a branch that has no release tag
+
+The automation ([`AUTOMATION.md`](./AUTOMATION.md)) only starts at a tag on `synaplan` `main`. For
+everything before that, resolve the branch to the commit it currently points at and pin that:
+
+```bash
+npm run release:sync -- --ref origin/main --resolve --commit
+```
+
+The branch itself is never pinned; the recorded pin is always an immutable SHA.
 
 ## Identifiers / config
 

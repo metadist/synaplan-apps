@@ -186,6 +186,10 @@ android/capacitor-cordova-android-plugins/
 # The flows themselves (.maestro/*.yaml) ARE committed; their output is not.
 .maestro/artifacts/
 
+# Release build output: signed OTA bundles + publish plans (scripts/ota-prepare.mjs)
+# and fetched OpenAPI contracts (scripts/fetch-openapi.mjs).
+artifacts/
+
 # ──────────────────────────────────────────────────────────────────────────
 # App store release area (_appstores/)
 # The public part (icons, screenshots, listing texts) IS committed.
@@ -209,7 +213,11 @@ _appstores/.local/
 *-service-account*.json
 fastlane/.env*
 keystore.properties
-# Capgo OTA signing private key (Epic 8) — public key is committed in capacitor.config.ts
+# Capgo OTA signing key pair (Epic 8). The private key is a release secret and the
+# public key reaches the build through the SYNAPLAN_OTA_PUBLIC_KEY variable, so
+# neither belongs in the repository. `capgo key create` writes both files here and
+# also rewrites capacitor.config.ts — revert that file, it is env-driven.
 .capgo_key
 .capgo_key_v2
+.capgo_key_v2.pub
 ios/App/App.xcodeproj/project.pbxproj
