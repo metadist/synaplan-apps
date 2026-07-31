@@ -17,7 +17,12 @@ no network calls to Apple.
 | ----- | ----- |
 | StoreKit config file with the 3 subscriptions | `ios/App/App/Synaplan.storekit` |
 | Shared scheme that loads it on launch | `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` |
-| Product IDs (match the backend defaults) | `com.synaplan.app.pro.monthly`, `.team.monthly`, `.business.monthly` |
+| Product IDs (must match `IAP_PRODUCT_*` on the server) | `com.synaplan.app.pro.monthly`, `.team.monthly.v2`, `.business.monthly.v2` |
+
+> The backend has **no** built-in product IDs — `IAP_PRODUCT_PRO` / `_TEAM` / `_BUSINESS` are empty
+> by default and every environment sets its own. Team and Business carry the `.v2` suffix because
+> the original products were created with Family Sharing enabled, which Apple cannot switch off
+> again (see the launch plan); the replacements have it disabled.
 
 The `.storekit` prices mirror the server's `appPrice` (web price + the
 `IAP_STORE_PRICE_*` EUR catalogue, must match ASC): €24.99 / €64.99 / €129.99. In-app prices
