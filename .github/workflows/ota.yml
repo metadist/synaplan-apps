@@ -101,29 +101,6 @@ jobs:
           fi
           echo "Store-required and payment-impacting releases are not accepted by this workflow." >> "$GITHUB_STEP_SUMMARY"
 
-      # TEMPORARY: identical credentials authenticate from a workstation and are
-      # rejected here, so the runner's origin is the only remaining variable.
-      # This reaches both Capgo hosts directly to separate a network-level block
-      # from an application answer. Remove once the cause is known.
-      - name: Probe the Capgo endpoints from this runner
-        env:
-          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
-          CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
-        run: |
-          set -uo pipefail
-          echo "--- egress address ---"
-          curl -s -m 15 https://api.ipify.org || echo "(unreachable)"
-          echo
-          echo "--- sb.capgo.synaplan.com/rest/v1/ ---"
-          curl -s -m 20 -o /tmp/sb.out -w 'status %{http_code}\n' \
-            -H "apikey: $CAPGO_SUPA_ANON" -H "Authorization: Bearer $CAPGO_SUPA_ANON" \
-            "$CAPGO_SUPA_HOST/rest/v1/"
-          head -c 300 /tmp/sb.out; echo
-          echo "--- api.capgo.synaplan.com/app/ ---"
-          curl -s -m 20 -o /tmp/api.out -w 'status %{http_code}\n' \
-            -H "authorization: $CAPGO_API_KEY" https://api.capgo.synaplan.com/app/
-          head -c 200 /tmp/api.out; echo
-
       - name: Checkout with submodules
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
