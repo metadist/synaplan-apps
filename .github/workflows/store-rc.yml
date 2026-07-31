@@ -46,7 +46,6 @@ jobs:
     environment: store-qa
     env:
       SYNAPLAN_ENV: prod
-      SYNAPLAN_BUILD_NUMBER: ${{ github.run_number }}
       SYNAPLAN_OTA_UPDATE_URL: ${{ vars.CAPGO_UPDATE_URL }}
       SYNAPLAN_OTA_CHANNEL_URL: ${{ vars.CAPGO_CHANNEL_URL }}
       SYNAPLAN_OTA_STATS_URL: ${{ vars.CAPGO_STATS_URL }}
@@ -88,6 +87,18 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      # A store rejects a build whose number is not higher than the last one it
+      # accepted for the same version, and builds also reach it from Xcode. The
+      # commit count keeps growing across all of them, while a per-workflow run
+      # counter restarts low and would collide with what is already published.
+      - name: Resolve the build number
+        run: |
+          set -euo pipefail
+          build_number="$(git rev-list --count HEAD)"
+          test "$build_number" -gt 0
+          echo "SYNAPLAN_BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "Build number: ${build_number}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Require a verifiable OTA configuration
         run: |
