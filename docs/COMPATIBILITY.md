@@ -8,30 +8,26 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.0 | `v4.0.10` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Reviewed mobile baseline v4.0.10 |
+| 4.0.0 | `v4.0.10` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Reviewed mobile baseline v4.0.10, TestFlight build 120 |
 
-## What the `v4.0.7` pin carries
+## What the `v4.0.10` pin carries
 
-The pin points at the `v4.0.7` release tag (`89c23b16585b6ca023ce003d0c5afe76adaec4f7`), which
-includes the merge of
-[metadist/synaplan#1405](https://github.com/metadist/synaplan/pull/1405).
+The pin points at the `v4.0.10` release tag (`3e23862b2df58a9e6a979bb48cca8941dbc53ad4`), shipped
+as TestFlight build **120**. It adds two changes on top of `v4.0.9`:
 
-It carries two changes:
+1. [metadist/synaplan#1421](https://github.com/metadist/synaplan/pull/1421) — the subscription page
+   localizes the plan benefits instead of printing the English `features` list the API returns. The
+   paywall modal already did; the two surfaces now share one implementation. Without this the
+   German store screenshots and the running app disagree on the very screen Apple inspects for IAP.
+2. [metadist/synaplan#1422](https://github.com/metadist/synaplan/pull/1422) — the Apple IAP
+   verifier says which part of its configuration is missing instead of failing blindly, and refuses
+   an unknown `IAP_APPLE_ENVIRONMENT` rather than silently falling back to Production.
 
-1. The first-run onboarding is reduced to the welcome page: the "get started" CTA enters the chat
-   as a guest, and the plans, account and purchase steps are removed.
-2. A subscription paywall opens when an allowance is spent — the guest trial, or a monthly quota
-   for a paying tier — and as a reminder for guests and free accounts at most once every 24 hours.
-   It is full-screen in the app and centered on the web, always dismissable, and shows only store
-   prices with IAP purchase and a "Restore purchases" entry inside the app.
-
-- Release classification: **store-required** — the IAP entry points and purchase behavior change,
-  so this must never ship as an OTA bundle.
-- Guests can now reach the plan catalogue before signing in, so the app calls the public
-  `GET /api/v1/subscription/plans` without a Bearer token. A purchase still requires an account:
-  the paywall routes a guest through sign-up and resumes on `/subscription?plan=<tier>`.
-- This pin also moves the platform state forward from the `v4.0.2-29` baseline, so the submodule
-  diff and its `MOBILE-APP SEAM` markers still need a full review.
+- Release classification: **store-required** — subscription copy and IAP configuration handling
+  are payment-path changes and must never ship as an OTA bundle.
+- Not in this pin: [#1423](https://github.com/metadist/synaplan/pull/1423), which stops the store
+  webhooks from acknowledging notifications they could not process. That is backend-only and was
+  deployed separately; the app needs no rebuild for it.
 - Before the next release: re-pin to the new reviewed `synaplan` release tag and add a matrix row
   above.
 
