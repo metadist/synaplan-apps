@@ -96,11 +96,15 @@ Useful Xcode menus while the app runs:
    Sandbox) and sign in on the device. The row is under **Settings → Developer →
    Sandbox Apple Account** on a device carrying a development profile, and under
    Settings → Apps → App Store otherwise.
-   Sign in even if you only want correct prices: when no sandbox account is
-   present, Apple silently assigns an auto-created **US-region** one, so StoreKit
-   reports USD prices and en-US product names while the purchase sheet — resolved
-   live against the real account — shows the buyer's real currency. That mismatch
-   is a testing artifact and does not occur in production.
+   **Do not use sandbox to verify prices — verify the purchase FLOW.** StoreKit
+   reports USD prices and en-US product names in sandbox/TestFlight regardless of
+   the storefront, while the purchase sheet (resolved live against the real
+   account) shows the buyer's actual currency. Confirmed 2026-08-01 with a
+   diagnostic build: a German Apple Account, a German sandbox tester, complete
+   country availability on the app AND every subscription, and correct EUR price
+   points still yielded `currency=USD` from `SKProduct.priceLocale`. It is a known
+   sandbox limitation, not a configuration error, and it does not occur in
+   production. Do not re-investigate ASC over it.
 3. Backend: `IAP_APPLE_ENVIRONMENT=Sandbox`, real Apple root certs in
    `IAP_APPLE_ROOT_CERTS_DIR`, `IAP_APPLE_APP_APPLE_ID` set.
 4. Configure the App Store Server Notifications V2 URL (sandbox) to
