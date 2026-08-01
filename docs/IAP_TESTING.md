@@ -93,7 +93,14 @@ Useful Xcode menus while the app runs:
 
 1. Create the subscription products in App Store Connect (same product IDs).
 2. Create a **Sandbox Apple Account** (App Store Connect → Users and Access →
-   Sandbox) and sign in on the device under Settings → App Store → Sandbox Account.
+   Sandbox) and sign in on the device. The row is under **Settings → Developer →
+   Sandbox Apple Account** on a device carrying a development profile, and under
+   Settings → Apps → App Store otherwise.
+   Sign in even if you only want correct prices: when no sandbox account is
+   present, Apple silently assigns an auto-created **US-region** one, so StoreKit
+   reports USD prices and en-US product names while the purchase sheet — resolved
+   live against the real account — shows the buyer's real currency. That mismatch
+   is a testing artifact and does not occur in production.
 3. Backend: `IAP_APPLE_ENVIRONMENT=Sandbox`, real Apple root certs in
    `IAP_APPLE_ROOT_CERTS_DIR`, `IAP_APPLE_APP_APPLE_ID` set.
 4. Configure the App Store Server Notifications V2 URL (sandbox) to
