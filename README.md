@@ -22,6 +22,8 @@ Gate details: [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md) · Multi-environm
 
 ## Docs
 
+- **[`docs/ONBOARDING.md`](docs/ONBOARDING.md)** — new here? Start with this. Machine setup, the
+  local loop, and how a change in `synaplan` becomes an app update, step by step.
 - **[`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)** — everything deferred to the
   launch/device/go-live phase: provider accounts, secrets & env, open product decisions,
   on-device QA, store-listing content. **Start here for "what we still need at the end".**
