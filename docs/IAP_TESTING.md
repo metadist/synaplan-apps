@@ -96,11 +96,15 @@ Useful Xcode menus while the app runs:
    Sandbox) and sign in on the device. The row is under **Settings → Developer →
    Sandbox Apple Account** on a device carrying a development profile, and under
    Settings → Apps → App Store otherwise.
-   Sign in even if you only want correct prices: when no sandbox account is
-   present, Apple silently assigns an auto-created **US-region** one, so StoreKit
-   reports USD prices and en-US product names while the purchase sheet — resolved
-   live against the real account — shows the buyer's real currency. That mismatch
-   is a testing artifact and does not occur in production.
+   **Do not use sandbox to verify prices — verify the purchase FLOW.** StoreKit
+   reports USD prices and en-US product names in sandbox/TestFlight regardless of
+   the storefront, while the purchase sheet (resolved live against the real
+   account) shows the buyer's actual currency. Confirmed 2026-08-01 with a
+   diagnostic build: a German Apple Account, a German sandbox tester, complete
+   country availability on the app AND every subscription, and correct EUR price
+   points still yielded `currency=USD` from `SKProduct.priceLocale`. It is a known
+   sandbox limitation, not a configuration error, and it does not occur in
+   production. Do not re-investigate ASC over it.
 3. Backend: `IAP_APPLE_ENVIRONMENT=Sandbox`, real Apple root certs in
    `IAP_APPLE_ROOT_CERTS_DIR`, `IAP_APPLE_APP_APPLE_ID` set.
 4. Configure the App Store Server Notifications V2 URL (sandbox) to
@@ -109,25 +113,52 @@ Useful Xcode menus while the app runs:
 ### Persist the Apple root certificates (production hosts)
 
 `IAP_APPLE_ROOT_CERTS_DIR` (usually `var/apple-roots`) lives **inside the backend
-container** unless you mount it. A `docker compose up -d --force-recreate
-backend` (or any image rebuild) **wipes the directory**, `/iap/verify` returns
-503 again, and every purchase fails until the cert is re-downloaded.
+container** unless you mount it. A `docker compose up -d` (or any image rebuild)
+**wipes the directory** and every purchase fails until the certificates are back.
 
-On production (`synweb100` / `synaplan-compose`), do **one** of:
+**This is not hypothetical — it happened on 2026-08-01**, during the first real
+sandbox purchase: Apple charged nothing, the app showed the generic "purchase
+could not be completed", and nothing else looked wrong. `/api/v1/subscription/plans`
+still reported `iapConfigured: true` (that flag covers the product IDs, not the
+verifier) and `POST /iap/verify` still answered `401` rather than `503`, so the
+endpoint check people usually run does **not** catch it. Only the container told
+the truth: `ls: cannot access 'var/apple-roots'`.
 
-1. **Preferred:** mount a host path into the backend (and worker, if present)
-   service, e.g. `./data/apple-roots:/app/var/apple-roots`, then download once
-   onto that volume; or
-2. Add the `curl … AppleRootCA-G3.cer` step to the deploy / entrypoint so every
-   container start re-creates the file.
-
-After every backend recreate, sanity-check:
+So **mount** the directory; do not copy into the container. On the production
+cluster the compose directory is shared across the nodes, so one copy serves all
+three:
 
 ```bash
-docker compose exec backend sh -c 'ls -l var/apple-roots && openssl x509 -inform der -in var/apple-roots/AppleRootCA-G3.cer -noout -subject'
+cd /netroot/synaplanCluster/synaplan-compose
+mkdir -p apple-roots
+for u in https://www.apple.com/appleca/AppleIncRootCertificate.cer \
+         https://www.apple.com/certificateauthority/AppleComputerRootCertificate.cer \
+         https://www.apple.com/certificateauthority/AppleRootCA-G2.cer \
+         https://www.apple.com/certificateauthority/AppleRootCA-G3.cer; do
+  curl -fsSL "$u" -o "apple-roots/$(basename "$u")"
+done
+chmod 644 apple-roots/*.cer
 ```
 
-Keep the file as Apple ships it (**DER** `.cer`). Do not convert to PEM.
+Then add to the `backend` **and** `worker` services (adjust the container path to
+the backend's project dir, `/var/www/backend` there):
+
+```yaml
+    volumes:
+      - ./apple-roots:/var/www/backend/var/apple-roots:ro
+```
+
+Download **all four** roots from the Apple PKI site, as the App Store Server
+Library's README asks. StoreKit 2 JWS currently chains to **G3** alone, so the
+others are insurance against Apple rotating the chain; an unused trust anchor is
+harmless. Keep them exactly as Apple ships them (**DER** `.cer`) — do not convert
+to PEM.
+
+Sanity-check after every backend recreate:
+
+```bash
+docker compose exec backend sh -c 'for f in var/apple-roots/*.cer; do openssl x509 -inform der -in "$f" -noout -subject -enddate; done'
+```
 
 ## Flip Sandbox → Production (go-live only)
 
