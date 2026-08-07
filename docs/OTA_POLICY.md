@@ -1,15 +1,17 @@
 # OTA (Over-the-Air) Update Policy
 
-> Locked in **Epic 8.1**. OTA lets us push **web-asset fixes** to installed apps without a store
-> review. This power is tightly bounded by store rules — misuse risks an **app ban**. Read this
-> before shipping any OTA bundle.
+> OTA lets us push **web-layer changes** to installed apps without a store review, so a store
+> submission is only needed when a change genuinely requires a new binary. This power is bounded by
+> store rules — misuse risks an **app ban**. Read this before shipping any OTA bundle.
 
 ## TL;DR
 
-- ✅ OTA is for **conforming changes only**: UI fixes, copy, styling, non-behavioral bug fixes to
-  the bundled web assets (`dist/`).
-- ❌ OTA must **never** change app behavior, feature gating, or **payment/IAP logic**
-  (Apple Guideline 2.5.2, Program License Agreement 3.3.2, and Google Play policy). Those ship
+- ✅ OTA is for the **web layer of the bundled SPA**: application code (Vue/TypeScript), styling,
+  translations, assets, generated API schemas, and web dependencies — including new frontend
+  features, as long as they stay within the app's approved purpose. Apple ADPLA 3.3.2 and Google
+  Play explicitly permit updating interpreted code that runs in the system WebView.
+- ❌ OTA must **never** touch **payment/IAP/entitlement logic**, **authentication transport**,
+  native code or capabilities, forced-update logic, or the update mechanism itself. Those ship
   **only** through a store review.
 - The forced-update gate (Epic 8.2, already implemented) is the complementary lever: when an app
   is too old for the backend contract, the server blocks it with a "please update" screen instead
@@ -17,33 +19,41 @@
 
 ## What MAY be shipped via OTA
 
-- Visual/CSS fixes, layout corrections, accessibility tweaks.
-- Copy/i18n corrections.
-- Bug fixes in the **web** layer that do not change documented behavior, entitlements, or pricing.
-- Hotfixes for crashes/regressions in the SPA that are within the already-reviewed feature set.
+- Frontend features, refactors, and bug fixes in the bundled SPA (`frontend/src/**` of the pinned
+  submodule), within the app's approved purpose.
+- Visual/CSS fixes, layout corrections, accessibility tweaks, copy/i18n changes, assets.
+- Generated API client schemas and web-only dependency updates (the OpenAPI parity check in the
+  build remains the gate).
+- Hotfixes for crashes/regressions in the SPA.
 
 ## What MUST NOT be shipped via OTA (store-review only)
 
-- **Any payment / subscription / IAP logic** (purchase, restore, entitlement, channel gating).
-- New features or feature flags that materially change what the reviewed app does.
+- **Any payment / subscription / IAP logic** (purchase, restore, entitlement, paywall, channel
+  gating) — Apple anti-steering and Play Billing rules.
+- **Authentication transport** and native seams (OAuth redirects, token handling, biometric lock,
+  `native*` services).
 - Changes to native capabilities, permissions, or the Capacitor native layer.
-- Anything that alters the app's purpose or circumvents store review (Apple 2.5.2/4.2, Google
-  "Device and Network Abuse" / deceptive behavior).
+- Forced-update/version-gate logic, the service worker, or the OTA update mechanism itself.
+- Anything that alters the app's primary purpose or circumvents store review (Apple 2.5.2/4.2,
+  Google "Device and Network Abuse" / deceptive behavior).
 
 ## Why (store rules)
 
-- **Apple App Store Review Guideline 2.5.2** — apps must be self-contained and may not download,
-  install, or execute code that introduces or changes app features or functionality.
-- **Apple Developer Program License Agreement 3.3.2** — downloaded interpreted code must stay
-  within Apple's permitted execution model and must not change the app's primary purpose or bypass
-  review.
+- **Apple Developer Program License Agreement 3.3.2** — interpreted code may be downloaded as long
+  as it does not change the app's primary purpose, does not create a store for other code, and
+  does not bypass signing, sandbox, or other OS security features. Web code running in `WKWebView`
+  satisfies all three, which is exactly what the bundled SPA is.
+- **Apple App Store Review Guideline 2.5.2** — apps may not download or execute code that
+  introduces or changes features outside Apple's permitted execution model; WebKit-interpreted
+  code is the permitted model.
 - **Apple App Store Review Guideline 4.2** — the submitted app must provide sufficient lasting
   utility; OTA cannot be used to turn a minimal shell into a materially different product.
-- **Google Play** — updates that significantly deviate from the reviewed app, or that introduce
-  payment flows for digital goods outside Play Billing, violate policy.
+- **Google Play** — the Device and Network Abuse policy exempts code interpreted in a WebView or
+  runtime; updates must not significantly deviate from the reviewed app or introduce payment flows
+  for digital goods outside Play Billing.
 
-Bottom line: OTA fixes the *presentation* of already-approved behavior. It never introduces or
-changes *behavior*, and **never** touches money.
+Bottom line: OTA ships the web layer of the already-approved product. It never changes the app's
+purpose, and **never** touches money, authentication transport, or native behavior.
 
 ## Unattended publishing
 
@@ -52,9 +62,10 @@ OTA bundles are published automatically once an `ota-candidate` synchronization 
 
 - The classification that decides `ota-candidate` versus `store-required` is produced by
   `.github/mobile-impact-policy.json` in the source repository and is **fail-closed**: any path
-  that is not explicitly allow-listed, and any file that can carry executable code, is
-  `store-required`. That file is the single gate protecting every rule above, so a change to it is
-  a change to this policy.
+  that is not explicitly allow-listed is `store-required`, and the payment, authentication
+  transport, native-seam, and update-mechanism paths are explicitly pinned to `store-required`.
+  That file is the single gate protecting every rule above, so a change to it is a change to this
+  policy. New paths are classified in the same PR that introduces them.
 - `ota.yml` refuses any class other than `ota-candidate`, whoever starts it.
 - `ota-health.yml` observes every published bundle and turns the run red when no device picks it up.
 

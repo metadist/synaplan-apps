@@ -3,7 +3,8 @@
 > How a release of `metadist/synaplan` reaches an installed app, what the guard rails are, and how
 > to stop a rollout.
 >
-> Cutting the release is the one deliberate step; everything after the tag is unattended.
+> Publishing the GitHub release is the one deliberate step; everything after the publish is
+> unattended.
 
 Related: [`OTA_POLICY.md`](./OTA_POLICY.md) for what may ship over the air,
 [`COMPATIBILITY.md`](./COMPATIBILITY.md) for the pin record, [`SECRETS.md`](./SECRETS.md) for the
@@ -13,38 +14,41 @@ credentials this chain needs.
 
 | # | Where | Workflow | What it does |
 |---|-------|----------|--------------|
-| 0 | `synaplan` | — | A maintainer starts `release-tag.yml` when a release is due. This is the only manual step. |
-| 1 | `synaplan` | `release-tag.yml` | Classifies everything merged since the previous release tag with `scripts/mobile-impact.mjs`. Only `ota-candidate` and `store-required` get a patch tag `vX.Y.Z`. Refuses a commit without a successful CI run. |
-| 2 | `synaplan` | `ci.yml` | Runs on the new tag. |
-| 3 | `synaplan` | `mobile-release-artifacts.yml` | Publishes the attested `mobile-release-<tag>-<sha>` artifact and starts `sync-synaplan.yml` in this repository. |
-| 4 | `synaplan-apps` | `sync-synaplan.yml` | Verifies the artifact and its attestation, moves the submodule pin, updates `COMPATIBILITY.md` and `IDENTIFIERS.md`, opens a PR and enables auto-merge. |
-| 5 | `synaplan-apps` | `ci.yml` | Builds the web bundle and runs the drift gate on the PR. Green means the auto-merge fires. |
-| 6 | `synaplan-apps` | `release-dispatch.yml` | Reads the classification recorded by the sync PR and routes it: `ota-candidate` to `ota.yml`, `store-required` to `store-rc.yml`. |
-| 7a | `synaplan-apps` | `ota.yml` | Builds, signs and publishes the bundle to the production channel. |
-| 7b | `synaplan-apps` | `store-rc.yml` | Builds signed binaries and uploads them to TestFlight and the Play internal track. |
-| 8 | `synaplan-apps` | `ota-health.yml` | Watches the freshly published bundle and rolls back automatically when it fails to become healthy. |
+| 0 | `synaplan` | `release-tag.yml` | A maintainer starts it when a release is due. It refuses a commit without a successful CI run, creates the patch tag `vX.Y.Z`, and prepares a **draft** GitHub release with generated notes. The tag feeds the platform jobs (`ci.yml`, Docker images, version pins) but never the apps. |
+| 1 | `synaplan` | — | A maintainer reviews and **publishes** the draft release. This is the deliberate step that starts the mobile chain — merges and tags alone never reach the apps. |
+| 2 | `synaplan` | `mobile-release-artifacts.yml` | Runs on `release: published`. Verifies a green CI run for the released commit, classifies everything merged since the previously published release with `scripts/mobile-impact.mjs`, publishes the attested `mobile-release-<tag>-<sha>` artifact, and — only for `ota-candidate` or `store-required` — starts `sync-synaplan.yml` in this repository. `backend-only` and `no-app-impact` releases end here. |
+| 3 | `synaplan-apps` | `sync-synaplan.yml` | Verifies the artifact and its attestation, moves the submodule pin, updates `COMPATIBILITY.md` and `IDENTIFIERS.md`, opens a PR and enables auto-merge. |
+| 4 | `synaplan-apps` | `ci.yml` | Builds the web bundle and runs the drift gate on the PR. Green means the auto-merge fires. |
+| 5 | `synaplan-apps` | `release-dispatch.yml` | Reads the classification recorded by the sync PR and routes it: `ota-candidate` to `ota.yml`, `store-required` to `store-rc.yml`. |
+| 6a | `synaplan-apps` | `ota.yml` | Builds, signs and publishes the bundle to the production channel. |
+| 6b | `synaplan-apps` | `store-rc.yml` | Builds signed binaries and uploads them to TestFlight and the Play internal track. |
+| 7 | `synaplan-apps` | `ota-health.yml` | Watches the freshly published bundle and rolls back automatically when it fails to become healthy. |
 
-The classification is written to `.github/release-route.json` by the sync workflow, so step 6 routes
+The classification is written to `.github/release-route.json` by the sync workflow, so step 5 routes
 on a value that was verified against the signed source manifest instead of re-deriving it.
 
 ## Cutting a release
 
 ```bash
-# Preview: reports the classification and the tag without creating it
+# Preview: reports the classification and the tag without creating anything
 gh workflow run release-tag.yml -R metadist/synaplan -f dry_run=true
 
-# Release
+# Tag + draft release
 gh workflow run release-tag.yml -R metadist/synaplan
+
+# Then: review the draft on GitHub and PUBLISH it — that starts the mobile chain
 ```
 
-Releasing is deliberate rather than per-merge for two reasons. The classifier is fail-closed, so a
-large share of merges lands on the store path, and tagging each one would produce a stream of review
-candidates. And a tag triggers a second full CI run on the same commit, because `ci.yml` builds the
-version-tagged images on `v*` — acceptable once per release, wasteful once per merge.
+Releasing is deliberate rather than per-merge or per-tag: publishing one release collects every
+merge since the previously published release into a single classification and at most one delivery.
+Ordinary backend work classifies as `backend-only` (nothing ships to the app) and ordinary frontend
+work as `ota-candidate` (ships over the air) — a store submission happens only when the release
+contains a `store-required` change: native, IAP/payments, authentication transport, forced-update
+logic, or the update mechanism itself.
 
 ## What is still manual
 
-- Deciding when to cut a release.
+- Deciding when to cut a release and when to publish the draft.
 - Submitting a store build for App Store review and answering review questions. Everything up to
   the TestFlight and Play internal builds is automatic.
 - The one-time credential setup below.
@@ -53,7 +57,7 @@ version-tagged images on `v*` — acceptable once per release, wasteful once per
 
 ## One-time setup
 
-Creating the apps needs organization-level rights. Until that is done, the chain stops after step 3
+Creating the apps needs organization-level rights. Until that is done, the chain stops after step 2
 and `mobile-release-artifacts.yml` reports a skipped dispatch.
 
 > **Doing it for the first time?** [`AUTOMATION_SETUP.md`](./AUTOMATION_SETUP.md) walks through the
@@ -146,7 +150,9 @@ itself.
 
 - **Classification is fail-closed.** `.github/mobile-impact-policy.json` in `synaplan` routes every
   path that is not explicitly allow-listed to `store-required`, so an unclassified change can never
-  reach a device over the air.
+  reach a device over the air. New paths are classified in the same PR that introduces them.
+- **Only a published release starts the chain.** Merges to `main` and tags feed the platform jobs
+  at most; nothing reaches an installed app without a maintainer publishing a GitHub release.
 - **Only `ota-candidate` reaches `ota.yml`.** The workflow re-checks the classification against the
   release route file and refuses anything else.
 - **Bundles are signed.** `ota.yml` signs each bundle with `CAPGO_BUNDLE_PRIVATE_KEY`; the app
@@ -180,8 +186,8 @@ gh workflow run ota.yml -R metadist/synaplan-apps \
 Published bundle versions are recorded in the run summary of `ota.yml` and in the
 `Current OTA bundle` column of [`COMPATIBILITY.md`](./COMPATIBILITY.md).
 
-To stop the automation entirely, stop cutting releases — or disable `release-tag.yml` in `synaplan`
-so nobody can. No tag means no chain.
+To stop the automation entirely, stop publishing releases — or disable
+`mobile-release-artifacts.yml` in `synaplan` so nobody can. No published release means no chain.
 
 ## Operational dependencies
 
