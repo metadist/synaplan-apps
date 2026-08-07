@@ -236,7 +236,7 @@ it.
 If your change was `backend-only`, you are done as far as the app is concerned — it reaches
 production through the normal platform deployment.
 
-## 10. Cut the release — the one manual step
+## 10. Cut the release — tag, then publish
 
 When a release is due (batch several merges; do not do this per PR):
 
@@ -244,32 +244,32 @@ When a release is due (batch several merges; do not do this per PR):
 # preview: reports the classification and the tag it would create, creates nothing
 gh workflow run release-tag.yml -R metadist/synaplan -f dry_run=true
 
-# for real
+# for real: creates the tag and a DRAFT GitHub release with generated notes
 gh workflow run release-tag.yml -R metadist/synaplan
 ```
 
-It classifies everything merged since the previous release tag, refuses a commit without a
-successful CI run, and creates a patch tag `vX.Y.Z` **only** if the result is `ota-candidate` or
-`store-required`. A batch that is purely backend-only or docs produces no tag, and that is correct.
+Then review the draft release on GitHub and **publish** it. Publishing is the deliberate step that
+starts the mobile chain — the tag alone only feeds the platform jobs (Docker images, version pins).
 
-Releasing is deliberate rather than automatic on every merge because the classifier is fail-closed
-(a large share of merges lands on the store path) and because a tag triggers a second full CI run.
+The classification happens at publish time against the previously **published** release, so one
+release collects every merge since the last one into a single delivery. Ordinary backend work is
+`backend-only` (nothing reaches the app), ordinary frontend work is `ota-candidate` (ships over the
+air) — a store submission happens only when the release contains a `store-required` change (native,
+IAP/payments, authentication transport, forced-update, update mechanism).
 
 ## 11. Watch the chain
 
-Everything after the tag is unattended:
+Everything after publishing the release is unattended:
 
 | # | Repo | Workflow | Does |
 |---|---|---|---|
-| 1 | `synaplan` | `release-tag.yml` | classifies, tags |
-| 2 | `synaplan` | `ci.yml` | runs on the tag |
-| 3 | `synaplan` | `mobile-release-artifacts.yml` | publishes the attested manifest, dispatches |
-| 4 | `synaplan-apps` | `sync-synaplan.yml` | verifies attestation, moves the pin, updates `COMPATIBILITY.md`, opens a PR with auto-merge |
-| 5 | `synaplan-apps` | `ci.yml` | builds the web bundle, runs the drift gate; green means the PR merges itself |
-| 6 | `synaplan-apps` | `release-dispatch.yml` | routes on `.github/release-route.json` |
-| 7a | `synaplan-apps` | `ota.yml` | signs and publishes the bundle to the production channel |
-| 7b | `synaplan-apps` | `store-rc.yml` | builds signed binaries, uploads to TestFlight and Play internal |
-| 8 | `synaplan-apps` | `ota-health.yml` | watches the bundle, rolls back automatically if it is unhealthy |
+| 1 | `synaplan` | `mobile-release-artifacts.yml` | runs on `release: published`, verifies CI, classifies, publishes the attested manifest, dispatches |
+| 2 | `synaplan-apps` | `sync-synaplan.yml` | verifies attestation, moves the pin, updates `COMPATIBILITY.md`, opens a PR with auto-merge |
+| 3 | `synaplan-apps` | `ci.yml` | builds the web bundle, runs the drift gate; green means the PR merges itself |
+| 4 | `synaplan-apps` | `release-dispatch.yml` | routes on `.github/release-route.json` |
+| 5a | `synaplan-apps` | `ota.yml` | signs and publishes the bundle to the production channel |
+| 5b | `synaplan-apps` | `store-rc.yml` | builds signed binaries, uploads to TestFlight and Play internal |
+| 6 | `synaplan-apps` | `ota-health.yml` | watches the bundle, rolls back automatically if it is unhealthy |
 
 Follow it:
 
@@ -317,8 +317,8 @@ Google Play is the same shape via the internal track.
 
 | Symptom | Cause and fix |
 |---|---|
-| No tag was created | The batch classified as `backend-only`/`no-app-impact`. Expected. |
-| `release-tag.yml` refuses | The head commit has no successful CI run. Fix CI first. |
+| Release published, nothing dispatched | The batch classified as `backend-only`/`no-app-impact`. Expected — check the run summary of `mobile-release-artifacts.yml`. |
+| `release-tag.yml` or `mobile-release-artifacts.yml` refuses | The commit has no successful CI run. Fix CI first. |
 | Sync PR open, not merging | Its CI is red, or auto-merge is off in repo settings. |
 | Drift gate fails | A synced native config still carries a `server.url` — someone committed after a live-reload `cap sync`. Run `SYNAPLAN_ENV=prod SYNAPLAN_BUILD_NUMBER=1 npm run config:app` and commit. |
 | Device shows old UI after OTA | Channel serves a stale bundle, or the app was not cold-started. See 12a. |
@@ -372,7 +372,7 @@ npm run ci-local
 # full build + run on the simulator
 SYNAPLAN_ENV=dev SYNAPLAN_OPENAPI_URL=http://localhost:8000/api/doc.json ./build.sh && npm run cap:ios
 
-# cut a release (dry run first)
+# cut a release (dry run first), then publish the draft release on GitHub
 gh workflow run release-tag.yml -R metadist/synaplan -f dry_run=true
 gh workflow run release-tag.yml -R metadist/synaplan
 

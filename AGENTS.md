@@ -83,21 +83,27 @@ DOCKER_CONTEXT=m4 make -C synaplan/frontend test
 
 ## Release Classification
 
-Classify each change before choosing a release path:
+Classify each change before choosing a release path. **Ship as little as possible through Apple**:
+store submissions are reserved for changes that genuinely require a new binary.
 
-- **backend-only:** no bundled SPA or native-shell effect. Deploy through the platform process.
-- **ota-candidate:** web assets only, within already reviewed behavior, with no entitlement,
-  payment, security, permission, privacy, or feature-contract change.
-- **store-required:** native code/configuration, plugins, permissions, privacy manifests, IAP,
-  authentication transport, new capabilities, or material behavior changes.
+- **backend-only:** server-side only, no bundled SPA or native-shell effect. Deploy through the
+  platform process; no app delivery at all.
+- **ota-candidate:** web-layer changes to the bundled SPA (application code, styles, translations,
+  assets, generated schemas, web dependencies) within the app's approved purpose — permitted over
+  the air by Apple ADPLA 3.3.2 and Google Play for code interpreted in the WebView.
+- **store-required:** native code/configuration, plugins, permissions, privacy manifests,
+  IAP/payments/entitlements, authentication transport, forced-update logic, or the update
+  mechanism itself.
 
 OTA releases originate only here, use the self-hosted Capgo service, and must follow
 `docs/OTA_POLICY.md`. Ambiguous changes are store-required.
 
 The classification, the submodule pin, and the delivery are automated end to end
-(`docs/AUTOMATION.md`). The automation never widens what may ship over the air: it routes on the
-fail-closed classification produced in the source repository and records it in
-`.github/release-route.json`. Treat that policy file and this routing as release-critical code.
+(`docs/AUTOMATION.md`). The chain starts only when a GitHub release is **published** in the source
+repository — merges and tags alone never reach the apps. The automation never widens what may ship
+over the air: it routes on the fail-closed classification produced in the source repository and
+records it in `.github/release-route.json`. Treat that policy file and this routing as
+release-critical code.
 
 ## Native and Store Rules
 
