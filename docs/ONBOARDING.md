@@ -298,8 +298,10 @@ old bundle no matter how often you reinstall.
 
 CI produces the signed binaries automatically and uploads them. From there a human takes over:
 
-1. **TestFlight**: the build appears after Apple finishes processing (typically 5–20 minutes).
-   Install it, test on a real device.
+1. **TestFlight**: the CI job finishes once Apple has the binary; the build itself appears once
+   Apple finishes processing it. That usually takes minutes but has taken over an hour, so a green
+   job and a missing build are not a contradiction. Install it, test on a real device. Apple
+   reports a rejected binary by email and in App Store Connect.
 2. **New App Store version?** The marketing version lives in `package.json` of `synaplan-apps`.
    Bumping `4.0.0` to `4.1.0` is a normal PR in the app repo. The build number needs no attention,
    it is the commit count.
