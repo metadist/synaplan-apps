@@ -345,19 +345,20 @@ jobs:
           # pilot rejects an attempt to assign a build to an internal group, so
           # the group is recorded for the promotion but not passed here.
           #
-          # The job ends once Apple has the binary. Waiting for the processing to
-          # finish held a macOS runner for over an hour on a build Apple accepted
-          # without complaint, and a rejected binary is still reported by email
-          # and in App Store Connect.
+          # The wait is what releases the build to the internal testers: pilot
+          # returns before `distribute` when `skip_waiting_for_build_processing`
+          # is set, so skipping it uploads a build that never reaches a device.
+          # Apple's own automatic distribution does not cover that gap.
           #
-          # This DEPENDS on the internal TestFlight group having automatic
-          # distribution enabled: the wait is what used to let pilot hand the
-          # processed build to the testers, and without either of the two a build
-          # uploads cleanly and never reaches a device (see docs/STORE_SETUP.md).
+          # The deadline keeps a stalled Apple from holding a macOS runner all
+          # afternoon - processing normally takes minutes but has taken over an
+          # hour. Hitting it fails the job with the binary already uploaded, so
+          # the build is then added to the internal group by hand.
           fastlane pilot upload \
             --ipa "$RUNNER_TEMP"/store-rc/*.ipa \
             --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
-            --skip_waiting_for_build_processing true
+            --skip_waiting_for_build_processing false \
+            --wait_processing_timeout_duration 2700
 
       - name: Upload to Google Play Internal
         if: ${{ ! inputs.dry_run && steps.platforms.outputs.android == 'true' }}
