@@ -298,10 +298,14 @@ old bundle no matter how often you reinstall.
 
 CI produces the signed binaries automatically and uploads them. From there a human takes over:
 
-1. **TestFlight**: the CI job finishes once Apple has the binary; the build itself appears once
-   Apple finishes processing it. That usually takes minutes but has taken over an hour, so a green
-   job and a missing build are not a contradiction. Install it, test on a real device. Apple
-   reports a rejected binary by email and in App Store Connect.
+1. **TestFlight**: the CI job finishes once Apple has the binary; the build reaches the testers once
+   Apple finishes processing it and distributes it to the internal group. Processing usually takes
+   minutes but has taken over an hour, so a green job and a build that has not surfaced yet are not
+   a contradiction. Install it, test on a real device. Apple reports a rejected binary by email and
+   in App Store Connect.
+   - A build that is selectable for submission but absent from TestFlight is processed and simply
+     not distributed: the internal group is missing automatic distribution (`docs/STORE_SETUP.md`).
+     Add the build to the group by hand; a new build would change nothing.
 2. **New App Store version?** The marketing version lives in `package.json` of `synaplan-apps`.
    Bumping `4.0.0` to `4.1.0` is a normal PR in the app repo. The build number needs no attention,
    it is the commit count.

@@ -50,7 +50,9 @@ logic, or the update mechanism itself.
 
 - Deciding when to cut a release and when to publish the draft.
 - Submitting a store build for App Store review and answering review questions. Everything up to
-  the TestFlight and Play internal builds is automatic.
+  the TestFlight and Play internal builds is automatic, provided the internal TestFlight group
+  distributes new builds automatically — CI uploads the binary but never hands it to the testers
+  ([`STORE_SETUP.md`](./STORE_SETUP.md)).
 - The one-time credential setup below.
 - Pinning against a `synaplan` feature branch that has not been merged yet. See
   [`DEVELOPMENT.md`](./DEVELOPMENT.md); no pin is needed to build and run locally.

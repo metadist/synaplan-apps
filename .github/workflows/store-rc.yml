@@ -342,15 +342,18 @@ jobs:
             '{key_id:$key_id, issuer_id:$issuer_id, key:$key, in_house:false}' \
             > "$RUNNER_TEMP/asc-api-key.json"
           chmod 600 "$RUNNER_TEMP/asc-api-key.json"
-          # App Store Connect hands a processed build to the internal testers on
-          # its own and rejects an attempt to assign one to an internal group,
-          # so the group is recorded for the promotion but not passed here.
+          # pilot rejects an attempt to assign a build to an internal group, so
+          # the group is recorded for the promotion but not passed here.
           #
           # The job ends once Apple has the binary. Waiting for the processing to
           # finish held a macOS runner for over an hour on a build Apple accepted
-          # without complaint, and it buys nothing: the distribution that would
-          # follow the wait is the one App Store Connect performs on its own.
-          # Apple reports a rejected binary by email and in App Store Connect.
+          # without complaint, and a rejected binary is still reported by email
+          # and in App Store Connect.
+          #
+          # This DEPENDS on the internal TestFlight group having automatic
+          # distribution enabled: the wait is what used to let pilot hand the
+          # processed build to the testers, and without either of the two a build
+          # uploads cleanly and never reaches a device (see docs/STORE_SETUP.md).
           fastlane pilot upload \
             --ipa "$RUNNER_TEMP"/store-rc/*.ipa \
             --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
