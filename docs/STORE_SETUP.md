@@ -39,12 +39,14 @@ The bundle identifier is `com.synaplan.app`. It must exist as an *Identifier* in
 portal, and the app must exist in App Store Connect, before an upload can succeed. TestFlight
 internal testing does not require App Review, so this path works before the first submission.
 
-**Turn on automatic distribution for the internal TestFlight group** (App Store Connect →
-TestFlight → the internal group → enable automatic distribution of new builds). `store-rc.yml`
-hands the binary to Apple and ends; nothing in CI hands the processed build to the testers. Without
-that switch a build uploads cleanly, becomes selectable for submission, and never appears in
-TestFlight — with no error anywhere to explain it. A build already uploaded when the switch was off
-has to be added to the group by hand.
+**Keep the internal TestFlight group on automatic distribution** (App Store Connect → TestFlight →
+the internal group). A group set to manual cannot be assigned by `pilot` at all, so the release
+would stop at "uploaded".
+
+`store-rc.yml` waits for Apple to finish processing because that wait is what releases the build to
+the testers, with a 45-minute deadline so a stalled Apple cannot hold the runner indefinitely. If
+the job fails on that deadline, the binary is uploaded and only the distribution is missing: add
+the build to the internal group by hand rather than building it again.
 
 | Secret | Where it comes from |
 | ------ | ------------------- |
