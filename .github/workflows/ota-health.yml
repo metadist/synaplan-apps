@@ -1,0 +1,167 @@
+name: Mobile OTA Health
+
+# Watches a freshly published bundle. The immediate protection is on the device:
+# a bundle that does not report ready within `appReadyTimeout` is reverted
+# locally, without this workflow being involved.
+#
+# Withdrawal from the channel is opt-in because of what the statistics API can
+# measure. It exposes device counts per bundle from a daily rollup and no failure
+# counter at all, so "nobody runs the new bundle yet" cannot be told apart from
+# "the rollout is still reaching devices" in the minutes after publishing.
+# Observing and reporting is therefore the default; set `withdraw_on_unhealthy`
+# once a channel has enough devices for the signal to be trustworthy.
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+      bundle_version:
+        required: true
+        type: string
+      rollback_to:
+        required: false
+        default: ''
+        type: string
+      observation_minutes:
+        required: false
+        default: 20
+        type: number
+      withdraw_on_unhealthy:
+        required: false
+        default: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Protected Capgo channel
+        required: true
+        default: production
+        type: choice
+        options: [canary, production]
+      bundle_version:
+        description: Bundle version to observe
+        required: true
+        type: string
+      rollback_to:
+        description: Bundle version to restore when the observation fails
+        required: false
+        type: string
+      observation_minutes:
+        description: How long to observe before giving up
+        required: false
+        default: 20
+        type: number
+      withdraw_on_unhealthy:
+        description: Take the bundle off the channel when no device runs it
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: mobile-ota-health-${{ inputs.channel }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  attestations: read
+  contents: read
+
+jobs:
+  observe:
+    name: Observe the published bundle
+    # Same runner as the publish job. The statistics endpoint of the self-hosted
+    # deployment must therefore be reachable from GitHub-hosted runners.
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.channel }}
+    timeout-minutes: 60
+    outputs:
+      status: ${{ steps.observe.outputs.status }}
+      recovery: ${{ steps.decide.outputs.recovery }}
+      reason: ${{ steps.observe.outputs.reason }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      - name: Poll release statistics
+        id: observe
+        env:
+          CAPGO_STATS_API_URL: ${{ vars.CAPGO_STATS_API_URL }}
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+        run: |
+          node scripts/ota-health.mjs \
+            --bundle "${{ inputs.bundle_version }}" \
+            --deadline-minutes "${{ inputs.observation_minutes }}" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Decide on a recovery
+        id: decide
+        env:
+          STATUS: ${{ steps.observe.outputs.status }}
+          ROLLBACK_TO: ${{ inputs.rollback_to }}
+          WITHDRAW: ${{ inputs.withdraw_on_unhealthy }}
+        run: |
+          set -euo pipefail
+          if [[ "$STATUS" != "unhealthy" || "$WITHDRAW" != "true" ]]; then
+            echo "recovery=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Pausing needs no known-good version and always stops the bleeding,
+          # so it is the fallback when no previous bundle was recorded.
+          if test -n "$ROLLBACK_TO"; then
+            echo "recovery=rollback" >> "$GITHUB_OUTPUT"
+          else
+            echo "recovery=pause" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report the observation
+        env:
+          STATUS: ${{ steps.observe.outputs.status }}
+          REASON: ${{ steps.observe.outputs.reason }}
+          RECOVERY: ${{ steps.decide.outputs.recovery }}
+        run: |
+          {
+            echo "Bundle \`${{ inputs.bundle_version }}\` on channel \`${{ inputs.channel }}\`: **$STATUS**"
+            echo ""
+            echo "$REASON"
+            echo ""
+            echo "Recovery: \`$RECOVERY\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  recover:
+    name: Take the bundle off the channel
+    needs: observe
+    if: needs.observe.outputs.recovery == 'rollback' || needs.observe.outputs.recovery == 'pause'
+    uses: ./.github/workflows/ota.yml
+    with:
+      operation: ${{ needs.observe.outputs.recovery }}
+      class: ota-candidate
+      channel: ${{ inputs.channel }}
+      rollback_bundle: ${{ inputs.rollback_to }}
+      dry_run: false
+    secrets: inherit
+
+  verdict:
+    name: Fail the run when a release was withdrawn
+    needs: [observe, recover]
+    if: always() && needs.observe.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      # An automatic recovery must not look like a clean release in the run list.
+      - name: Check the observation
+        env:
+          STATUS: ${{ needs.observe.outputs.status }}
+          REASON: ${{ needs.observe.outputs.reason }}
+        run: |
+          set -euo pipefail
+          if [[ "$STATUS" == "unhealthy" || "$STATUS" == "unknown" ]]; then
+            echo "::error::Release observation ended as $STATUS. $REASON"
+            exit 1
+          fi
+          echo "Release observation ended as $STATUS. $REASON"

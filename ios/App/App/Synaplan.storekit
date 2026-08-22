@@ -1,0 +1,131 @@
+{
+  "identifier" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF0001",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "de_DE",
+    "_storefront" : "DEU",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF1000",
+      "localizations" : [
+
+      ],
+      "name" : "Synaplan Subscriptions",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "24.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF1001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "15x more usage than the free plan.",
+              "displayName" : "Pro",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "15x mehr Nutzung als im Free-Plan.",
+              "displayName" : "Pro",
+              "locale" : "de_DE"
+            }
+          ],
+          "productID" : "com.synaplan.app.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF1000",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "64.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF1002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Everything in Pro, 40x more usage.",
+              "displayName" : "Team",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Alles aus Pro, 40x mehr Nutzung.",
+              "displayName" : "Team",
+              "locale" : "de_DE"
+            }
+          ],
+          "productID" : "com.synaplan.app.team.monthly.v2",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Team Monthly",
+          "subscriptionGroupID" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF1000",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "129.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF1003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Everything in Team, 80x more usage.",
+              "displayName" : "Business",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Alles aus Team, 80x mehr Nutzung.",
+              "displayName" : "Business",
+              "locale" : "de_DE"
+            }
+          ],
+          "productID" : "com.synaplan.app.business.monthly.v2",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Business Monthly",
+          "subscriptionGroupID" : "F1A7C0DE-5EED-4A11-9B7A-53AA10AF1000",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

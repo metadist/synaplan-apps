@@ -1,0 +1,213 @@
+# Release Automation
+
+> How a release of `metadist/synaplan` reaches an installed app, what the guard rails are, and how
+> to stop a rollout.
+>
+> Publishing the GitHub release is the one deliberate step; everything after the publish is
+> unattended.
+
+Related: [`OTA_POLICY.md`](./OTA_POLICY.md) for what may ship over the air,
+[`COMPATIBILITY.md`](./COMPATIBILITY.md) for the pin record, [`SECRETS.md`](./SECRETS.md) for the
+credentials this chain needs.
+
+## The chain
+
+| # | Where | Workflow | What it does |
+|---|-------|----------|--------------|
+| 0 | `synaplan` | `release-tag.yml` | A maintainer starts it when a release is due. It refuses a commit without a successful CI run, creates the patch tag `vX.Y.Z`, and prepares a **draft** GitHub release with generated notes. The tag feeds the platform jobs (`ci.yml`, Docker images, version pins) but never the apps. |
+| 1 | `synaplan` | — | A maintainer reviews and **publishes** the draft release. This is the deliberate step that starts the mobile chain — merges and tags alone never reach the apps. |
+| 2 | `synaplan` | `mobile-release-artifacts.yml` | Runs on `release: published`. Verifies a green CI run for the released commit, classifies everything merged since the previously published release with `scripts/mobile-impact.mjs`, publishes the attested `mobile-release-<tag>-<sha>` artifact, and — only for `ota-candidate` or `store-required` — starts `sync-synaplan.yml` in this repository. `backend-only` and `no-app-impact` releases end here. |
+| 3 | `synaplan-apps` | `sync-synaplan.yml` | Verifies the artifact and its attestation, moves the submodule pin, updates `COMPATIBILITY.md` and `IDENTIFIERS.md`, opens a PR and enables auto-merge. |
+| 4 | `synaplan-apps` | `ci.yml` | Builds the web bundle and runs the drift gate on the PR. Green means the auto-merge fires. |
+| 5 | `synaplan-apps` | `release-dispatch.yml` | Reads the classification recorded by the sync PR and routes it: `ota-candidate` to `ota.yml`, `store-required` to `store-rc.yml`. |
+| 6a | `synaplan-apps` | `ota.yml` | Builds, signs and publishes the bundle to the production channel. |
+| 6b | `synaplan-apps` | `store-rc.yml` | Builds signed binaries and uploads them to TestFlight and the Play internal track. |
+| 7 | `synaplan-apps` | `ota-health.yml` | Watches the freshly published bundle and rolls back automatically when it fails to become healthy. |
+
+The classification is written to `.github/release-route.json` by the sync workflow, so step 5 routes
+on a value that was verified against the signed source manifest instead of re-deriving it.
+
+## Cutting a release
+
+```bash
+# Preview: reports the classification and the tag without creating anything
+gh workflow run release-tag.yml -R metadist/synaplan -f dry_run=true
+
+# Tag + draft release
+gh workflow run release-tag.yml -R metadist/synaplan
+
+# Then: review the draft on GitHub and PUBLISH it — that starts the mobile chain
+```
+
+Releasing is deliberate rather than per-merge or per-tag: publishing one release collects every
+merge since the previously published release into a single classification and at most one delivery.
+Ordinary backend work classifies as `backend-only` (nothing ships to the app) and ordinary frontend
+work as `ota-candidate` (ships over the air) — a store submission happens only when the release
+contains a `store-required` change: native, IAP/payments, authentication transport, forced-update
+logic, or the update mechanism itself.
+
+## What is still manual
+
+- Deciding when to cut a release and when to publish the draft.
+- Submitting a store build for App Store review and answering review questions. Everything up to
+  the TestFlight and Play internal builds is automatic, provided the internal TestFlight group
+  stays on automatic distribution ([`STORE_SETUP.md`](./STORE_SETUP.md)).
+- The one-time credential setup below.
+- Pinning against a `synaplan` feature branch that has not been merged yet. See
+  [`DEVELOPMENT.md`](./DEVELOPMENT.md); no pin is needed to build and run locally.
+
+## One-time setup
+
+Creating the apps needs organization-level rights. Until that is done, the chain stops after step 2
+and `mobile-release-artifacts.yml` reports a skipped dispatch.
+
+> **Doing it for the first time?** [`AUTOMATION_SETUP.md`](./AUTOMATION_SETUP.md) walks through the
+> same setup click by click. This section is the reference for what has to exist and why.
+
+### 1. Three GitHub Apps
+
+| App | Installed on | Repository permissions | Secrets stored in |
+|-----|--------------|------------------------|-------------------|
+| Release tagger | `metadist/synaplan` | Contents: read and write | `synaplan`: `MOBILE_TAG_APP_ID`, `MOBILE_TAG_APP_PRIVATE_KEY` |
+| Dispatcher | `metadist/synaplan-apps` | Actions: read and write, **no Contents** | `synaplan`: `MOBILE_APPS_APP_ID`, `MOBILE_APPS_APP_PRIVATE_KEY` |
+| Synchronizer | `metadist/synaplan-apps` | Contents + Pull requests: read and write | `synaplan-apps`: `MOBILE_SYNC_APP_ID`, `MOBILE_SYNC_APP_PRIVATE_KEY` |
+
+App tokens are required rather than the default `GITHUB_TOKEN` in two places: a tag created with
+`GITHUB_TOKEN` does not start a workflow run, so nothing would ever be built, and a merge performed
+with it would record the release route without ever acting on it.
+
+Three apps rather than one keeps the write scope for the app repository out of the public
+repository, and keeps the tagger's write access to `synaplan` away from the app repository.
+
+### 2. Repository settings in `synaplan-apps`
+
+Enable **Allow auto-merge** under Settings → General → Pull Requests. Without it
+`gh pr merge --auto` fails and the chain stops at an open pull request.
+
+Repository-level secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Why it cannot live in an environment |
+|--------|--------------------------------------|
+| `MOBILE_SYNC_APP_ID` / `MOBILE_SYNC_APP_PRIVATE_KEY` | `sync-synaplan.yml` runs without an environment |
+| `SYNAPLAN_ARTIFACT_TOKEN` | Also read by `ci.yml`, which runs without an environment. Only needed if `GITHUB_TOKEN` cannot read Actions artifacts and attestations from `metadist/synaplan` |
+
+### 3. Environments in `synaplan-apps`
+
+Create `canary`, `production` and `store-qa` under Settings → Environments.
+
+Do **not** add required reviewers to `canary` or `production`: a reviewer there reintroduces the
+manual approval this chain removes, and `production` is shared with `ota.yml`. A store submission
+is a human decision anyway, so `store-qa` may keep reviewers — the automatic build still runs, only
+the upload waits.
+
+`canary` and `production` (used by `ota.yml` and `ota-health.yml`):
+
+| Name | Kind | Value |
+|------|------|-------|
+| `CAPGO_API_KEY` | secret | Upload-scoped key of the self-hosted deployment |
+| `CAPGO_SUPA_ANON` | secret | Anonymous key that routes the CLI to the self-hosted backend |
+| `CAPGO_BUNDLE_PRIVATE_KEY` | secret | Bundle signing key; keep an encrypted offline backup |
+| `CAPGO_SUPA_HOST` | variable | Self-hosted Supabase host, e.g. `https://sb.capgo.<domain>` |
+| `CAPGO_CHANNEL` | variable | **Must equal the environment name** — `ota.yml` refuses a mismatch |
+| `CAPGO_UPDATE_URL` | variable | Updater endpoint, HTTPS, e.g. `https://api.capgo.<domain>/updates` |
+| `CAPGO_CHANNEL_URL` | variable | Channel endpoint, HTTPS, e.g. `https://api.capgo.<domain>/channel_self` |
+| `CAPGO_STATS_URL` | variable | Statistics ingest endpoint the app reports to, e.g. `https://api.capgo.<domain>/stats` |
+| `CAPGO_BUNDLE_PUBLIC_KEY` | variable | Counterpart of the signing key, compiled into the binary |
+| `CAPGO_STATS_API_URL` | variable | Statistics **query** root for `ota-health.yml`, e.g. `https://api.capgo.<domain>/statistics`; needs a read-scoped key. A value containing `{appId}` or `{bundle}` is used verbatim instead |
+
+`store-qa` (used by `store-rc.yml`):
+
+| Name | Kind | Value |
+|------|------|-------|
+| `ANDROID_KEYSTORE_BASE64` | secret | Upload keystore, base64 encoded |
+| `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secret | Keystore credentials |
+| `IOS_DISTRIBUTION_CERTIFICATE_BASE64` | secret | Distribution `.p12`, base64 encoded |
+| `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | secret | Password of that `.p12` |
+| `IOS_PROVISIONING_PROFILE_BASE64` | secret | App Store provisioning profile, base64 encoded |
+| `APPLE_TEAM_ID` | secret | Apple Developer team identifier |
+| `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID` | secret | App Store Connect API key identifiers |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | secret | Contents of the `.p8`, downloadable only once |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | secret | Play service-account JSON |
+| `CAPGO_UPDATE_URL`, `CAPGO_CHANNEL_URL`, `CAPGO_STATS_URL`, `CAPGO_BUNDLE_PUBLIC_KEY` | variable | Compiled into the binary, so a store build targets the reviewed deployment |
+| `CAPGO_PRODUCTION_CHANNEL` | variable | Default channel of a store build, normally `production` |
+| `TESTFLIGHT_INTERNAL_GROUP` | variable | TestFlight group that receives the build, default `Internal` |
+
+`store-rc.yml` deliberately declares no `workflow_call` secrets: the credentials are resolved from
+this environment, so an automatic call cannot substitute them.
+
+### 4. Verification run
+
+```bash
+gh workflow run sync-synaplan.yml \
+  -R metadist/synaplan-apps \
+  -f synaplan_ref=v4.0.6 \
+  -f synaplan_sha=<the 40-character sha of that tag>
+```
+
+A successful run opens a synchronization pull request. The chain is live once that PR merges by
+itself.
+
+## Guard rails
+
+- **Classification is fail-closed.** `.github/mobile-impact-policy.json` in `synaplan` routes every
+  path that is not explicitly allow-listed to `store-required`, so an unclassified change can never
+  reach a device over the air. New paths are classified in the same PR that introduces them.
+- **Only a published release starts the chain.** Merges to `main` and tags feed the platform jobs
+  at most; nothing reaches an installed app without a maintainer publishing a GitHub release.
+- **Only `ota-candidate` reaches `ota.yml`.** The workflow re-checks the classification against the
+  release route file and refuses anything else.
+- **Bundles are signed.** `ota.yml` signs each bundle with `CAPGO_BUNDLE_PRIVATE_KEY`; the app
+  verifies against the public key compiled into the binary.
+- **The device reverts by itself.** A bundle that does not call `notifyAppReady()` within
+  `appReadyTimeout` is discarded and the previous bundle is restored.
+- **The channel is watched.** `ota-health.yml` polls the published bundle and rolls back
+  automatically when the healthy share stays below the configured threshold.
+- **Store binaries stay tied to their build.** `store-rc.yml` records a SHA-256 for every signed
+  artifact and `production-promotion.yml` re-checks it before touching a rollout. Signed provenance
+  would be the stronger guarantee, but GitHub only offers it for private repositories on Enterprise
+  Cloud; the OpenAPI artifact from the public `synaplan` repository is still attested and verified.
+
+## Stopping a rollout
+
+```bash
+# Freeze the channel: devices keep what they have, nothing new is served
+gh workflow run ota.yml -R metadist/synaplan-apps \
+  -f operation=pause -f class=ota-candidate -f channel=production -f dry_run=false
+
+# Roll back to a known good bundle
+gh workflow run ota.yml -R metadist/synaplan-apps \
+  -f operation=rollback -f class=ota-candidate -f channel=production \
+  -f rollback_bundle=<bundle version> -f dry_run=false
+
+# Resume
+gh workflow run ota.yml -R metadist/synaplan-apps \
+  -f operation=resume -f class=ota-candidate -f channel=production -f dry_run=false
+```
+
+Published bundle versions are recorded in the run summary of `ota.yml` and in the
+`Current OTA bundle` column of [`COMPATIBILITY.md`](./COMPATIBILITY.md).
+
+To stop the automation entirely, stop publishing releases — or disable
+`mobile-release-artifacts.yml` in `synaplan` so nobody can. No published release means no chain.
+
+## Operational dependencies
+
+Every workflow runs on GitHub-hosted machines. There is no build machine to maintain, and **no
+contributor ever needs a runner**: cloning the repository and following [`DEVELOPMENT.md`](./DEVELOPMENT.md)
+is the whole setup. Release infrastructure is deliberately not part of a development environment —
+a runner executes workflow code with repository secrets, which does not belong on a personal laptop.
+
+Two consequences follow from that choice:
+
+- **The Capgo endpoints must be reachable from the public internet.** `ota.yml` and `ota-health.yml`
+  run on `ubuntu-latest`, so an upload or statistics endpoint that only answers inside a private
+  network would fail there. The updater endpoint is public by necessity anyway, since installed apps
+  fetch from it.
+- **`store-rc.yml` is pinned to `macos-26`, not `macos-latest`.** A signed release must not silently
+  move to a new operating system and Xcode default. The image carries the required Xcode and the
+  Android SDK, so a single job produces both artifacts. macOS minutes are billed at ten times the
+  Linux rate; store builds are rare enough for that to be cheaper than owning a Mac, but it is the
+  reason the frequent OTA path stays on Linux.
+
+When the pinned image is retired, the explicit Xcode assertion in the workflow fails loudly rather
+than producing a build against an unreviewed toolchain.

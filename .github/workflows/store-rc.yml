@@ -1,0 +1,390 @@
+name: Mobile Store RC
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: Stores to build for, or empty for the STORE_PLATFORMS variable
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        description: Build signed artifacts without store uploads
+        required: true
+        default: true
+        type: boolean
+  # No `secrets:` declaration on purpose. The signing and store credentials live
+  # in the `store-qa` environment that the job below selects. Declaring them as
+  # call inputs would shadow the environment values with whatever the caller
+  # passes, and a caller job without that environment cannot see them at all.
+  workflow_call:
+    inputs:
+      platforms:
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: mobile-store-rc
+  cancel-in-progress: false
+
+permissions:
+  attestations: read
+  contents: read
+
+jobs:
+  release-candidate:
+    name: Build store release candidate
+    # Pinned rather than macos-latest: a signed release must not silently move to
+    # a new operating system and Xcode default. The image carries both the Xcode
+    # the step below requires and the Android SDK, so one job covers both stores.
+    runs-on: macos-26
+    environment: store-qa
+    env:
+      SYNAPLAN_ENV: prod
+      SYNAPLAN_OTA_UPDATE_URL: ${{ vars.CAPGO_UPDATE_URL }}
+      SYNAPLAN_OTA_CHANNEL_URL: ${{ vars.CAPGO_CHANNEL_URL }}
+      SYNAPLAN_OTA_STATS_URL: ${{ vars.CAPGO_STATS_URL }}
+      SYNAPLAN_OTA_PUBLIC_KEY: ${{ vars.CAPGO_BUNDLE_PUBLIC_KEY }}
+      SYNAPLAN_OTA_DEFAULT_CHANNEL: ${{ vars.CAPGO_PRODUCTION_CHANNEL || 'production' }}
+      TESTFLIGHT_INTERNAL_GROUP: ${{ vars.TESTFLIGHT_INTERNAL_GROUP || 'Internal' }}
+    steps:
+      # A store is only reachable once its signing material and store account
+      # exist. Selecting them keeps a release possible while the second store is
+      # still being set up, without carrying a half-configured build.
+      - name: Resolve target stores
+        id: platforms
+        env:
+          SELECTED: ${{ inputs.platforms || vars.STORE_PLATFORMS || 'ios,android' }}
+        run: |
+          set -euo pipefail
+          ios=false
+          android=false
+          for store in ${SELECTED//,/ }; do
+            case "$store" in
+              ios) ios=true ;;
+              android) android=true ;;
+              *)
+                echo "::error::Unknown store '${store}' — use ios, android, or both."
+                exit 1
+                ;;
+            esac
+          done
+          if [ "$ios" = false ] && [ "$android" = false ]; then
+            echo "::error::Select at least one store."
+            exit 1
+          fi
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
+          echo "android=$android" >> "$GITHUB_OUTPUT"
+          echo "Building a release candidate for: ${SELECTED}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout with submodules
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      # A store rejects a build whose number is not higher than the last one it
+      # accepted for the same version, and builds also reach it from Xcode. The
+      # commit count keeps growing across all of them, while a per-workflow run
+      # counter restarts low and would collide with what is already published.
+      - name: Resolve the build number
+        run: |
+          set -euo pipefail
+          build_number="$(git rev-list --count HEAD)"
+          test "$build_number" -gt 0
+          echo "SYNAPLAN_BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "Build number: ${build_number}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require a verifiable OTA configuration
+        run: |
+          set -euo pipefail
+          # The public key is compiled into the binary and is the only thing that
+          # lets a shipped app reject a tampered bundle. An empty value drops
+          # `publicKey` from the config without any error, so a release built that
+          # way would trust every bundle for the lifetime of the install, and a
+          # malformed one aborts the app at launch on every device.
+          node scripts/ota-key.mjs
+
+      - name: Require Xcode 26 or newer
+        run: |
+          set -euo pipefail
+          major="$(xcodebuild -version | awk '/Xcode/{split($2,v,"."); print v[1]}')"
+          test "${major:-0}" -ge 26
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install and validate
+        run: |
+          npm ci
+          npm run ci-local
+
+      - name: Download commit-matching OpenAPI artifact
+        id: openapi
+        env:
+          GH_TOKEN: ${{ secrets.SYNAPLAN_ARTIFACT_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          synaplan_sha="$(git -C synaplan rev-parse HEAD)"
+          synaplan_tag="$(git -C synaplan describe --tags --exact-match HEAD)"
+          artifact_name="mobile-release-${synaplan_tag}-${synaplan_sha}"
+          artifact_id="$(
+            gh api --method GET repos/metadist/synaplan/actions/artifacts \
+              -f "name=$artifact_name" \
+              --jq '[.artifacts[] | select(.expired == false)] | first | .id // empty'
+          )"
+          test -n "$artifact_id"
+          mkdir -p "$RUNNER_TEMP/openapi"
+          gh api "repos/metadist/synaplan/actions/artifacts/${artifact_id}/zip" > "$RUNNER_TEMP/openapi.zip"
+          unzip -q "$RUNNER_TEMP/openapi.zip" -d "$RUNNER_TEMP/openapi"
+          (
+            cd "$RUNNER_TEMP/openapi"
+            shasum -a 256 --check checksums.sha256
+          )
+          gh attestation verify "$RUNNER_TEMP/openapi/checksums.sha256" \
+            --repo metadist/synaplan \
+            --signer-workflow metadist/synaplan/.github/workflows/mobile-release-artifacts.yml
+          test -s "$RUNNER_TEMP/openapi/openapi-spec.json"
+          echo "file=$RUNNER_TEMP/openapi/openapi-spec.json" >> "$GITHUB_OUTPUT"
+
+      - name: Build and synchronize native projects
+        env:
+          SYNAPLAN_OPENAPI_FILE: ${{ steps.openapi.outputs.file }}
+        run: |
+          test -n "$SYNAPLAN_OTA_UPDATE_URL"
+          test -n "$SYNAPLAN_OTA_CHANNEL_URL"
+          test -n "$SYNAPLAN_OTA_STATS_URL"
+          test -n "$SYNAPLAN_OTA_PUBLIC_KEY"
+          npm run build
+          npm run release:manifest
+          npm run check:release:strict
+
+      - name: Import Android signing material
+        if: steps.platforms.outputs.android == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/android-signing" "$HOME/.gradle"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -D > "$RUNNER_TEMP/android-signing/release.jks"
+          chmod 600 "$RUNNER_TEMP/android-signing/release.jks"
+          {
+            echo "android.injected.signing.store.file=$RUNNER_TEMP/android-signing/release.jks"
+            echo "android.injected.signing.store.password=$KEYSTORE_PASSWORD"
+            echo "android.injected.signing.key.alias=$KEY_ALIAS"
+            echo "android.injected.signing.key.password=$KEY_PASSWORD"
+          } > "$HOME/.gradle/gradle.properties"
+          chmod 600 "$HOME/.gradle/gradle.properties"
+
+      - name: Build signed Android AAB
+        if: steps.platforms.outputs.android == 'true'
+        working-directory: android
+        run: ./gradlew --no-daemon bundleRelease
+
+      - name: Import iOS signing material
+        if: steps.platforms.outputs.ios == 'true'
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/mobile-signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$RUNNER_TEMP/distribution.p12"
+          security import "$RUNNER_TEMP/distribution.p12" -k "$keychain" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$password" "$keychain" >/dev/null
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          printf '%s' "$PROFILE_BASE64" | base64 -D > \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/synaplan.mobileprovision"
+          security cms -D -i \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/synaplan.mobileprovision" \
+            > "$RUNNER_TEMP/profile.plist"
+          profile_name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")"
+          echo "IOS_PROFILE_NAME=$profile_name" >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/distribution.p12"
+
+      - name: Build and export signed iOS archive
+        if: steps.platforms.outputs.ios == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/Synaplan.xcarchive"
+          export_dir="$RUNNER_TEMP/ios-export"
+          node scripts/ios-signing.mjs
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath "$archive" \
+            -destination "generic/platform=iOS"
+          bundle_id="$(/usr/libexec/PlistBuddy -c \
+            'Print :ApplicationProperties:CFBundleIdentifier' "$archive/Info.plist")"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict><key>${bundle_id}</key><string>${IOS_PROFILE_NAME}</string></dict>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+          echo "Exporting ${bundle_id} with profile ${IOS_PROFILE_NAME}."
+          xcodebuild -exportArchive \
+            -archivePath "$archive" \
+            -exportPath "$export_dir" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Prepare store upload request
+        env:
+          PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          BUILD_IOS: ${{ steps.platforms.outputs.ios }}
+          BUILD_ANDROID: ${{ steps.platforms.outputs.android }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/store-rc"
+          if [ "$BUILD_ANDROID" = 'true' ]; then
+            test -n "$PLAY_CREDENTIALS"
+            printf '%s' "$PLAY_CREDENTIALS" | jq -e '.client_email and .private_key' >/dev/null
+            cp android/app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/store-rc/"
+          fi
+          if [ "$BUILD_IOS" = 'true' ]; then
+            cp "$RUNNER_TEMP"/ios-export/*.ipa "$RUNNER_TEMP/store-rc/"
+          fi
+          app_version="$(node -p "require('./package.json').version")"
+          jq -n \
+            --arg track internal \
+            --arg apple_group "$TESTFLIGHT_INTERNAL_GROUP" \
+            --arg sha "$GITHUB_SHA" \
+            --arg app_version "$app_version" \
+            --arg build_number "$SYNAPLAN_BUILD_NUMBER" \
+            --argjson ios "$BUILD_IOS" \
+            --argjson android "$BUILD_ANDROID" \
+            '{
+              googlePlayTrack:$track,
+              testFlightGroup:$apple_group,
+              commit:$sha,
+              appVersion:$app_version,
+              iosBuildNumber:$build_number,
+              androidVersionCode:$build_number,
+              stores:{ios:$ios, android:$android}
+            }' \
+            > "$RUNNER_TEMP/store-rc/upload-request.json"
+
+      # Signed provenance would need GitHub Enterprise Cloud for a private
+      # repository, so the artifacts carry checksums that the promotion
+      # re-verifies against the run they were built in.
+      - name: Record store artifact checksums
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/store-rc"
+          # Only the selected stores produce a binary, so an absent pattern has
+          # to disappear rather than reach shasum as a literal name.
+          shopt -s nullglob
+          shasum -a 256 *.ipa *.aab > checksums.sha256
+          test -s checksums.sha256
+          shasum -a 256 --check checksums.sha256
+          {
+            echo '### Signed store artifacts'
+            echo '```'
+            cat checksums.sha256
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload signed store artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: store-rc-${{ github.sha }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/store-rc/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Install pinned store upload tooling
+        if: ${{ ! inputs.dry_run }}
+        run: gem install fastlane --version 2.237.0 --no-document
+
+      - name: Upload to TestFlight Internal
+        if: ${{ ! inputs.dry_run && steps.platforms.outputs.ios == 'true' }}
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$ASC_KEY_ID"
+          test -n "$ASC_ISSUER_ID"
+          jq -n \
+            --arg key_id "$ASC_KEY_ID" \
+            --arg issuer_id "$ASC_ISSUER_ID" \
+            --arg key "$ASC_PRIVATE_KEY" \
+            '{key_id:$key_id, issuer_id:$issuer_id, key:$key, in_house:false}' \
+            > "$RUNNER_TEMP/asc-api-key.json"
+          chmod 600 "$RUNNER_TEMP/asc-api-key.json"
+          # pilot rejects an attempt to assign a build to an internal group, so
+          # the group is recorded for the promotion but not passed here.
+          #
+          # The wait is what releases the build to the internal testers: pilot
+          # returns before `distribute` when `skip_waiting_for_build_processing`
+          # is set, so skipping it uploads a build that never reaches a device.
+          # Apple's own automatic distribution does not cover that gap.
+          #
+          # The deadline keeps a stalled Apple from holding a macOS runner all
+          # afternoon - processing normally takes minutes but has taken over an
+          # hour. Hitting it fails the job with the binary already uploaded, so
+          # the build is then added to the internal group by hand.
+          fastlane pilot upload \
+            --ipa "$RUNNER_TEMP"/store-rc/*.ipa \
+            --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
+            --skip_waiting_for_build_processing false \
+            --wait_processing_timeout_duration 2700
+
+      - name: Upload to Google Play Internal
+        if: ${{ ! inputs.dry_run && steps.platforms.outputs.android == 'true' }}
+        env:
+          PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PLAY_CREDENTIALS" > "$RUNNER_TEMP/google-play.json"
+          chmod 600 "$RUNNER_TEMP/google-play.json"
+          fastlane supply \
+            --aab "$RUNNER_TEMP/store-rc/app-release.aab" \
+            --track internal \
+            --json_key "$RUNNER_TEMP/google-play.json" \
+            --skip_upload_metadata true \
+            --skip_upload_images true \
+            --skip_upload_screenshots true \
+            --skip_upload_changelogs true
+
+      - name: Report dry run
+        if: inputs.dry_run
+        run: echo "Dry run completed; neither store was changed." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          rm -f "$HOME/.gradle/gradle.properties"
+          rm -f "$RUNNER_TEMP/asc-api-key.json" "$RUNNER_TEMP/google-play.json"
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/synaplan.mobileprovision"
+          security delete-keychain "$RUNNER_TEMP/mobile-signing.keychain-db" 2>/dev/null || true

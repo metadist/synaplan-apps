@@ -1,0 +1,311 @@
+name: Mobile OTA Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Publish or control an existing channel
+        required: true
+        default: publish
+        type: choice
+        options: [publish, pause, resume, rollback]
+      class:
+        description: Release impact class
+        required: true
+        type: choice
+        options: [ota-candidate]
+      rollback_bundle:
+        description: Existing bundle version to restore when operation is rollback
+        required: false
+        type: string
+      channel:
+        description: Protected Capgo channel
+        required: true
+        default: canary
+        type: choice
+        options: [canary, production]
+      dry_run:
+        description: Build and validate without publishing
+        required: true
+        default: true
+        type: boolean
+  # Called by release-dispatch.yml after an automated synchronization merges.
+  # The policy guard below is unchanged for this path: only `ota-candidate` is
+  # ever accepted, whoever the caller is.
+  workflow_call:
+    inputs:
+      operation:
+        required: false
+        default: publish
+        type: string
+      class:
+        required: true
+        type: string
+      rollback_bundle:
+        required: false
+        default: ''
+        type: string
+      channel:
+        required: true
+        type: string
+      dry_run:
+        required: false
+        default: true
+        type: boolean
+    outputs:
+      bundle_version:
+        description: The bundle version that was built and published
+        value: ${{ jobs.bundle.outputs.bundle-version }}
+      previous_bundle_version:
+        description: The bundle the channel served before this run, empty when unknown
+        value: ${{ jobs.bundle.outputs.previous-bundle-version }}
+
+concurrency:
+  group: mobile-ota-${{ inputs.channel }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  attestations: read
+  contents: read
+
+jobs:
+  bundle:
+    name: Build signed OTA bundle
+    # An OTA bundle is web assets only, so this needs no macOS and no machine of
+    # our own. It does require the configured Capgo endpoints to be reachable
+    # from GitHub-hosted runners.
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.channel }}
+    timeout-minutes: 60
+    outputs:
+      bundle-version: ${{ steps.bundle.outputs.version }}
+      previous-bundle-version: ${{ steps.previous.outputs.bundle }}
+    env:
+      CAPGO_SUPA_HOST: ${{ vars.CAPGO_SUPA_HOST }}
+      CAPGO_CHANNEL: ${{ vars.CAPGO_CHANNEL }}
+      SYNAPLAN_OTA_UPDATE_URL: ${{ vars.CAPGO_UPDATE_URL }}
+      SYNAPLAN_OTA_CHANNEL_URL: ${{ vars.CAPGO_CHANNEL_URL }}
+      SYNAPLAN_OTA_STATS_URL: ${{ vars.CAPGO_STATS_URL }}
+      SYNAPLAN_OTA_PUBLIC_KEY: ${{ vars.CAPGO_BUNDLE_PUBLIC_KEY }}
+      SYNAPLAN_OTA_DEFAULT_CHANNEL: ${{ vars.CAPGO_CHANNEL }}
+    steps:
+      - name: Enforce OTA policy
+        run: |
+          set -euo pipefail
+          test "${{ inputs.class }}" = "ota-candidate"
+          test "${{ inputs.channel }}" = "canary" -o "${{ inputs.channel }}" = "production"
+          [[ "${{ inputs.operation }}" =~ ^(publish|pause|resume|rollback)$ ]]
+          if [[ "${{ inputs.operation }}" == "rollback" ]]; then
+            test -n "${{ inputs.rollback_bundle }}"
+          fi
+          echo "Store-required and payment-impacting releases are not accepted by this workflow." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout with submodules
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      # We sign every bundle, so the app must be able to verify one. An empty key
+      # disables verification silently: the config omits `publicKey` and the
+      # updater accepts any bundle. Entering the key as a secret instead of a
+      # variable produces exactly that empty value.
+      - name: Require a verifiable OTA configuration
+        if: inputs.operation == 'publish'
+        run: node scripts/ota-key.mjs
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install and validate
+        if: inputs.operation == 'publish'
+        run: |
+          npm ci
+          npm run ci-local
+
+      - name: Download commit-matching OpenAPI artifact
+        if: inputs.operation == 'publish'
+        id: openapi
+        env:
+          GH_TOKEN: ${{ secrets.SYNAPLAN_ARTIFACT_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          synaplan_sha="$(git -C synaplan rev-parse HEAD)"
+          synaplan_tag="$(git -C synaplan describe --tags --exact-match HEAD)"
+          artifact_name="mobile-release-${synaplan_tag}-${synaplan_sha}"
+          artifact_id="$(
+            gh api --method GET repos/metadist/synaplan/actions/artifacts \
+              -f "name=$artifact_name" \
+              --jq '[.artifacts[] | select(.expired == false)] | first | .id // empty'
+          )"
+          test -n "$artifact_id"
+          mkdir -p "$RUNNER_TEMP/openapi"
+          gh api "repos/metadist/synaplan/actions/artifacts/${artifact_id}/zip" > "$RUNNER_TEMP/openapi.zip"
+          unzip -q "$RUNNER_TEMP/openapi.zip" -d "$RUNNER_TEMP/openapi"
+          (
+            cd "$RUNNER_TEMP/openapi"
+            sha256sum --check checksums.sha256
+          )
+          gh attestation verify "$RUNNER_TEMP/openapi/checksums.sha256" \
+            --repo metadist/synaplan \
+            --signer-workflow metadist/synaplan/.github/workflows/mobile-release-artifacts.yml
+          test -s "$RUNNER_TEMP/openapi/openapi-spec.json"
+          echo "file=$RUNNER_TEMP/openapi/openapi-spec.json" >> "$GITHUB_OUTPUT"
+
+      - name: Build web assets
+        if: inputs.operation == 'publish'
+        env:
+          SYNAPLAN_ENV: prod
+          SYNAPLAN_BUILD_NUMBER: ${{ github.run_number }}
+          SYNAPLAN_OPENAPI_FILE: ${{ steps.openapi.outputs.file }}
+        run: npm run build -- --web-only
+
+      - name: Exercise release routing policy
+        if: inputs.operation == 'publish'
+        run: node scripts/release-drill.mjs
+
+      - name: Prepare, bundle, and sign
+        if: inputs.operation == 'publish'
+        id: bundle
+        env:
+          # Binds the bundle version to this run, so two publishes from the same
+          # commit cannot collide on a version the updater would then ignore.
+          SYNAPLAN_BUILD_NUMBER: ${{ github.run_number }}
+          OTA_SIGNING_KEY: ${{ secrets.CAPGO_BUNDLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OTA_SIGNING_KEY"
+          node scripts/ota-prepare.mjs
+          bundles=(artifacts/ota/*.zip)
+          test -e "${bundles[0]}"
+          bundle_path="${bundles[0]}"
+          bundle="$(basename "$bundle_path")"
+          cp "$bundle_path" "$RUNNER_TEMP/$bundle"
+          printf '%s' "$OTA_SIGNING_KEY" > "$RUNNER_TEMP/ota-signing-key.pem"
+          chmod 600 "$RUNNER_TEMP/ota-signing-key.pem"
+          openssl dgst -sha256 -sign "$RUNNER_TEMP/ota-signing-key.pem" \
+            -out "$RUNNER_TEMP/$bundle.sig" "$RUNNER_TEMP/$bundle"
+          sha256sum "$RUNNER_TEMP/$bundle" > "$RUNNER_TEMP/$bundle.sha256"
+          rm -f "$RUNNER_TEMP/ota-signing-key.pem"
+          # The publish plan carries the bundleVersion that release-lib derived
+          # from app version, pinned Synaplan ref and build number. The package
+          # version alone repeats for every release and would collide.
+          plans=(artifacts/ota/*.publish.json)
+          test -e "${plans[0]}"
+          version="$(jq -r '.bundleVersion' "${plans[0]}")"
+          test "$version" = "${bundle%.zip}"
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed bundle artifact
+        if: inputs.operation == 'publish'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ota-${{ inputs.channel }}-${{ steps.bundle.outputs.version }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/${{ steps.bundle.outputs.bundle }}
+            ${{ runner.temp }}/${{ steps.bundle.outputs.bundle }}.sig
+            ${{ runner.temp }}/${{ steps.bundle.outputs.bundle }}.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Validate Capgo publication configuration
+        if: ${{ ! inputs.dry_run }}
+        env:
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+          CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
+        run: |
+          set -euo pipefail
+          test -n "$CAPGO_API_KEY"
+          test -n "$CAPGO_SUPA_HOST"
+          test -n "$CAPGO_SUPA_ANON"
+          test -n "$CAPGO_CHANNEL"
+          test "$CAPGO_CHANNEL" = "${{ inputs.channel }}"
+
+      # Captured before publishing so an automatic rollback has an exact target
+      # instead of guessing the previous version from a bundle listing.
+      - name: Record the currently served bundle
+        if: ${{ ! inputs.dry_run && inputs.operation == 'publish' }}
+        id: previous
+        continue-on-error: true
+        env:
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+          CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
+        run: |
+          set -uo pipefail
+          current="$(
+            npx --yes @capgo/cli@8.31.3 channel currentBundle "$CAPGO_CHANNEL" com.synaplan.app \
+              --apikey "$CAPGO_API_KEY" \
+              --supa-host "$CAPGO_SUPA_HOST" \
+              --supa-anon "$CAPGO_SUPA_ANON" 2>/dev/null |
+              tr -d '[:space:]' |
+              grep -Eo '[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*' |
+              tail -n 1
+          )" || current=''
+          echo "bundle=$current" >> "$GITHUB_OUTPUT"
+          if test -n "$current"; then
+            echo "Channel \`$CAPGO_CHANNEL\` currently serves \`$current\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No previous bundle could be determined; a failing release will pause the channel instead of rolling back." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publish OTA bundle
+        if: ${{ ! inputs.dry_run && inputs.operation == 'publish' }}
+        env:
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+          CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
+          CAPGO_KEY: ${{ secrets.CAPGO_BUNDLE_PRIVATE_KEY }}
+        run: |
+          npx --yes @capgo/cli@8.31.3 bundle upload com.synaplan.app \
+            --apikey "$CAPGO_API_KEY" \
+            --supa-host "$CAPGO_SUPA_HOST" \
+            --supa-anon "$CAPGO_SUPA_ANON" \
+            --channel "$CAPGO_CHANNEL" \
+            --path synaplan/frontend/dist \
+            --bundle "${{ steps.bundle.outputs.version }}" \
+            --key-data-v2 "$CAPGO_KEY" \
+            --tus
+          echo "Published bundle \`${{ steps.bundle.outputs.version }}\` to channel \`$CAPGO_CHANNEL\`." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pause, resume, or roll back OTA channel
+        if: ${{ ! inputs.dry_run && inputs.operation != 'publish' }}
+        env:
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+          CAPGO_SUPA_ANON: ${{ secrets.CAPGO_SUPA_ANON }}
+          ROLLBACK_BUNDLE: ${{ inputs.rollback_bundle }}
+        run: |
+          set -euo pipefail
+          common=(
+            "$CAPGO_CHANNEL"
+            com.synaplan.app
+            --apikey "$CAPGO_API_KEY"
+            --supa-host "$CAPGO_SUPA_HOST"
+            --supa-anon "$CAPGO_SUPA_ANON"
+          )
+          case "${{ inputs.operation }}" in
+            pause)
+              npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
+                --no-prod --no-dev --no-emulator --no-device
+              ;;
+            resume)
+              if [[ "$CAPGO_CHANNEL" == "production" ]]; then
+                npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
+                  --prod --device --no-dev --no-emulator
+              else
+                npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
+                  --dev --device --no-prod --no-emulator
+              fi
+              ;;
+            rollback)
+              npx --yes @capgo/cli@8.31.3 channel set "${common[@]}" \
+                --bundle "$ROLLBACK_BUNDLE" --downgrade
+              ;;
+          esac
+
+      - name: Report dry run
+        if: inputs.dry_run
+        run: echo "Dry run completed for ${{ inputs.operation }}; no Capgo channel was changed." >> "$GITHUB_STEP_SUMMARY"

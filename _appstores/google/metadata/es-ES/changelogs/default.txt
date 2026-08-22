@@ -1,0 +1,1 @@
+Primera versión v4.0: chatea con los mejores modelos de IA y tus documentos, entrada por voz, generación de imágenes, modo oscuro e inicio de sesión por servidor.

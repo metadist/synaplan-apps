@@ -1,0 +1,26 @@
+Synaplan is your private AI assistant that talks to leading AI models AND your own knowledge.
+
+Ask questions in plain language and get answers grounded in your own documents, not just the
+model's training data. Upload files into knowledge folders and chat with them — reports,
+manuals, notes, research — and get answers with the sources they came from.
+
+WHY SYNAPLAN
+• One assistant, many models — pick the AI that fits the task.
+• Chat with your documents (RAG): upload files and ask across them.
+• Voice input: dictate instead of typing.
+• Image generation: create visuals right in the chat.
+• Tools & knowledge folders to organize how you work.
+• Private by design: your data flows through the server you choose.
+
+BUILT FOR YOU
+• Connect to Synaplan.com or to your own self-hosted Synaplan server — you decide where your
+  data lives.
+• Clean, fast, native experience: dark mode, offline-aware, share and save results.
+• Available in English, German, Spanish, and Turkish.
+
+SUBSCRIPTIONS
+Free to start. Optional subscriptions unlock higher usage and advanced features, billed through
+your Google Play account. Manage or cancel anytime in your account settings.
+
+Synaplan is flexible and open: the platform is brandable and can be self-hosted, so the same app
+works for Synaplan.com and for your own AI platform.

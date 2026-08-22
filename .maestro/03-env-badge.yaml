@@ -1,0 +1,18 @@
+# Gate 2 (Click) — non-prod environment badge (Epic 10.1).
+#
+# Non-production builds must show a visible env badge (so a tester never confuses a
+# dev/staging build with prod). build.sh stamps window.__SYNAPLAN_ENV__ and the
+# bootstrap renders e.g. "DEV · 4.0 (123)". Run this ONLY against a dev/staging build:
+#   maestro test .maestro/03-env-badge.yaml -e APP_ID=com.synaplan.app.dev
+#   maestro test .maestro/03-env-badge.yaml -e APP_ID=com.synaplan.app.staging
+# (Prod shows no badge by design, so this flow is excluded from a prod suite run.)
+appId: ${APP_ID}
+env:
+  APP_ID: com.synaplan.app.dev
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: '(DEV|STAGING).*'
+    timeout: 25000
+- takeScreenshot: .maestro/artifacts/03-env-badge

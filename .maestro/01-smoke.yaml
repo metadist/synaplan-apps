@@ -1,0 +1,25 @@
+# Gate 2 (Click) — app-shell cold-launch smoke.
+#
+# Proves the bundled SPA actually boots in the native WebView (no white screen).
+# The app-owned native bootstrap (app/synaplan-native.js) renders a non-prod
+# environment badge (e.g. "DEV · 4.0 (123)") in onReady() — independent of the
+# SPA, the network, or the UI locale — so its presence is a stable proof that
+# index.html loaded and JS executed in the shell.
+#
+# NOTE: the old always-on "Server settings" gear was removed; the server switch
+# now lives in the SPA (Admin → App server). The env badge is the remaining
+# locale-/network-independent app-owned boot anchor, so smoke targets a non-prod
+# build where it is present. appId is parameterised:
+#   maestro test .maestro -e APP_ID=com.synaplan.app.dev       # dev build
+#   maestro test .maestro -e APP_ID=com.synaplan.app.staging   # staging build
+appId: ${APP_ID}
+env:
+  APP_ID: com.synaplan.app.dev
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      text: '(DEV|STAGING).*'
+    timeout: 25000
+- takeScreenshot: .maestro/artifacts/01-smoke

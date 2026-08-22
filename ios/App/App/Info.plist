@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+        <string>Synaplan Dev</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Export compliance: the app uses only standard, exempt encryption (HTTPS/TLS
+	     via the system stack). Declaring this here lets TestFlight/App Store builds
+	     skip the per-build "Missing Compliance" prompt. Set to true only if the app
+	     ever ships proprietary/non-exempt cryptography. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+	<!-- Epic 7.1: WKWebView getUserMedia + file picker require these purpose strings.
+	     A MISSING string causes a hard crash/App Store reject on first access. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Synaplan uses the microphone so you can dictate messages and use voice features.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Synaplan uses the camera so you can capture photos to attach to your messages.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Synaplan needs access to your photos so you can attach images and documents to your messages.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Synaplan needs permission to save generated images and files to your photo library.</string>
+	<!-- Epic 7.2: optional biometric app lock. Required or Face ID access crashes. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Synaplan uses Face ID to unlock the app.</string>
+	<!-- Self-hosting / dev: let the app reach a Synaplan backend on the local
+	     network (e.g. http://192.168.x.x:8000) configured under Admin → App server.
+	     NSAllowsLocalNetworking relaxes App Transport Security ONLY for private and
+	     link-local addresses (App Store safe; it does NOT permit arbitrary cleartext
+	     HTTP to the public internet). The usage string is required so iOS can show
+	     the Local Network permission prompt on first connection. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Synaplan connects to a Synaplan server on your local network when you configure one under Admin → App server.</string>
+	<!-- OAuth deep link (Epic 3): com.synaplan.app://oauth/callback -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.synaplan.app.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.synaplan.app</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
