@@ -11,7 +11,7 @@ single source. Identifiers are frozen in [`IDENTIFIERS.md`](./IDENTIFIERS.md).
 | `SYNAPLAN_BUILD_NUMBER`| monotonic integer (default: git commit count, else `1`) | `versionCode` (Android) / `CFBundleVersion` (iOS) |
 
 The **human version** is owned by [`package.json`](../package.json) `version` (currently
-`4.0.0`). It drives `versionName` / `MARKETING_VERSION` **and** the User-Agent token
+`4.0.1`). It drives `versionName` / `MARKETING_VERSION` **and** the User-Agent token
 (`capacitor.config.ts`), so bumping it in one place updates everything.
 
 ## Per-environment identity

@@ -11,6 +11,7 @@ import { createReleaseRoute, readReleaseRoute } from '../scripts/release-route.m
 import { classifyReleaseRoute, runReleaseDrill } from '../scripts/release-drill.mjs'
 import {
   ROOT,
+  appVersion,
   bundleVersion,
   checkServiceWorkerGuard,
   validatePublicOtaConfig,
@@ -85,9 +86,9 @@ test('release manifest contains deterministic checksums and native compatibility
       },
       generatedAt: '2026-07-10T08:00:00.000Z',
     })
-    assert.equal(manifest.app.version, '4.0.0')
-    assert.equal(manifest.app.nativeCompatibility.minVersion, '4.0.0')
-    assert.equal(manifest.app.nativeCompatibility.maxVersion, '4.0.0')
+    assert.equal(manifest.app.version, appVersion())
+    assert.equal(manifest.app.nativeCompatibility.minVersion, appVersion())
+    assert.equal(manifest.app.nativeCompatibility.maxVersion, appVersion())
     assert.equal(manifest.app.nativeCompatibility.androidVersionCode, 77)
     assert.equal(manifest.channel, 'candidate')
     assert.equal(manifest.apiContractSha256, 'a'.repeat(64))
