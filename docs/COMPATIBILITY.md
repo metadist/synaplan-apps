@@ -8,7 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.1 | `v4.2.8` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v4.2.8 |
+| 4.0.1 | `v4.3.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v4.3.0 |
 | 4.0.0 | `v4.2.4` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Reviewed mobile baseline v4.2.4 |
 
 ## Pin history
