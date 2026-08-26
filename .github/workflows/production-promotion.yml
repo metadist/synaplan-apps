@@ -256,7 +256,13 @@ jobs:
       - name: Promote Apple build to phased production
         if: ${{ ! inputs.dry_run && (inputs.platform == 'all' || inputs.platform == 'apple') && inputs.operation == 'promote' }}
         run: |
-          fastlane deliver \
+          # submit_build, not bare `deliver`: the default command looks for a
+          # Deliverfile or a metadata directory and, finding neither, asks
+          # "Do you want to setup deliver?" — which crashes on a runner with
+          # "Could not retrieve response as fastlane runs in non-interactive
+          # mode". submit_build has no such prompt and is the upstream path for
+          # sending an already-uploaded build to review.
+          fastlane deliver submit_build \
             --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
             --app_identifier "$SYNAPLAN_APP_ID" \
             --app_version "${{ inputs.app_version }}" \
