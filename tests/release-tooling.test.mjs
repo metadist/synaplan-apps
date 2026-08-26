@@ -303,8 +303,8 @@ test('a store release candidate can target one store while the other is unpublis
   // Promotion has to accept a candidate that only carries the store it was
   // built for, rather than insisting on both binaries.
   const promotion = read('.github/workflows/production-promotion.yml')
-  assert.match(promotion, /\$PLATFORM" != "google" \]\]; then test "\$\{#ipas\[@\]\}" -eq 1/)
-  assert.match(promotion, /\$PLATFORM" != "apple" \]\]; then test "\$\{#aabs\[@\]\}" -eq 1/)
+  assert.match(promotion, /\$PLATFORM" != "google" && "\$\{#ipas\[@\]\}" -ne 1/)
+  assert.match(promotion, /\$PLATFORM" != "apple" && "\$\{#aabs\[@\]\}" -ne 1/)
 })
 
 test('an unusable OTA verification key fails the build instead of the app', () => {
@@ -435,6 +435,34 @@ test('a production promotion can actually run its store steps', () => {
   assert.match(promotion, /--metadata_path "\$SYNAPLAN_APPLE_METADATA"/)
   assert.match(promotion, /cp "\$notes" "\$staged\/\$locale\/release_notes\.txt"/)
   assert.doesNotMatch(promotion, /--metadata_path _appstores/)
+})
+
+test('a promotion rolls out fully unless it is asked not to', () => {
+  const promotion = read('.github/workflows/production-promotion.yml')
+
+  // A 5% slice of a small user base is too few installs to learn from while
+  // stranding everyone else on the old build. Any percentage stays available
+  // per run for a release that warrants a canary.
+  assert.match(promotion, /google_rollout_percent:\n(?:.*\n)*?\s+default: '100'/)
+  assert.match(promotion, /description: Google managed rollout percentage \(0\.01-100\)/)
+})
+
+test('a release candidate missing the platform binary says so', () => {
+  const promotion = read('.github/workflows/production-promotion.yml')
+
+  // Apple and Google can come from different release-candidate runs, so the
+  // wrong run id passes every other check and fails here. A bare `test` ends
+  // the job with no output, which sends the reader hunting through the log.
+  assert.match(
+    promotion,
+    /::error::Release candidate \$\{STORE_RC_RUN_ID\} carries \$\{#ipas\[@\]\} \.ipa files/
+  )
+  assert.match(
+    promotion,
+    /::error::Release candidate \$\{STORE_RC_RUN_ID\} carries \$\{#aabs\[@\]\} \.aab files/
+  )
+  assert.doesNotMatch(promotion, /then test "\$\{#ipas\[@\]\}" -eq 1; fi/)
+  assert.doesNotMatch(promotion, /then test "\$\{#aabs\[@\]\}" -eq 1; fi/)
 })
 
 test('the Apple submission only uploads locales the listing actually has', () => {
