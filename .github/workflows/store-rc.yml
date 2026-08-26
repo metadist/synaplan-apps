@@ -92,13 +92,31 @@ jobs:
       # accepted for the same version, and builds also reach it from Xcode. The
       # commit count keeps growing across all of them, while a per-workflow run
       # counter restarts low and would collide with what is already published.
+      #
+      # STORE_BUILD_NUMBER_OFFSET lifts that count above what the stores already
+      # hold. It is needed because squashing the history reset the count far below
+      # the builds already published, and Google Play requires versionCode to
+      # increase per PACKAGE regardless of versionName — a version bump cannot
+      # absorb it the way it can for Apple's per-version CFBundleVersion. Adding a
+      # constant keeps every commit mapped to its own, strictly increasing number.
       - name: Resolve the build number
+        env:
+          OFFSET: ${{ vars.STORE_BUILD_NUMBER_OFFSET || '0' }}
         run: |
           set -euo pipefail
-          build_number="$(git rev-list --count HEAD)"
-          test "$build_number" -gt 0
+          # A malformed variable must not silently fall back to an offset of 0 and
+          # produce a build the stores reject after the whole signed build ran.
+          case "$OFFSET" in
+            '' | *[!0-9]*)
+              echo "::error::STORE_BUILD_NUMBER_OFFSET must be a non-negative integer, got '${OFFSET}'."
+              exit 1
+              ;;
+          esac
+          commit_count="$(git rev-list --count HEAD)"
+          test "$commit_count" -gt 0
+          build_number="$((commit_count + OFFSET))"
           echo "SYNAPLAN_BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
-          echo "Build number: ${build_number}." >> "$GITHUB_STEP_SUMMARY"
+          echo "Build number: ${build_number} (${commit_count} commits + ${OFFSET} offset)." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Require a verifiable OTA configuration
         run: |
