@@ -253,6 +253,35 @@ jobs:
             chmod 600 "$RUNNER_TEMP/google-play.json"
           fi
 
+      # Apple rejects a submission without release notes ("You must provide a
+      # value for the attribute 'whatsNew'"), so the notes have to be uploaded.
+      # Only release_notes.txt is staged: pointing deliver at the full metadata
+      # directory would also push description, keywords, name, subtitle and
+      # promotional text on every promotion, overwriting anything edited in App
+      # Store Connect since the last release.
+      - name: Stage the Apple release notes
+        if: ${{ ! inputs.dry_run && (inputs.platform == 'all' || inputs.platform == 'apple') && inputs.operation == 'promote' }}
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/apple-metadata"
+          echo 'Release notes uploaded to App Store Connect:' >> "$GITHUB_STEP_SUMMARY"
+          # A literal list, not a glob over the metadata directory: that
+          # directory also carries es-ES and tr, which the App Store listing does
+          # not have, and deliver would create those localizations. Listed
+          # inline rather than through a variable so the loop does not depend on
+          # word splitting.
+          for locale in en-US de-DE; do
+            notes="_appstores/apple/metadata/${locale}/release_notes.txt"
+            if [ ! -s "$notes" ]; then
+              echo "::error::Missing or empty release notes for ${locale} at ${notes}."
+              exit 1
+            fi
+            mkdir -p "$staged/$locale"
+            cp "$notes" "$staged/$locale/release_notes.txt"
+            echo "- ${locale}: $(cat "$notes")" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "SYNAPLAN_APPLE_METADATA=$staged" >> "$GITHUB_ENV"
+
       - name: Promote Apple build to phased production
         if: ${{ ! inputs.dry_run && (inputs.platform == 'all' || inputs.platform == 'apple') && inputs.operation == 'promote' }}
         run: |
@@ -272,7 +301,8 @@ jobs:
             --precheck_include_in_app_purchases false \
             --phased_release "${{ inputs.apple_phased_release }}" \
             --skip_binary_upload true \
-            --skip_metadata true \
+            --skip_metadata false \
+            --metadata_path "$SYNAPLAN_APPLE_METADATA" \
             --skip_screenshots true \
             --force true
 

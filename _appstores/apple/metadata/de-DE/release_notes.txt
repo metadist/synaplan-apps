@@ -1,1 +1,1 @@
-Erstes v4.0-Release: native iOS-App – chatte mit führenden KI-Modellen und deinen eigenen Dokumenten, Spracheingabe, Bildgenerierung, Dark Mode und Anmeldung pro Server.
+Schnellerer Start: Die App öffnet jetzt sofort und bleibt nicht mehr auf dem Startbildschirm hängen – auch wenn du sie einige Tage nicht benutzt hast. Updates werden im Hintergrund vorbereitet und beim nächsten Öffnen übernommen.
