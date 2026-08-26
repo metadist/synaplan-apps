@@ -27,6 +27,10 @@
  *      its own (see `openOverlay()` below) — it does NOT go through
  *      `window.SynaplanServer.save()/reset()`, so it is unaffected by the
  *      persist/reload split above.
+ *   4. Own the native launch screen: hide it as soon as the SPA has painted, with
+ *      a hard ceiling as a safety net. The launch screen is configured with
+ *      `launchAutoHide: false` and the updater's `autoSplashscreen` is not used,
+ *      so this file is the single place that takes it down.
  *
  * Notes:
  *   - The server URL is NOT a secret, and the bootstrap must read it
@@ -102,8 +106,88 @@
     return getStoredUrl() || DEFAULT_SERVER_URL
   }
 
+  // ── Splash screen ownership (native only) ───────────────────────────────────
+  // The launch screen is configured with `launchAutoHide: false`, so it stays up
+  // until something hides it — and this file is the only thing that does.
+  //
+  // The updater's `autoSplashscreen` is deliberately NOT used: it hides from
+  // `sendReadyToJs()`, i.e. only after the OTA update check has returned, and on a
+  // cold start the plugin never shows the splash itself, so it never arms its own
+  // `autoSplashscreenTimeout` either. A slow or unreachable update server then
+  // held the launch screen for the whole check (up to `responseTimeout`, 20s) even
+  // though the SPA behind it was fully interactive.
+  //
+  // Ownership is bounded twice over: hide on the SPA's first paint, and hide
+  // anyway once SPLASH_MAX_WAIT_MS has elapsed. A failure anywhere in this file
+  // or in the SPA can therefore never leave the user stuck on the splash.
+  var SPLASH_MAX_WAIT_MS = 5000
+  var splashHidden = false
+  var splashObserver = null
+
+  function stopSplashObserver() {
+    if (!splashObserver) return
+    try {
+      splashObserver.disconnect()
+    } catch (e) {
+      /* ignore */
+    }
+    splashObserver = null
+  }
+
+  function hideSplash() {
+    if (splashHidden) return
+    splashHidden = true
+    stopSplashObserver()
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var splash = plugins && plugins.SplashScreen
+      if (!splash || typeof splash.hide !== 'function') return
+      splash.hide({ fadeOutDuration: 200 })
+    } catch (e) {
+      /* best-effort: a missing plugin must never keep the app from running */
+    }
+  }
+
+  // The SPA mounts into #app, so its first element child is the first frame the
+  // user could actually see. One rAF defers the fade-out until that frame is on
+  // screen — hiding earlier would flash the empty page.
+  function initSplashPaintWatch() {
+    try {
+      var isPainted = function () {
+        var root = document.getElementById('app')
+        return !!(root && root.firstElementChild)
+      }
+      var hideAfterPaint = function () {
+        stopSplashObserver()
+        if ('function' === typeof window.requestAnimationFrame) {
+          window.requestAnimationFrame(hideSplash)
+        } else {
+          hideSplash()
+        }
+      }
+      if (isPainted()) {
+        hideAfterPaint()
+        return
+      }
+      if ('function' !== typeof MutationObserver) return
+      splashObserver = new MutationObserver(function () {
+        if (isPainted()) hideAfterPaint()
+      })
+      splashObserver.observe(document.documentElement, { childList: true, subtree: true })
+    } catch (e) {
+      /* the SPLASH_MAX_WAIT_MS ceiling below stays as the guarantee */
+    }
+  }
+
   // ── 1. Synchronous bootstrap: expose the resolved server to the SPA ─────────
   if (isNativeShell()) {
+    // FIRST, before any other native initialization: arm the ceiling. Everything
+    // below may throw; the launch screen must come down regardless.
+    try {
+      setTimeout(hideSplash, SPLASH_MAX_WAIT_MS)
+    } catch (e) {
+      /* ignore */
+    }
     try {
       window[GLOBAL_KEY] = resolveServerUrl()
     } catch (e) {
@@ -242,6 +326,11 @@
   function openOverlay(opts) {
     opts = opts || {}
     closeOverlay()
+
+    // The overlay hangs off <body>, not off #app, so the paint watch above never
+    // sees it. Without this the recovery flow would sit invisibly behind the
+    // launch screen whenever the configured server is unreachable.
+    hideSplash()
 
     var current = resolveServerUrl()
 
@@ -534,6 +623,7 @@
   // ── Mount UI + connectivity self-check (native only) ────────────────────────
   if (isNativeShell()) {
     var onReady = function () {
+      initSplashPaintWatch()
       enforceNoZoomViewport()
       initKeyboardInsetBridge()
       mountEnvBadge()

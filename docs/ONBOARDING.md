@@ -286,9 +286,11 @@ If the sync PR sits there open, its CI is red. Read it — do not merge past it.
 
 The bundle is on the `production` channel within minutes. On the phone:
 
-1. Close the app **completely** (swipe it out of the app switcher). An update is applied on the next
-   cold start, never while the app is in the foreground.
-2. Reopen it. First launch downloads, second launch shows the new bundle.
+1. Open the app and leave it open for a moment — the new bundle downloads in the background while
+   you keep using the current one. Nothing about the launch waits for this.
+2. Close the app (swipe it out of the app switcher). The downloaded bundle is activated on the way
+   into the background — never in the foreground, so a session is never reloaded under you.
+3. Reopen it: the new bundle is live. First launch downloads, second launch shows it.
 
 If nothing changes, open the Capgo console and look at which bundle the `production` channel serves.
 A channel pinned to a stale bundle is the single most common cause — devices keep re-downloading the

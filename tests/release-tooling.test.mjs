@@ -462,13 +462,17 @@ test('Capacitor config exposes only public self-hosted OTA settings', () => {
   }
 })
 
-test('Capacitor config applies updates immediately and refuses a dev server in prod', () => {
+test('Capacitor config applies updates in the background and refuses a dev server in prod', () => {
   const config = read('capacitor.config.ts')
-  assert.match(config, /autoUpdate: 'always'/)
-  assert.match(config, /autoSplashscreen: true/)
-  assert.match(config, /autoSplashscreenTimeout: \d+/)
+  // A launch must never wait for the update check: download while the app keeps
+  // running, activate on the way to the background, live on the next open.
+  assert.match(config, /autoUpdate: 'atBackground'/)
+  assert.match(config, /keepUrlPathAfterReload: true/)
   assert.match(config, /periodCheckDelay: \d+/)
-  // The updater hides the splash screen itself; auto-hide would flash the old UI.
+  // app/synaplan-native.js owns the splash screen. autoSplashscreen would hide it
+  // only after the update check returned — on a cold start the plugin never arms
+  // autoSplashscreenTimeout, so a slow update server froze the launch for ~20s.
+  assert.doesNotMatch(config, /^\s*autoSplashscreen[A-Za-z]*:/m)
   assert.match(config, /launchAutoHide: false/)
   // Deprecated in favour of the autoUpdate string modes.
   assert.doesNotMatch(config, /directUpdate:/)
