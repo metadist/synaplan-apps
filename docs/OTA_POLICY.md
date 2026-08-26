@@ -108,9 +108,17 @@ signing key, and the default channel through protected release-environment varia
 
 - ✅ `@capgo/capacitor-updater` added to `package.json` (native plugin) **and** the shared frontend
   `synaplan/frontend/package.json` (so the SPA can call `notifyAppReady()`).
-- ✅ `CapacitorUpdater` configured in `capacitor.config.ts`: `autoUpdate: 'always'` with
-  `autoSplashscreen`, `periodCheckDelay`, `resetWhenUpdate`, `appReadyTimeout`, auto-delete
-  failed/previous. A published bundle is applied on the next foreground, not the next cold start.
+- ✅ `CapacitorUpdater` configured in `capacitor.config.ts`: `autoUpdate: 'atBackground'` with
+  `keepUrlPathAfterReload`, `periodCheckDelay`, `resetWhenUpdate`, `appReadyTimeout`, auto-delete
+  failed/previous. A published bundle is downloaded in the background while the app keeps running on
+  the current bundle, activated when the app moves to the background, and live the next time the
+  user opens the app — a launch never waits for the update check and a session is never reloaded out
+  from under the user. Urgent changes go through the forced-update gate, not through OTA.
+- ✅ The launch screen is owned solely by `app/synaplan-native.js` (`launchAutoHide: false`, no
+  `autoSplashscreen`): hidden on the SPA's first paint, with a hard ceiling as a safety net. The
+  updater's `autoSplashscreen` is deliberately unused because it hides only after the update check
+  returns and never arms its own timeout on a cold start, which froze launches for the full network
+  timeout when the update server was slow or unreachable.
 - ✅ The SPA confirms each launch via `notifyAppReady()` (`src/services/otaUpdates.ts`, native-only)
   so Capgo auto-reverts a bad bundle.
 - ✅ `ota.yml` builds from a commit-matching OpenAPI artifact, signs the unique bundle, targets the

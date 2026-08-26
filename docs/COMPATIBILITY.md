@@ -8,6 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
+| 4.0.2 | `v4.3.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Launch screen owned by the app bootstrap; OTA applies in the background |
 | 4.0.1 | `v4.3.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v4.3.0 |
 | 4.0.0 | `v4.2.4` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Reviewed mobile baseline v4.2.4 |
 
@@ -15,6 +16,34 @@
 
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
+
+### App 4.0.2 — launch screen ownership and OTA apply timing
+
+App-owned only; the `synaplan` pin is unchanged from 4.0.1. The version bump exists because a store
+build derives its build number from the commit count, which the history squash reset below what
+TestFlight already holds for 4.0.x — a new version string may start its build numbers over.
+
+Fixes a launch that hung on the blue launch screen
+for ~20 seconds on devices that had been closed for days, while the SPA behind it was already
+interactive.
+
+1. `capacitor.config.ts` — `CapacitorUpdater.autoUpdate` moves from `'always'` to `'atBackground'`
+   and `autoSplashscreen`/`autoSplashscreenTimeout` are removed. The instant-apply mode held the
+   launch screen until the update check returned, and on a cold start the plugin never armed its own
+   timeout, so an unreachable update server cost the full network timeout (`responseTimeout`, 20s).
+   `keepUrlPathAfterReload: true` keeps the user on the same screen across the background reload.
+2. `app/synaplan-native.js` — the bootstrap is now the sole owner of the launch screen: hidden one
+   frame after the SPA's first paint into `#app`, when the server-recovery overlay opens, and at a
+   5-second ceiling armed before any other native initialization.
+
+**Changed user-visible behavior:** an OTA bundle is downloaded in the background while the app keeps
+running on the current one, activated when the app moves to the background, and live the next time
+the app is opened. A published fix therefore arrives one app restart later than before, and a
+running session is never reloaded out from under the user. Urgent changes go through the
+forced-update gate, not through a faster OTA apply.
+
+- Release classification: **store-required** — native configuration, an app-owned native seam, and
+  the update mechanism itself are never OTA-eligible (`docs/OTA_POLICY.md`).
 
 ### `v4.0.11` — TestFlight build 122
 

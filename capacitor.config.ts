@@ -139,9 +139,17 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchShowDuration: 1500,
-      // The updater hides the splash screen itself (autoSplashscreen below).
-      // With auto-hide the old UI would flash for a moment before an update is
-      // swapped in, which reads as a glitch rather than an update.
+      // app/synaplan-native.js is the ONLY owner of the splash screen: it hides
+      // it on the SPA's first paint, with a hard ceiling as a safety net. Auto-hide
+      // would fire on a fixed timer that can elapse before the SPA has painted,
+      // leaving the user on a blank page.
+      //
+      // Do NOT delegate this to the updater's autoSplashscreen: that option hides
+      // the splash from sendReadyToJs(), i.e. only AFTER the OTA update check has
+      // returned. On a cold start the plugin never shows the splash itself, so it
+      // never arms autoSplashscreenTimeout either — the splash then stays up for
+      // the full update-check round trip (up to responseTimeout, 20s). That was
+      // the ~20s launch hang on a device that had been closed for days.
       launchAutoHide: false,
       backgroundColor: '#003fc7',
       androidScaleType: 'CENTER_CROP',
@@ -175,19 +183,24 @@ const config: CapacitorConfig = {
       ...(otaApiOrigin ? { localApi: otaApiOrigin, localApiFiles: otaApiOrigin } : {}),
       ...(otaPublicKey ? { publicKey: otaPublicKey } : {}),
       defaultChannel: otaDefaultChannel,
-      // Chosen behavior: check on every auto-update run and install directly, so
-      // a published fix reaches the device on the next foreground instead of the
-      // next cold start. Replaces the deprecated directUpdate option, which the
-      // string modes now cover.
-      autoUpdate: 'always',
-      // Holds the splash screen while a downloaded bundle is applied, and hides
-      // it once the app is ready or no update is pending. Requires
-      // SplashScreen.launchAutoHide to be false.
-      autoSplashscreen: true,
-      // Hard ceiling on how long a start may wait for an update. When it fires,
-      // the download continues in the background and is installed on the next
-      // launch, so a slow network delays a fix but never blocks the app.
-      autoSplashscreenTimeout: 5000,
+      // Chosen behavior: check and download in the background while the app keeps
+      // running on the current bundle, then activate the downloaded bundle when the
+      // app moves to the background (installNext) so it is live the next time the
+      // user opens the app. A launch NEVER waits for the update check, and a user
+      // is never reloaded out of a running session.
+      //
+      // The instant-apply modes ('always' / 'atInstall' / 'onLaunch') deliberately
+      // are NOT used: they block the start behind the update check (see the
+      // SplashScreen comment above). Urgent changes go through the forced-update
+      // gate (Epic 8.2), not through a faster OTA apply.
+      //
+      // autoSplashscreen is intentionally absent — it only takes effect in the
+      // instant-apply modes and would re-couple the splash to the network check.
+      // Replaces the deprecated directUpdate option, which the string modes cover.
+      autoUpdate: 'atBackground',
+      // The background activation reloads the WebView. Without this the user would
+      // return to the app root instead of the screen they left.
+      keepUrlPathAfterReload: true,
       // Seconds between checks while the app stays in the foreground; the plugin
       // rejects anything below 600. Without it a permanently open session would
       // only see updates after a background/foreground cycle.
@@ -200,6 +213,10 @@ const config: CapacitorConfig = {
       // this window, Capgo auto-reverts to the previous good bundle. This is the
       // guard that makes unattended publishing survivable.
       appReadyTimeout: 10000,
+      // responseTimeout stays at the plugin default (20s) on purpose: on iOS it
+      // also caps the whole bundle download (performDownloadRequest waits
+      // max(responseTimeout + 5, 10) seconds), so a lower value would abort OTA
+      // downloads on slow connections. Nothing user-visible waits on it anymore.
       autoDeleteFailed: true,
       autoDeletePrevious: true,
       // Signature / E2E encryption (enabled per decision): run
