@@ -351,6 +351,17 @@ test('a TestFlight upload does not assign the build to an internal group', () =>
   assert.match(workflow, /fastlane pilot upload/)
 })
 
+test('a Play upload names the package it is uploading to', () => {
+  const workflow = read('.github/workflows/store-rc.yml')
+  // supply has no Appfile here and aborted with "No value found for
+  // 'package_name'" after the AAB had already been built and signed. Reading it
+  // from the config `cap sync` wrote keeps it identical to the artifact instead
+  // of duplicating the identifier into a workflow literal or a repo variable.
+  assert.match(workflow, /--package_name "\$package_name"/)
+  assert.match(workflow, /package_name="\$\(node -p .*capacitor\.config\.json.*\)\.appId/)
+  assert.doesNotMatch(workflow, /--package_name com\.synaplan/)
+})
+
 test('a store build number stays above what the stores already accepted', () => {
   const workflow = read('.github/workflows/store-rc.yml')
   // A workflow run counter restarts low and would collide with the builds that

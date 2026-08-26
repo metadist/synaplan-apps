@@ -368,7 +368,16 @@ jobs:
           set -euo pipefail
           printf '%s' "$PLAY_CREDENTIALS" > "$RUNNER_TEMP/google-play.json"
           chmod 600 "$RUNNER_TEMP/google-play.json"
+          # supply has no Appfile to read the package from and aborts with
+          # "No value found for 'package_name'" without it. Taking it from the
+          # config that `cap sync` just wrote means it cannot drift from the
+          # artifact: Gradle derives applicationId from the same SYNAPLAN_ENV
+          # matrix that produced this appId.
+          package_name="$(node -p "JSON.parse(require('node:fs').readFileSync('android/app/src/main/assets/capacitor.config.json', 'utf8')).appId")"
+          test -n "$package_name"
+          echo "Play package: ${package_name}." >> "$GITHUB_STEP_SUMMARY"
           fastlane supply \
+            --package_name "$package_name" \
             --aab "$RUNNER_TEMP/store-rc/app-release.aab" \
             --track internal \
             --json_key "$RUNNER_TEMP/google-play.json" \
