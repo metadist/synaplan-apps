@@ -198,9 +198,36 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      # sudo, unlike the macOS runner in store-rc.yml: this job runs on ubuntu,
+      # where the system gem directory is not writable and a plain install fails
+      # with "You don't have write permissions for /var/lib/gems".
       - name: Install pinned store promotion tooling
         if: ${{ ! inputs.dry_run }}
-        run: gem install fastlane --version 2.237.0 --no-document
+        run: sudo gem install fastlane --version 2.237.0 --no-document
+
+      # deliver needs the Apple identifier and supply needs the Play package, and
+      # this job has no `cap sync`-generated native config to read them from. The
+      # module below is the same one that stamps the iOS bundle id, and Gradle
+      # mirrors its env matrix, so the id cannot drift from what the binaries
+      # carry.
+      - name: Resolve the production application id
+        if: ${{ ! inputs.dry_run }}
+        env:
+          SYNAPLAN_ENV: prod
+        run: |
+          set -euo pipefail
+          app_id="$(node --input-type=module \
+            -e "import { resolveAppConfig } from './scripts/app-config.mjs'; process.stdout.write(resolveAppConfig().bundleId)")"
+          # A suffixed id would mean a dev or staging identity reached a
+          # production rollout, which must never happen silently.
+          case "$app_id" in
+            '' | *.dev | *.staging)
+              echo "::error::Refusing to promote a non-production application id: '${app_id}'."
+              exit 1
+              ;;
+          esac
+          echo "SYNAPLAN_APP_ID=$app_id" >> "$GITHUB_ENV"
+          echo "Application id: ${app_id}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare protected store credentials
         if: ${{ ! inputs.dry_run }}
@@ -231,7 +258,7 @@ jobs:
         run: |
           fastlane deliver \
             --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
-            --app_identifier com.synaplan.app \
+            --app_identifier "$SYNAPLAN_APP_ID" \
             --app_version "${{ inputs.app_version }}" \
             --build_number "${{ inputs.apple_build_number }}" \
             --submit_for_review true \
@@ -271,6 +298,7 @@ jobs:
             status=halted
           fi
           fastlane supply \
+            --package_name "$SYNAPLAN_APP_ID" \
             --track "$track" \
             "${promote_args[@]}" \
             --version_code "${{ inputs.google_version_code }}" \

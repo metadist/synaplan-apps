@@ -396,6 +396,28 @@ test('store binaries stay tied to the run that built them', () => {
   assert.match(promotion, /grep -qF "\$\(basename "\$binary"\)"/)
 })
 
+test('a production promotion can actually run its store steps', () => {
+  const promotion = read('.github/workflows/production-promotion.yml')
+  // Every step below is gated on `! inputs.dry_run`, so none of it executed
+  // until the first real promotion — where all three of these failed in turn.
+
+  // ubuntu's system gem directory is not writable, unlike the macOS runner in
+  // store-rc.yml, so a plain install aborts before fastlane exists.
+  assert.match(promotion, /sudo gem install fastlane --version 2\.237\.0 --no-document/)
+
+  // deliver and supply both need the identifier, and this job has no synced
+  // native config to read it from, so it comes from the module that stamps the
+  // iOS bundle id rather than from a literal repeated per step.
+  assert.match(promotion, /resolveAppConfig\(\)\.bundleId/)
+  assert.match(promotion, /--app_identifier "\$SYNAPLAN_APP_ID"/)
+  assert.match(promotion, /--package_name "\$SYNAPLAN_APP_ID"/)
+  assert.doesNotMatch(promotion, /--app_identifier com\.synaplan/)
+  assert.doesNotMatch(promotion, /--package_name com\.synaplan/)
+
+  // A dev or staging identity must never reach a production rollout.
+  assert.match(promotion, /Refusing to promote a non-production application id/)
+})
+
 test('release signing reaches the app target without touching Swift packages', () => {
   const configurations = (pbx) =>
     pbx
