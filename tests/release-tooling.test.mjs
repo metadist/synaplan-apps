@@ -421,6 +421,12 @@ test('a production promotion can actually run its store steps', () => {
   // neither, prompts "Do you want to setup deliver?" — fatal on a runner.
   assert.match(promotion, /fastlane deliver submit_build/)
   assert.doesNotMatch(promotion, /fastlane deliver \\\n/)
+
+  // precheck runs before submission and cannot read in-app purchases through an
+  // App Store Connect API key, which aborted the submission. Only that part is
+  // excluded — the remaining metadata checks stay on.
+  assert.match(promotion, /--precheck_include_in_app_purchases false/)
+  assert.doesNotMatch(promotion, /--run_precheck_before_submit false/)
 })
 
 test('release signing reaches the app target without touching Swift packages', () => {
