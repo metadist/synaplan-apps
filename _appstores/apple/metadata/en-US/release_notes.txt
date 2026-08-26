@@ -1,1 +1,1 @@
-First v4.0 release: native iOS app — chat with leading AI models and your own documents, voice input, image generation, dark mode, and per-server sign-in.
+Faster start: the app now opens right away instead of waiting on the start screen, even if you have not used it for a few days. Updates are prepared in the background and applied the next time you open the app.

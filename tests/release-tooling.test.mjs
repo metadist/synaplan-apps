@@ -427,6 +427,33 @@ test('a production promotion can actually run its store steps', () => {
   // excluded — the remaining metadata checks stay on.
   assert.match(promotion, /--precheck_include_in_app_purchases false/)
   assert.doesNotMatch(promotion, /--run_precheck_before_submit false/)
+
+  // Apple refuses a submission with no release notes, so they must be uploaded
+  // from a staged directory holding nothing but release_notes.txt — the full
+  // metadata directory would overwrite the live listing on every promotion.
+  assert.match(promotion, /--skip_metadata false/)
+  assert.match(promotion, /--metadata_path "\$SYNAPLAN_APPLE_METADATA"/)
+  assert.match(promotion, /cp "\$notes" "\$staged\/\$locale\/release_notes\.txt"/)
+  assert.doesNotMatch(promotion, /--metadata_path _appstores/)
+})
+
+test('the Apple submission only uploads locales the listing actually has', () => {
+  const promotion = read('.github/workflows/production-promotion.yml')
+
+  // App Store Connect carries English and German only. A glob over the metadata
+  // directory would also feed deliver es-ES and tr and create localizations
+  // that do not exist on the listing.
+  // Inline literals, so the loop cannot break on shell word-splitting rules.
+  assert.match(promotion, /for locale in en-US de-DE; do/)
+
+  // Every listed locale must have notes on disk, or the release ships Apple's
+  // stale text from the previous version.
+  for (const locale of ['en-US', 'de-DE']) {
+    const notes = read(`_appstores/apple/metadata/${locale}/release_notes.txt`).trim()
+    assert.ok(notes.length > 0, `${locale} release notes are empty`)
+    // Apple's whatsNew limit.
+    assert.ok(notes.length <= 4000, `${locale} release notes exceed 4000 characters`)
+  }
 })
 
 test('release signing reaches the app target without touching Swift packages', () => {
