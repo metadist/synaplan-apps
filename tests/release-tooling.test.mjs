@@ -416,6 +416,11 @@ test('a production promotion can actually run its store steps', () => {
 
   // A dev or staging identity must never reach a production rollout.
   assert.match(promotion, /Refusing to promote a non-production application id/)
+
+  // Bare `deliver` looks for a Deliverfile or metadata directory and, finding
+  // neither, prompts "Do you want to setup deliver?" — fatal on a runner.
+  assert.match(promotion, /fastlane deliver submit_build/)
+  assert.doesNotMatch(promotion, /fastlane deliver \\\n/)
 })
 
 test('release signing reaches the app target without touching Swift packages', () => {
