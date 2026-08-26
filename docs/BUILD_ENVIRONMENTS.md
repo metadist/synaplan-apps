@@ -11,8 +11,23 @@ single source. Identifiers are frozen in [`IDENTIFIERS.md`](./IDENTIFIERS.md).
 | `SYNAPLAN_BUILD_NUMBER`| monotonic integer (default: git commit count, else `1`) | `versionCode` (Android) / `CFBundleVersion` (iOS) |
 
 The **human version** is owned by [`package.json`](../package.json) `version` (currently
-`4.0.1`). It drives `versionName` / `MARKETING_VERSION` **and** the User-Agent token
+`4.0.2`). It drives `versionName` / `MARKETING_VERSION` **and** the User-Agent token
 (`capacitor.config.ts`), so bumping it in one place updates everything.
+
+## Build number offset (store releases)
+
+`store-rc.yml` computes the build number as **git commit count + `STORE_BUILD_NUMBER_OFFSET`**
+(repository variable, default `0`; a non-integer value fails the run rather than producing an
+unpublishable binary).
+
+The offset exists because squashing the history reset the commit count far below the builds already
+published. Apple only needs `CFBundleVersion` to increase *within* a version string, so a version
+bump absorbs it there. Google Play needs `versionCode` to increase *per package* regardless of
+`versionName`, and rejects the rollout with "does not allow any existing users to upgrade to the
+newly added APKs" — so the count itself has to clear the published range.
+
+Set the variable once, to more than the highest `versionCode` the Play Console lists for
+`com.synaplan.app`. It never needs lowering, and lowering it would break the next release.
 
 ## Per-environment identity
 

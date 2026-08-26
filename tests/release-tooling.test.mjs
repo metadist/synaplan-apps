@@ -367,9 +367,17 @@ test('a store build number stays above what the stores already accepted', () => 
   // A workflow run counter restarts low and would collide with the builds that
   // reached TestFlight from Xcode before this automation existed.
   assert.doesNotMatch(workflow, /SYNAPLAN_BUILD_NUMBER: \$\{\{ github\.run_number \}\}/)
-  assert.match(workflow, /build_number="\$\(git rev-list --count HEAD\)"/)
+  assert.match(workflow, /commit_count="\$\(git rev-list --count HEAD\)"/)
   // Counting commits needs the full history, not the default shallow checkout.
   assert.match(workflow, /fetch-depth: 0/)
+  // Squashing the history reset the count below the published builds, and Google
+  // Play rejects a versionCode that does not increase per package even under a
+  // new versionName. The offset lifts the count over that range in one place.
+  assert.match(workflow, /OFFSET: \$\{\{ vars\.STORE_BUILD_NUMBER_OFFSET \|\| '0' \}\}/)
+  assert.match(workflow, /build_number="\$\(\(commit_count \+ OFFSET\)\)"/)
+  // A typo in the variable must fail the run, not quietly build an unpublishable
+  // binary after the whole signing pipeline already ran.
+  assert.match(workflow, /STORE_BUILD_NUMBER_OFFSET must be a non-negative integer/)
 })
 
 test('store binaries stay tied to the run that built them', () => {
