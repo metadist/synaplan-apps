@@ -269,6 +269,7 @@ jobs:
             --build_number "${{ inputs.apple_build_number }}" \
             --submit_for_review true \
             --automatic_release true \
+            --precheck_include_in_app_purchases false \
             --phased_release "${{ inputs.apple_phased_release }}" \
             --skip_binary_upload true \
             --skip_metadata true \
