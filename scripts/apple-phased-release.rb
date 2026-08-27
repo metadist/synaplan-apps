@@ -22,7 +22,16 @@ version = app
 abort("App Store version #{version_string} not found") unless version
 
 phased_release = version.fetch_app_store_version_phased_release
-abort("Phased release for #{version_string} not found") unless phased_release
+unless phased_release
+  # The usual cause is a promotion run with apple_phased_release off, which is
+  # the default: without a phased release there is no rollout to act on, and
+  # Apple offers no equivalent brake. Removing the version from sale or shipping
+  # a fixed build are the remaining options.
+  abort(
+    "No phased release exists for #{version_string}, so '#{operation}' has nothing to act on. " \
+    "The version was released to all users at once."
+  )
+end
 
 case operation
 when "pause", "rollback"

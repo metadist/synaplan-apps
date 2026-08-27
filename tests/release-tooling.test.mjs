@@ -445,6 +445,16 @@ test('a promotion rolls out fully unless it is asked not to', () => {
   // per run for a release that warrants a canary.
   assert.match(promotion, /google_rollout_percent:\n(?:.*\n)*?\s+default: '100'/)
   assert.match(promotion, /description: Google managed rollout percentage \(0\.01-100\)/)
+
+  // Apple has to match, or the same version trickles out over seven days on one
+  // store and lands at once on the other.
+  assert.match(promotion, /apple_phased_release:\n(?:.*\n)*?\s+default: false/)
+
+  // Without a phased release there is nothing for pause or rollback to act on,
+  // so the script has to say that instead of reporting a missing object.
+  const script = read('scripts/apple-phased-release.rb')
+  assert.match(script, /No phased release exists for/)
+  assert.match(script, /released to all users at once/)
 })
 
 test('a release candidate missing the platform binary says so', () => {
