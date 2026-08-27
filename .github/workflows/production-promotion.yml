@@ -36,10 +36,13 @@ on:
         description: Google Play version code
         required: false
         type: string
+      # Full rollout by default: the user base is small enough that a 5% slice
+      # is too few installs to learn anything from, while leaving the other 95%
+      # on the old build. Lower it per run when a release warrants a canary.
       google_rollout_percent:
         description: Google managed rollout percentage (0.01-100)
         required: true
-        default: '5'
+        default: '100'
         type: string
       dry_run:
         description: Validate and emit a promotion request only
@@ -85,9 +88,18 @@ jobs:
           aabs=(store-rc-source/**/*.aab)
           ipas=(store-rc-source/**/*.ipa)
           test "${#requests[@]}" -eq 1
-          # A release candidate only carries the stores it was built for.
-          if [[ "$PLATFORM" != "google" ]]; then test "${#ipas[@]}" -eq 1; fi
-          if [[ "$PLATFORM" != "apple" ]]; then test "${#aabs[@]}" -eq 1; fi
+          # A release candidate only carries the stores it was built for, so a
+          # rerun for one platform cannot serve the other. Reporting which
+          # binary is missing matters: a bare `test` fails the job with no
+          # output at all, and the run id is the easiest input to get wrong.
+          if [[ "$PLATFORM" != "google" && "${#ipas[@]}" -ne 1 ]]; then
+            echo "::error::Release candidate ${STORE_RC_RUN_ID} carries ${#ipas[@]} .ipa files, expected 1. Use the run that built for Apple."
+            exit 1
+          fi
+          if [[ "$PLATFORM" != "apple" && "${#aabs[@]}" -ne 1 ]]; then
+            echo "::error::Release candidate ${STORE_RC_RUN_ID} carries ${#aabs[@]} .aab files, expected 1. Use the run that built for Google."
+            exit 1
+          fi
           jq -e \
             --arg app_version "$APP_VERSION" \
             --arg platform "$PLATFORM" \
