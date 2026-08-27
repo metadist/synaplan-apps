@@ -27,10 +27,15 @@ on:
         description: App Store Connect build number
         required: false
         type: string
+      # Off by default, to match the full Google rollout below: a phased release
+      # trickles out over seven days, so the two stores would otherwise be on
+      # very different schedules for the same version. The cost is that iOS then
+      # has no rollout brake — pause and rollback need a phased release to act
+      # on — so enable this per run for a release that wants one.
       apple_phased_release:
-        description: Use Apple phased release
+        description: Use Apple phased release (slow 7-day rollout, enables pause/rollback)
         required: true
-        default: true
+        default: false
         type: boolean
       google_version_code:
         description: Google Play version code
