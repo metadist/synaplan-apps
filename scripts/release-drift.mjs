@@ -13,6 +13,7 @@ import {
   git,
   isBootstrapRef,
   readJson,
+  resolveSubmoduleTag,
   scanServiceWorkerGuard,
   submoduleIdentity,
   validatePublicOtaConfig,
@@ -54,16 +55,27 @@ export function collectDrift({ bootstrap = false, manifestPath = DEFAULT_MANIFES
   const identifierRef = identifiers.match(
     /\*\*(?:Pinned to|Current (?:development )?pin):\*\*\s*`([^`]+)`/
   )?.[1]
+  // Resolving the tag is stricter than trusting `git describe`, which picks an
+  // arbitrary one when several tags share the pinned commit.
   const matchesIdentity = (ref) =>
     ref === identity.tag ||
     ref === identity.sha ||
-    (/^[0-9a-f]{7,40}$/i.test(ref) && identity.sha.startsWith(ref))
+    (/^[0-9a-f]{7,40}$/i.test(ref) && identity.sha.startsWith(ref)) ||
+    resolveSubmoduleTag(ref) === identity.sha
+  // A submodule cloned without tags cannot confirm a correct pin either, and
+  // reporting that as drift sends the reader hunting a problem that is not
+  // there. The pin stays unverified in both cases, so both remain errors.
+  const pinProblem = (label, ref) =>
+    !identity.tagsAvailable && /^v\d+\.\d+\.\d+/.test(ref)
+      ? `${label} ${ref} cannot be verified: the synaplan submodule was cloned ` +
+        'without tags (check out with fetch-depth: 0)'
+      : `${label} ${ref} does not identify ${identity.sha}`
   if (!identifierRef) {
     errors.push('docs/IDENTIFIERS.md does not declare a pinned synaplan ref')
   } else if (bootstrap && /^v3\./.test(identifierRef) && !identity.tag) {
     warnings.push(`IDENTIFIERS still records bootstrap ref ${identifierRef}`)
   } else if (!matchesIdentity(identifierRef)) {
-    errors.push(`IDENTIFIERS pin ${identifierRef} does not identify ${identity.sha}`)
+    errors.push(pinProblem('IDENTIFIERS pin', identifierRef))
   }
 
   const compatibility = readFileSync(join(ROOT, 'docs', 'COMPATIBILITY.md'), 'utf8')
@@ -74,7 +86,7 @@ export function collectDrift({ bootstrap = false, manifestPath = DEFAULT_MANIFES
     const message = `COMPATIBILITY has a bootstrap synaplan ref for app ${version}`
     ;(bootstrap ? warnings : errors).push(message)
   } else if (!matchesIdentity(row.synaplanRef)) {
-    errors.push(`COMPATIBILITY ref ${row.synaplanRef} does not identify ${identity.sha}`)
+    errors.push(pinProblem('COMPATIBILITY ref', row.synaplanRef))
   }
 
   if (!existsSync(manifestPath)) {

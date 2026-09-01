@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -14,6 +14,7 @@ import {
   appVersion,
   bundleVersion,
   checkServiceWorkerGuard,
+  resolveSubmoduleTag,
   validatePublicOtaConfig,
 } from '../scripts/release-lib.mjs'
 import { createReleaseManifest } from '../scripts/release-manifest.mjs'
@@ -141,12 +142,58 @@ test('bootstrap drift check only warns when a build manifest is absent', () => {
       bootstrap: true,
       manifestPath: join(directory, 'missing-release-manifest.json'),
     })
-    assert.deepEqual(result.errors, [])
+    // Asserting an empty error list made this unit test depend on the live
+    // repository: a shallow submodule clone, or a worktree that has not been
+    // updated to the pin yet, failed it for reasons it does not describe. The
+    // recorded release state is checked by `npm run check:release` instead.
+    assert.deepEqual(
+      result.errors.filter((error) => error.includes('Release manifest')),
+      []
+    )
     assert.ok(result.warnings.some((warning) => warning.includes('Release manifest')))
     assert.deepEqual(result.serviceWorkers.unguardedFiles, [])
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+})
+
+test('a workflow that checks out the submodule can resolve its release tag', () => {
+  // The drill cloned the submodule with --depth=1. Once the pin was no longer
+  // the tip of synaplan/main, git fetched the bare SHA without any refs, so
+  // `git describe` found no tag and the drift check reported the correct pin
+  // v4.4.2 as drift against the very commit that tag names.
+  const workflows = join(ROOT, '.github', 'workflows')
+  for (const entry of readdirSync(workflows)) {
+    const content = readFileSync(join(workflows, entry), 'utf8')
+    const checkouts = content.match(/submodules: recursive/g)?.length ?? 0
+    if (checkouts === 0) continue
+    assert.equal(content.match(/fetch-depth: 0/g)?.length ?? 0, checkouts, entry)
+  }
+})
+
+test('an unverifiable synaplan pin is not reported as drift', () => {
+  // Only a real release tag is resolved, and only through refs/tags, so a
+  // branch that happens to point at the pinned commit cannot pass as a pin.
+  assert.equal(resolveSubmoduleTag('main'), null)
+  assert.equal(resolveSubmoduleTag('refs/heads/main'), null)
+  assert.equal(resolveSubmoduleTag('HEAD'), null)
+  assert.equal(resolveSubmoduleTag('v0.0.0-does-not-exist'), null)
+
+  // A clone without tags cannot confirm a correct pin either, so it stays an
+  // error — but one that names the checkout instead of a drift that is not there.
+  const source = read('scripts/release-drift.mjs')
+  assert.match(source, /cannot be verified: the synaplan submodule was cloned/)
+  assert.match(source, /check out with fetch-depth: 0/)
+})
+
+test('the release drill runs on main and not only once a month', () => {
+  const workflow = read('.github/workflows/release-drill.yml')
+  // ci.yml is pull_request only, so nothing verified main after a sync merged.
+  assert.match(workflow, /push:\n\s+branches: \[main\]/)
+  assert.match(workflow, /cron: '17 6 \* \* 1'/)
+  // The recorded release state is checked deliberately here rather than as a
+  // side effect of a unit test asserting an empty drift error list.
+  assert.match(workflow, /run: npm run check:release/)
 })
 
 test('sync rejects moving main branches and updates release records deterministically in dry-run', () => {
