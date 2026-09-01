@@ -37,7 +37,25 @@ export function submoduleIdentity() {
   } catch {
     // A bootstrap commit is allowed before the coordinated v4 tag exists.
   }
-  return { sha, shortSha: sha.slice(0, 12), tag }
+  // A checkout without `fetch-depth: 0` clones the submodule with --depth=1 and,
+  // when the pin is not the tip of the default branch, fetches the bare SHA with
+  // no refs at all. `tag` is then null for a commit that IS tagged, which reads
+  // as drift. Callers need to tell that apart from a genuinely untagged commit.
+  const tagsAvailable =
+    git(['rev-parse', '--is-shallow-repository'], SUBMODULE) === 'false' &&
+    git(['tag', '--list'], SUBMODULE) !== ''
+  return { sha, shortSha: sha.slice(0, 12), tag, tagsAvailable }
+}
+
+export function resolveSubmoduleTag(ref) {
+  if (!/^v\d+\.\d+\.\d+/.test(ref)) return null
+  try {
+    // Only refs/tags, never a bare ref: a branch name that happens to point at
+    // the pinned commit must not pass as an immutable pin.
+    return git(['rev-parse', '--verify', '--quiet', `refs/tags/${ref}^{commit}`], SUBMODULE)
+  } catch {
+    return null
+  }
 }
 
 export function bundleVersion({ version, sha, tag, build }) {

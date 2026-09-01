@@ -1,8 +1,14 @@
 name: Mobile Release Drill
 
+# ci.yml only runs on pull requests, so a merged submodule sync is the first
+# state nothing verifies. The push trigger closes that gap; the weekly schedule
+# stays as the heartbeat for decay that happens without a commit here, such as
+# runner image updates or a pin whose tag ages out of a shallow fetch.
 on:
+  push:
+    branches: [main]
   schedule:
-    - cron: '17 6 1 * *'
+    - cron: '17 6 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +26,10 @@ jobs:
       - name: Checkout with submodules
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
+          # A shallow checkout fetches the submodule with --depth=1 and, once the
+          # pin is no longer the tip of synaplan/main, without any tags. The drift
+          # check then cannot resolve the documented release tag.
+          fetch-depth: 0
           submodules: recursive
 
       - name: Setup Node.js
@@ -32,6 +42,9 @@ jobs:
         run: |
           npm ci
           npm run ci-local
+
+      - name: Check the recorded release state
+        run: npm run check:release
 
       - name: Run non-publishing release drill
         run: node scripts/release-drill.mjs | tee release-drill.txt
