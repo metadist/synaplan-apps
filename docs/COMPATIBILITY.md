@@ -8,7 +8,8 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.2 | `v4.6.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v4.6.0 |
+| 4.0.3 | `v4.6.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v4.6.0 |
+| 4.0.2 | `v4.5.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Released on the App Store; its version train is closed |
 | 4.0.1 | `v4.3.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v4.3.0 |
 | 4.0.0 | `v4.2.4` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Reviewed mobile baseline v4.2.4 |
 
@@ -17,7 +18,22 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
-### App 4.0.2 — iOS App Shortcuts (Kurzbefehle)
+### App 4.0.3 — reopen a version train after the App Store release
+
+App-owned only; the `synaplan` pin is unchanged from the 4.0.2 row. No user-visible change.
+
+4.0.2 is live on the App Store, which closes its pre-release train: App Store Connect answers
+`Invalid Pre-Release Train … closed for new build submissions (90186)` and rejects every further
+upload for that version string, no matter how high the build number is. The marketing version is
+the only way to reopen a train, so a store release has to be followed by a version bump before the
+next release candidate can reach TestFlight.
+
+The bump is release mechanics, not a feature claim — the same reason 4.0.2 exists. The App
+Shortcuts binary below ships under this version.
+
+- Release classification: **store-required** — it exists to produce a new store binary.
+
+### App 4.0.2 — iOS App Shortcuts
 
 App-owned native work plus a thin SPA seam. The reviewed `synaplan` pin is unchanged
 until the Shortcuts seam PR is tagged; this history records the capability so a later
