@@ -1,0 +1,7 @@
+/* App Shortcut phrases. Keys must match SynaplanAppShortcuts.swift. */
+"Open ${applicationName}" = "Open ${applicationName}";
+"Start ${applicationName}" = "Start ${applicationName}";
+"Dictate with ${applicationName}" = "Dictate with ${applicationName}";
+"Start dictation in ${applicationName}" = "Start dictation in ${applicationName}";
+"Analyze a photo with ${applicationName}" = "Analyze a photo with ${applicationName}";
+"Take a photo with ${applicationName}" = "Take a photo with ${applicationName}";

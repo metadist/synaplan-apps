@@ -197,7 +197,10 @@ function loadBootstrap(options = {}) {
       removeItem: (key) => storage.delete(key),
     },
     Capacitor: {
-      Plugins: options.withoutSplashPlugin === true ? {} : { SplashScreen: splashScreen },
+      Plugins: Object.assign(
+        options.withoutSplashPlugin === true ? {} : { SplashScreen: splashScreen },
+        options.extraPlugins || {}
+      ),
     },
     location: { reload() {} },
     requestAnimationFrame: (fn) => setTimeoutStub(fn, 0),
@@ -346,4 +349,89 @@ test('a shell without the SplashScreen plugin is tolerated', () => {
   env.paintApp()
   env.advance(SPLASH_CEILING_MS)
   assert.equal(env.hideCalls.length, 0)
+})
+
+test('Shortcuts and Camera bridges are exposed on the native shell', () => {
+  const env = loadBootstrap()
+  assert.equal(typeof env.window.SynaplanShortcuts.consumePending, 'function')
+  assert.equal(typeof env.window.SynaplanShortcuts.subscribe, 'function')
+  assert.equal(typeof env.window.SynaplanCamera.isAvailable, 'function')
+  assert.equal(typeof env.window.SynaplanCamera.capturePhoto, 'function')
+  assert.equal(env.window.SynaplanCamera.isAvailable(), false)
+})
+
+test('consumePending returns the native store action and skips a later duplicate token', async () => {
+  const env = loadBootstrap({
+    extraPlugins: {
+      SynaplanShortcuts: {
+        consumePendingAction: () => Promise.resolve({ action: 'dictate', token: 't-1' }),
+        addListener() {},
+      },
+    },
+  })
+  env.fireDomContentLoaded()
+
+  const first = await env.window.SynaplanShortcuts.consumePending()
+  assert.equal(first.length, 1)
+  assert.equal(first[0].action, 'dictate')
+  assert.equal(first[0].token, 't-1')
+
+  const second = await env.window.SynaplanShortcuts.consumePending()
+  assert.equal(second.length, 0)
+})
+
+test('subscribe flushes buffered plugin events and consumePending de-duplicates them', async () => {
+  let listener = null
+  const env = loadBootstrap({
+    extraPlugins: {
+      SynaplanShortcuts: {
+        consumePendingAction: () => Promise.resolve({ action: 'dictate', token: 't-live' }),
+        addListener(_name, fn) {
+          listener = fn
+        },
+      },
+    },
+  })
+  env.fireDomContentLoaded()
+  assert.equal(typeof listener, 'function')
+
+  listener({ action: 'dictate', token: 't-live' })
+
+  const seen = []
+  env.window.SynaplanShortcuts.subscribe((payload) => {
+    seen.push(payload)
+  })
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0].action, 'dictate')
+  assert.equal(seen[0].token, 't-live')
+
+  const pending = await env.window.SynaplanShortcuts.consumePending()
+  assert.equal(pending.length, 0)
+})
+
+test('capturePhoto falls back to the photo library when the camera is unavailable', async () => {
+  const sources = []
+  const env = loadBootstrap({
+    extraPlugins: {
+      Camera: {
+        getPhoto(opts) {
+          sources.push(opts.source)
+          if (opts.source === 'CAMERA') {
+            return Promise.reject(new Error('no camera'))
+          }
+          return Promise.resolve({
+            dataUrl: 'data:image/jpeg;base64,abc',
+            format: 'jpeg',
+          })
+        },
+      },
+    },
+  })
+
+  assert.equal(env.window.SynaplanCamera.isAvailable(), true)
+  const photo = await env.window.SynaplanCamera.capturePhoto()
+  assert.deepEqual(sources, ['CAMERA', 'PHOTOS'])
+  assert.equal(photo.mimeType, 'image/jpeg')
+  assert.match(photo.fileName, /^photo-\d+\.jpg$/)
+  assert.equal(photo.dataUrl, 'data:image/jpeg;base64,abc')
 })

@@ -17,6 +17,22 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
+### App 4.0.2 — iOS App Shortcuts (Kurzbefehle)
+
+App-owned native work plus a thin SPA seam. The reviewed `synaplan` pin is unchanged
+until the Shortcuts seam PR is tagged; this history records the capability so a later
+store build does not ship the binary without the matching SPA handlers.
+
+Adds three iOS 16+ App Shortcuts — Open Synaplan, Start dictation, Analyze photo —
+wired through an app-local Capacitor plugin, `app/synaplan-native.js`
+(`window.SynaplanShortcuts` / `window.SynaplanCamera`), and a default-off MOBILE-APP
+SEAM in the bundled SPA. `@capacitor/camera` is the capture path; the Simulator
+falls back to the photo library. iOS 15 keeps working and simply has no Shortcuts.
+
+- Release classification: **store-required** — new native Swift, an App Intents
+  surface, and a native plugin (`docs/OTA_POLICY.md`). The SPA seam alone would be
+  an OTA candidate, but it is useless without the binary.
+
 ### App 4.0.2 — launch screen ownership and OTA apply timing
 
 App-owned only; the `synaplan` pin is unchanged from 4.0.1. The version bump exists because a store
