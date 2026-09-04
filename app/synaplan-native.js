@@ -573,6 +573,198 @@
     },
   }
 
+  // ── Shortcuts bridge (iOS App Intents → SPA chat actions) ───────────────────
+  // The native plugin persists the latest Shortcuts tap (cold start can run
+  // `perform()` before this file, let alone the SPA). Live taps while the app
+  // is already open arrive as a `shortcutAction` plugin event. Events that
+  // land before the SPA has subscribed are buffered and flushed on
+  // `subscribe()`; `consumePending()` also returns that buffer plus whatever
+  // is still sitting in the native store. Tokens de-duplicate a pull against
+  // the matching live event so dictation is never toggled twice.
+  var shortcutBuffer = []
+  var shortcutSubscribers = []
+  var shortcutHandledTokens = {}
+
+  function normalizeShortcutPayload(raw) {
+    if (!raw || typeof raw !== 'object') return null
+    var action = raw.action
+    if (typeof action !== 'string' || action === '') return null
+    var token = typeof raw.token === 'string' ? raw.token : ''
+    return { action: action, token: token }
+  }
+
+  function rememberShortcutToken(token) {
+    if (!token) return false
+    if (shortcutHandledTokens[token]) return true
+    shortcutHandledTokens[token] = true
+    return false
+  }
+
+  function deliverShortcut(payload) {
+    if (!payload) return
+    if (shortcutSubscribers.length === 0) {
+      shortcutBuffer.push(payload)
+      return
+    }
+    if (rememberShortcutToken(payload.token)) return
+    for (var i = 0; i < shortcutSubscribers.length; i++) {
+      try {
+        shortcutSubscribers[i](payload)
+      } catch (e) {
+        /* a subscriber must never break the others */
+      }
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('synaplan:shortcut', { detail: payload }))
+    } catch (e) {
+      /* CustomEvent missing in a test stub is fine */
+    }
+  }
+
+  function getShortcutsPlugin() {
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      return plugins && plugins.SynaplanShortcuts ? plugins.SynaplanShortcuts : null
+    } catch (e) {
+      return null
+    }
+  }
+
+  function consumePendingShortcuts() {
+    var plugin = getShortcutsPlugin()
+    var native = Promise.resolve(null)
+    if (plugin && typeof plugin.consumePendingAction === 'function') {
+      native = Promise.resolve()
+        .then(function () {
+          return plugin.consumePendingAction()
+        })
+        .then(function (result) {
+          return normalizeShortcutPayload(result)
+        })
+        .catch(function () {
+          return null
+        })
+    }
+    return native.then(function (fromNative) {
+      var queued = shortcutBuffer.splice(0, shortcutBuffer.length)
+      var merged = []
+      if (fromNative) merged.push(fromNative)
+      for (var i = 0; i < queued.length; i++) merged.push(queued[i])
+      var unique = []
+      var seen = {}
+      for (var j = 0; j < merged.length; j++) {
+        var item = merged[j]
+        var key = item.token || item.action + ':' + j
+        if (seen[key]) continue
+        seen[key] = true
+        // Drop actions the live listener already delivered (same token).
+        if (rememberShortcutToken(item.token)) continue
+        unique.push(item)
+      }
+      return unique
+    })
+  }
+
+  function subscribeShortcuts(fn) {
+    if (typeof fn !== 'function') return function () {}
+    shortcutSubscribers.push(fn)
+    var queued = shortcutBuffer.splice(0, shortcutBuffer.length)
+    for (var i = 0; i < queued.length; i++) {
+      deliverShortcut(queued[i])
+    }
+    return function unsubscribe() {
+      var idx = shortcutSubscribers.indexOf(fn)
+      if (idx >= 0) shortcutSubscribers.splice(idx, 1)
+    }
+  }
+
+  function initShortcutBridge() {
+    try {
+      var plugin = getShortcutsPlugin()
+      if (!plugin || typeof plugin.addListener !== 'function') return
+      plugin.addListener('shortcutAction', function (raw) {
+        deliverShortcut(normalizeShortcutPayload(raw))
+      })
+    } catch (e) {
+      /* missing plugin is a no-op — web and Android have no App Intents */
+    }
+  }
+
+  window.SynaplanShortcuts = {
+    consumePending: consumePendingShortcuts,
+    subscribe: subscribeShortcuts,
+  }
+
+  // ── Camera bridge (native capture for the Analyze-photo shortcut) ───────────
+  // The SPA stays Capacitor-free. `getPhoto` from CAMERA is the product path;
+  // PHOTOS is the fallback on the Simulator (no camera) so the shortcut is
+  // still exercisable. A user cancel resolves `null`, never throws.
+  function getCameraPlugin() {
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var camera = plugins && plugins.Camera
+      if (!camera || typeof camera.getPhoto !== 'function') return null
+      return camera
+    } catch (e) {
+      return null
+    }
+  }
+
+  function isNativeCameraAvailable() {
+    return getCameraPlugin() !== null
+  }
+
+  function takeNativePhoto(source) {
+    var camera = getCameraPlugin()
+    if (!camera) return Promise.resolve(null)
+    return Promise.resolve()
+      .then(function () {
+        return camera.getPhoto({
+          source: source,
+          resultType: 'dataUrl',
+          quality: 90,
+          allowEditing: false,
+          correctOrientation: true,
+        })
+      })
+      .then(function (photo) {
+        if (!photo || typeof photo.dataUrl !== 'string' || photo.dataUrl === '') {
+          return null
+        }
+        var format = String(photo.format || 'jpeg').toLowerCase()
+        var mimeType = 'image/jpeg'
+        var ext = 'jpg'
+        if (format === 'png') {
+          mimeType = 'image/png'
+          ext = 'png'
+        } else if (format === 'gif') {
+          mimeType = 'image/gif'
+          ext = 'gif'
+        }
+        return {
+          dataUrl: photo.dataUrl,
+          mimeType: mimeType,
+          fileName: 'photo-' + Date.now() + '.' + ext,
+        }
+      })
+  }
+
+  function captureNativePhoto() {
+    if (!isNativeCameraAvailable()) return Promise.resolve(null)
+    return takeNativePhoto('CAMERA')
+      .catch(function () {
+        return takeNativePhoto('PHOTOS')
+      })
+      .catch(function () {
+        return null
+      })
+  }
+
+  window.SynaplanCamera = {
+    isAvailable: isNativeCameraAvailable,
+    capturePhoto: captureNativePhoto,
+  }
+
   // ── Keyboard inset bridge (float the composer above the keyboard) ───────────
   // With Keyboard.resize = 'none' the WebView keeps its full height, so the
   // page never shrinks. We publish the keyboard height as the CSS variable
@@ -626,6 +818,7 @@
       initSplashPaintWatch()
       enforceNoZoomViewport()
       initKeyboardInsetBridge()
+      initShortcutBridge()
       mountEnvBadge()
       // Self-check: if the configured server is unreachable, auto-open the
       // recovery overlay so the user can fix it — the SPA (and the in-app Admin

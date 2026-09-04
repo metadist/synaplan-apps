@@ -39,6 +39,28 @@ servers, locales, and branding:
 > release/TestFlight build, signing, and test accounts (Epic 10.2/10.5). They stay manual /
 > reviewer-path until those gates open; see `docs/QUALITY_GATES.md` (rows 3, 5).
 
+## Manual — iOS App Shortcuts (Kurzbefehle)
+
+Maestro cannot open Apple's Shortcuts app, so this path is a **manual Simulator /
+device check** after the first launch (App Intents are indexed only then).
+
+1. Build a **dev** iOS binary (`SYNAPLAN_ENV=dev ./build.sh`, then `xcodebuild` /
+   `npx cap run ios`) and launch `com.synaplan.app.dev` once.
+2. Open **Kurzbefehle / Shortcuts**. Under the Synaplan Dev (or Synaplan)
+   donation, confirm three donated shortcuts:
+   - **Open Synaplan** — brings the app to the foreground and does nothing else.
+   - **Start dictation** — opens chat and starts the microphone (needs a server
+     with speech-to-text; otherwise a toast explains it is unavailable).
+   - **Analyze photo** — opens chat and the camera. On the Simulator there is no
+     camera: the capture UI falls back to the photo library. The chosen image is
+     **attached**, not auto-sent.
+3. Siri phrase recognition is **not** available in the Simulator; phrases can
+   still be inspected on the shortcut's detail page / Spotlight on a device.
+
+Cold-start and warm-start (app already in memory) should both work. A guest
+session hitting Analyze photo must show the existing attach feature-gate, not
+the camera.
+
 ## Install Maestro
 
 ```bash

@@ -16,6 +16,12 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		7A1F0001AABBCCDD00000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7A1F0001AABBCCDD00000001 /* PrivacyInfo.xcprivacy */; };
+		A11F0001AABBCCDD00000002 /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000001 /* ShortcutAction.swift */; };
+		A11F0001AABBCCDD00000004 /* SynaplanAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000003 /* SynaplanAppIntents.swift */; };
+		A11F0001AABBCCDD00000006 /* SynaplanAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000005 /* SynaplanAppShortcuts.swift */; };
+		A11F0001AABBCCDD00000008 /* SynaplanShortcutsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000007 /* SynaplanShortcutsPlugin.swift */; };
+		A11F0001AABBCCDD0000000A /* SynaplanBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */; };
+		A11F0001AABBCCDD0000000C /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD0000000B /* AppShortcuts.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +37,16 @@
 		7A1F0001AABBCCDD00000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		AF10A7C02E5F00010000AF01 /* Synaplan.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Synaplan.storekit; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000001 /* ShortcutAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutAction.swift; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000003 /* SynaplanAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanAppIntents.swift; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000005 /* SynaplanAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanAppShortcuts.swift; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000007 /* SynaplanShortcutsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanShortcutsPlugin.swift; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanBridgeViewController.swift; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000011 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000012 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000013 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000014 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		A11F0001AABBCCDD00000015 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +83,9 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */,
+				A11F0001AABBCCDD0000000F /* Shortcuts */,
+				A11F0001AABBCCDD0000000B /* AppShortcuts.strings */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -77,6 +96,17 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		A11F0001AABBCCDD0000000F /* Shortcuts */ = {
+			isa = PBXGroup;
+			children = (
+				A11F0001AABBCCDD00000001 /* ShortcutAction.swift */,
+				A11F0001AABBCCDD00000003 /* SynaplanAppIntents.swift */,
+				A11F0001AABBCCDD00000005 /* SynaplanAppShortcuts.swift */,
+				A11F0001AABBCCDD00000007 /* SynaplanShortcutsPlugin.swift */,
+			);
+			path = Shortcuts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -124,6 +154,10 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				de,
+				es,
+				fr,
+				tr,
 				Base,
 			);
 			mainGroup = 504EC2FB1FED79650016851F;
@@ -151,6 +185,7 @@
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				7A1F0001AABBCCDD00000002 /* PrivacyInfo.xcprivacy in Resources */,
+				A11F0001AABBCCDD0000000C /* AppShortcuts.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -162,6 +197,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				A11F0001AABBCCDD00000002 /* ShortcutAction.swift in Sources */,
+				A11F0001AABBCCDD00000004 /* SynaplanAppIntents.swift in Sources */,
+				A11F0001AABBCCDD00000006 /* SynaplanAppShortcuts.swift in Sources */,
+				A11F0001AABBCCDD00000008 /* SynaplanShortcutsPlugin.swift in Sources */,
+				A11F0001AABBCCDD0000000A /* SynaplanBridgeViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -182,6 +222,18 @@
 				504EC3111FED79650016851F /* Base */,
 			);
 			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		A11F0001AABBCCDD0000000B /* AppShortcuts.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A11F0001AABBCCDD00000011 /* en */,
+				A11F0001AABBCCDD00000012 /* de */,
+				A11F0001AABBCCDD00000013 /* es */,
+				A11F0001AABBCCDD00000014 /* fr */,
+				A11F0001AABBCCDD00000015 /* tr */,
+			);
+			name = AppShortcuts.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
