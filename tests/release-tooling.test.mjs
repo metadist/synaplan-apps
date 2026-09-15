@@ -642,3 +642,14 @@ test('Capacitor config applies updates in the background and refuses a dev serve
   assert.doesNotMatch(config, /directUpdate:/)
   assert.match(config, /SYNAPLAN_DEV_SERVER must not be set for a prod build/)
 })
+
+test('keyboard overlay is shared: iOS must not resize, Android must not shrink the WebView', () => {
+  const config = read('capacitor.config.ts')
+  const manifest = read('android/app/src/main/AndroidManifest.xml')
+  // iOS: Capacitor `resize` is iOS-only. `none` keeps the WKWebView full height.
+  assert.match(config, /resize: 'none'/)
+  // Android: `resizeOnFullScreen: true` would shrink the WebView AND the SPA
+  // still translates by --keyboard-inset-height → the page slides up.
+  assert.match(config, /resizeOnFullScreen: false/)
+  assert.match(manifest, /android:windowSoftInputMode="adjustNothing"/)
+})

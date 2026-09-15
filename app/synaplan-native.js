@@ -274,7 +274,9 @@
   // the content (the layout viewport keeps full height) to match iOS's
   // Keyboard.resize = 'none'. The SPA floats the chat composer above the keyboard
   // via the --keyboard-inset-height var (see initKeyboardInsetBridge below), so
-  // the page never shrinks on either platform.
+  // the page never shrinks on either platform. Android also needs
+  // Keyboard.resizeOnFullScreen = false and windowSoftInputMode=adjustNothing —
+  // otherwise the WebView shrinks/pans AND this inset still lifts the composer.
   var LOCKED_VIEWPORT =
     'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, ' +
     'viewport-fit=cover, interactive-widget=overlays-content'
@@ -773,7 +775,39 @@
   // the START of the iOS keyboard animation WITH the final height, so a matching
   // CSS transition slides the composer up in sync — no lag. Every call is
   // guarded so a missing plugin / non-native context is a silent no-op.
-  function setKeyboardInset(px) {
+  // Android 15+ / OEM WebViews still shrink innerHeight when the IME opens.
+  // Sticky bottom:0 then already sits above the keyboard; applying the full IME
+  // height on top double-lifts the composer. iOS does not shrink innerHeight, so
+  // the subtraction is 0 and the overlay path is unchanged.
+  var layoutHeightBaseline = 0
+  var lastReportedKeyboardPx = 0
+
+  function rememberLayoutHeight() {
+    try {
+      var h = window.innerHeight
+      if (typeof h === 'number' && h > 0) layoutHeightBaseline = h
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function layoutAlreadyGaveWayPx() {
+    var shrink = 0
+    var pan = 0
+    try {
+      if (layoutHeightBaseline > 0) {
+        shrink = Math.max(0, layoutHeightBaseline - window.innerHeight)
+      }
+      if (window.visualViewport && window.visualViewport.offsetTop > 0) {
+        pan = Math.round(window.visualViewport.offsetTop)
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    return shrink + pan
+  }
+
+  function publishKeyboardInset(px) {
     try {
       var height = typeof px === 'number' && px > 0 ? Math.round(px) : 0
       document.documentElement.style.setProperty('--keyboard-inset-height', height + 'px')
@@ -788,13 +822,61 @@
     }
   }
 
+  function ensureKeyboardOpenStyle() {
+    try {
+      if (document.getElementById('synaplan-keyboard-open-style')) return
+      var style = document.createElement('style')
+      style.setAttribute('id', 'synaplan-keyboard-open-style')
+      // When the layout viewport already shrank, --keyboard-inset-height is 0, so
+      // the SPA's safe-area padding-bottom would remain and leave a gap above the
+      // IME. Collapse it for the duration of the keyboard without touching iOS
+      // overlay (that path already zeros padding via the inset var).
+      style.textContent = 'html.synaplan-keyboard-open .chat-composer-sticky{padding-bottom:0;}'
+      var head = document.head || document.getElementsByTagName('head')[0]
+      if (head) head.appendChild(style)
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function applyKeyboardInset(reportedPx) {
+    var reported = typeof reportedPx === 'number' && reportedPx > 0 ? Math.round(reportedPx) : 0
+    lastReportedKeyboardPx = reported
+    try {
+      document.documentElement.classList.toggle('synaplan-keyboard-open', reported > 0)
+    } catch (e) {
+      /* ignore */
+    }
+    if (reported <= 0) {
+      rememberLayoutHeight()
+      publishKeyboardInset(0)
+      return
+    }
+    ensureKeyboardOpenStyle()
+    // IME height includes system bars the WebView never occupied. After the
+    // layout has already shrunk, a remainder translate is the leftover gap on
+    // Samsung; sticky bottom:0 is already correct. iOS never shrinks, so this
+    // branch does not run and the full overlay inset is published.
+    if (layoutAlreadyGaveWayPx() > 8) {
+      publishKeyboardInset(0)
+      return
+    }
+    publishKeyboardInset(reported)
+  }
+
+  function onViewportChangedWhileKeyboardOpen() {
+    if (lastReportedKeyboardPx <= 0) return
+    applyKeyboardInset(lastReportedKeyboardPx)
+  }
+
   function initKeyboardInsetBridge() {
     try {
+      rememberLayoutHeight()
       var plugins = window.Capacitor && window.Capacitor.Plugins
       var keyboard = plugins && plugins.Keyboard
       if (!keyboard || typeof keyboard.addListener !== 'function') return
       keyboard.addListener('keyboardWillShow', function (info) {
-        setKeyboardInset(info && info.keyboardHeight)
+        applyKeyboardInset(info && info.keyboardHeight)
       })
       // Re-assert the inset once the keyboard is FULLY shown. WKWebView can reset
       // the scroll position during the slide-in animation, so any scroll-assist
@@ -802,11 +884,19 @@
       // inset event again here gives the SPA a correctly-timed signal to scroll a
       // focused input clear of the keyboard (keyboardScrollAssist.ts).
       keyboard.addListener('keyboardDidShow', function (info) {
-        setKeyboardInset(info && info.keyboardHeight)
+        applyKeyboardInset(info && info.keyboardHeight)
       })
       keyboard.addListener('keyboardWillHide', function () {
-        setKeyboardInset(0)
+        applyKeyboardInset(0)
       })
+      keyboard.addListener('keyboardDidHide', function () {
+        applyKeyboardInset(0)
+      })
+      window.addEventListener('resize', onViewportChangedWhileKeyboardOpen)
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', onViewportChangedWhileKeyboardOpen)
+        window.visualViewport.addEventListener('scroll', onViewportChangedWhileKeyboardOpen)
+      }
     } catch (e) {
       /* best-effort: the composer simply keeps its default bottom position */
     }
