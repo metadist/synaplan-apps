@@ -10,7 +10,17 @@ apply plugin: 'com.android.application'
 // the visible launcher label. Identifiers are frozen in docs/IDENTIFIERS.md.
 def synaplanVersionName = new JsonSlurper().parse(file("$rootDir/../package.json")).version
 
+// Machine-local overrides live in gitignored local.properties (sdk.dir + synaplanEnv).
+// That lets Android Studio's Play button install as com.synaplan.app.dev next to
+// the Play Store app, without stamping CI/store builds.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
 def synaplanEnv = (project.findProperty('synaplanEnv')
+        ?: localProperties.getProperty('synaplanEnv')
         ?: System.getenv('SYNAPLAN_ENV') ?: 'prod').toString().toLowerCase()
 def synaplanEnvMatrix = [
         prod   : [suffix: '', label: 'Synaplan'],
