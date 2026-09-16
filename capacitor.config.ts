@@ -165,8 +165,14 @@ const config: CapacitorConfig = {
       // app/synaplan-native.js publishes as the `--keyboard-inset-height` CSS var
       // from the Keyboard `keyboardWillShow`/`keyboardWillHide` events (fired at
       // the START of the iOS animation, so a CSS transition glides in sync).
+      // iOS-only. Android ignores this and is aligned via `resizeOnFullScreen`
+      // below plus `windowSoftInputMode=adjustNothing` in the manifest.
       resize: 'none',
-      resizeOnFullScreen: true,
+      // Android-only. `true` shrinks the WebView to sit above the IME. Combined
+      // with `--keyboard-inset-height` that double-lifts the composer (the page
+      // "slides up") while iOS, which never resizes, looks correct. Stay overlay
+      // on both platforms; the SPA already accounts for the keyboard height.
+      resizeOnFullScreen: false,
     },
     // ── OTA live updates (Epic 8.1, Capgo) ─────────────────────────────────────
     // Ships CONFORMING web-asset fixes without a store review. Behavior/payment

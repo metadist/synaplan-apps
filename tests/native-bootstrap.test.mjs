@@ -36,10 +36,28 @@ class StubElement {
     this.tagName = String(tagName).toUpperCase()
     this.children = []
     this.attributes = {}
-    this.style = { setProperty() {} }
+    this.styleProps = {}
+    this.style = {
+      setProperty: (name, value) => {
+        this.styleProps[name] = String(value)
+      },
+    }
     this.textContent = ''
     this.parentNode = null
     this.onMutation = onMutation
+    this._classes = new Set()
+    this.classList = {
+      add: (name) => this._classes.add(name),
+      remove: (name) => this._classes.delete(name),
+      contains: (name) => this._classes.has(name),
+      toggle: (name, force) => {
+        if (force === true) this._classes.add(name)
+        else if (force === false) this._classes.delete(name)
+        else if (this._classes.has(name)) this._classes.delete(name)
+        else this._classes.add(name)
+        return this._classes.has(name)
+      },
+    }
   }
 
   get firstElementChild() {
@@ -206,6 +224,7 @@ function loadBootstrap(options = {}) {
     requestAnimationFrame: (fn) => setTimeoutStub(fn, 0),
     dispatchEvent() {},
     addEventListener() {},
+    innerHeight: options.innerHeight || 800,
   }
 
   const documentStub = {
@@ -434,4 +453,36 @@ test('capturePhoto falls back to the photo library when the camera is unavailabl
   assert.equal(photo.mimeType, 'image/jpeg')
   assert.match(photo.fileName, /^photo-\d+\.jpg$/)
   assert.equal(photo.dataUrl, 'data:image/jpeg;base64,abc')
+})
+
+test('keyboard inset ignores IME height already taken by a shrunk Android layout viewport', () => {
+  const listeners = {}
+  const env = loadBootstrap({
+    extraPlugins: {
+      Keyboard: {
+        addListener(name, fn) {
+          listeners[name] = fn
+        },
+      },
+    },
+  })
+  env.fireDomContentLoaded()
+  assert.equal(typeof listeners.keyboardWillShow, 'function')
+  assert.equal(typeof listeners.keyboardDidShow, 'function')
+
+  // iOS overlay: innerHeight stays put, so the full IME height is published.
+  listeners.keyboardWillShow({ keyboardHeight: 400 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '400px')
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-open'), true)
+
+  // Remainder after a partial shrink (IME includes system bars the WebView never
+  // had) must not keep translating — that leftover is the small Samsung gap.
+  env.window.innerHeight = 440
+  listeners.keyboardDidShow({ keyboardHeight: 400 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '0px')
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-open'), true)
+
+  listeners.keyboardWillHide()
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '0px')
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-open'), false)
 })
