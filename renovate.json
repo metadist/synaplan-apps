@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "timezone": "Europe/Berlin",
+  "schedule": ["before 6am on monday"],
+  "enabledManagers": ["npm", "github-actions"],
+  "ignorePaths": ["synaplan/**"],
+  "prConcurrentLimit": 3,
+  "platformAutomerge": true,
+  "packageRules": [
+    {
+      "description": "Build tooling is fully covered by the CI gate, so it merges unattended.",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "build tooling",
+      "automerge": true
+    },
+    {
+      "description": "Pinned action digests have no local drift signal.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "github actions",
+      "automerge": true
+    },
+    {
+      "description": "Native plugins, IAP and the OTA updater are store-required and device-gated, and the Capacitor CLI must not drift from core.",
+      "matchPackageNames": [
+        "@capacitor/**",
+        "@capacitor-community/**",
+        "@capgo/**",
+        "@aparajita/**",
+        "cordova-plugin-purchase",
+        "cordova-plugin-purchase-storekit2"
+      ],
+      "groupName": "native runtime",
+      "automerge": false
+    },
+    {
+      "description": "Major upgrades stay a human decision.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}
