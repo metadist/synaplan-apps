@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "tag": "v5.0.6",
-  "sha": "7734889a5235b8eef5f9184bfd8804b9bc0217ef",
-  "classification": "store-required",
-  "sourceRunId": "36538965006",
-  "recordedAt": "2026-09-29T07:50:46.912Z"
+  "tag": "v5.0.7",
+  "sha": "6a8a4f2634af160a6533438588bcb29c6deac6a4",
+  "classification": "ota-candidate",
+  "sourceRunId": "36704456858",
+  "recordedAt": "2026-09-30T10:47:12.926Z"
 }
