@@ -20,7 +20,8 @@ titled after "the current pin" goes stale on the next release — append here in
 
 ### Next store build — CarPlay voice conversations
 
-App-owned only; the `synaplan` pin stays on `v5.1.0`. The version number is assigned when the
+App-owned only; built against the `v5.3.0` pin (the `pinned` chat field needs `v5.2.0`+ and is
+optional on older servers). The version number is assigned when the
 release candidate is cut.
 
 Adds a native CarPlay surface (iOS 26.4+, overlay on iOS 27): a list of recent chats and a

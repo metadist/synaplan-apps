@@ -62,7 +62,7 @@ alone, so nothing in CarPlay depends on the WebView.
 
 | Call | Use |
 |------|-----|
-| `GET /api/v1/chats?limit=12&offset=0` | Recent chats; widget sessions are skipped |
+| `GET /api/v1/chats?limit=30&offset=0` | Recent web chats, up to twelve shown; pinned chats (`pinned`, since v5.2.0) first with a pin icon. The server orders by activity only, so a pinned chat appears when it is among the 30 most recent |
 | `POST /api/v1/chats` | Created lazily on the first utterance of a new conversation |
 | `POST /api/v1/messages/stream` | SSE; `status: data` chunks are spoken, `complete` / `error` / `message` (limit) end the turn |
 | `GET /api/v1/tts/stream?text&language&format=mp3` | The user's voice per sentence |

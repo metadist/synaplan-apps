@@ -5,6 +5,7 @@ struct CarChatSummary: Equatable {
     let id: Int
     let title: String
     let updatedAt: Date?
+    var pinned = false
 }
 
 enum CarClientError: Error, Equatable {
@@ -24,8 +25,9 @@ enum CarAPIDecoding {
     /// Titles the backend reports for a chat that has no generated title yet.
     static let placeholderTitles: Set<String> = ["New Chat", "Neuer Chat"]
 
-    /// `GET /api/v1/chats?limit=…` → the user's own web chats, newest activity
-    /// first. An empty title means "untitled".
+    /// `GET /api/v1/chats?limit=…` → the user's own web chats, pinned first,
+    /// otherwise in the server's newest-activity order. An empty title means
+    /// "untitled".
     static func chatList(_ data: Data) throws -> [CarChatSummary] {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let chats = object["chats"] as? [[String: Any]] else {
@@ -34,7 +36,7 @@ enum CarAPIDecoding {
         let isoFractional = ISO8601DateFormatter()
         isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let iso = ISO8601DateFormatter()
-        return chats.compactMap { chat in
+        let summaries: [CarChatSummary] = chats.compactMap { chat in
             guard let id = chat["id"] as? Int else { return nil }
             // Widget visitor conversations belong to the widget, not to the user's own chats.
             if let widget = chat["widgetSession"], !(widget is NSNull) { return nil }
@@ -46,9 +48,11 @@ enum CarAPIDecoding {
             return CarChatSummary(
                 id: id,
                 title: placeholderTitles.contains(title) ? "" : title,
-                updatedAt: iso.date(from: rawDate) ?? isoFractional.date(from: rawDate)
+                updatedAt: iso.date(from: rawDate) ?? isoFractional.date(from: rawDate),
+                pinned: chat["pinned"] as? Bool ?? false
             )
         }
+        return summaries.filter(\.pinned) + summaries.filter { !$0.pinned }
     }
 
     /// `POST /api/v1/chats` → id of the new chat.

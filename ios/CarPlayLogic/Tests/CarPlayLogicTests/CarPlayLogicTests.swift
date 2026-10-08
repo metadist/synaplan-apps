@@ -55,6 +55,20 @@ final class CarAPIDecodingTests: XCTestCase {
         XCTAssertEqual(chats.map(\.title), ["", ""])
     }
 
+    func testPinnedChatsComeFirstAndKeepServerOrder() throws {
+        let json = """
+        {"chats":[
+          {"id":1,"title":"Recent","updatedAt":"2026-10-07T18:30:00+02:00","pinned":false},
+          {"id":2,"title":"Pinned new","updatedAt":"2026-10-06T18:30:00+02:00","pinned":true},
+          {"id":3,"title":"Older","updatedAt":"2026-10-05T18:30:00+02:00"},
+          {"id":4,"title":"Pinned old","updatedAt":"2026-10-01T18:30:00+02:00","pinned":true}
+        ]}
+        """
+        let chats = try CarAPIDecoding.chatList(Data(json.utf8))
+        XCTAssertEqual(chats.map(\.id), [2, 4, 1, 3])
+        XCTAssertEqual(chats.map(\.pinned), [true, true, false, false])
+    }
+
     func testMalformedChatListFails() {
         XCTAssertThrowsError(try CarAPIDecoding.chatList(Data("{\"error\":\"x\"}".utf8)))
     }

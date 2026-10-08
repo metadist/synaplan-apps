@@ -113,7 +113,8 @@ final class CarPlayRootController {
         let items: [CPListItem] = chats.prefix(limit).map { chat in
             let item = CPListItem(
                 text: chat.title.isEmpty ? CarPlayStrings.text("root.untitledChat") : chat.title,
-                detailText: chat.updatedAt.map { CarPlayStrings.relativeTime($0) }
+                detailText: chat.updatedAt.map { CarPlayStrings.relativeTime($0) },
+                image: chat.pinned ? UIImage(systemName: "pin.fill") : nil
             )
             item.accessoryType = .none
             item.handler = { [weak self] _, completion in

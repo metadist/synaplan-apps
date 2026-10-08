@@ -108,6 +108,7 @@ test('chat list and create responses carry the fields the car reads', () => {
     'updatedAt:',
     'widgetSession:',
     'source:',
+    'pinned:',
   ]) {
     assert.ok(list.includes(field), `chat list lost ${field}`)
   }
@@ -117,6 +118,7 @@ test('chat list and create responses carry the fields the car reads', () => {
   assert.match(SWIFT_MODELS, /object\["chats"\]/)
   assert.match(SWIFT_MODELS, /chat\["widgetSession"\]/)
   assert.match(SWIFT_MODELS, /chat\["source"\]/)
+  assert.match(SWIFT_MODELS, /chat\["pinned"\]/)
   assert.match(CHAT_CONTROLLER, /'source' => \$chat->getSource\(\),/)
   assert.match(SWIFT_CLIENT, /"\/api\/v1\/chats"/)
 })
