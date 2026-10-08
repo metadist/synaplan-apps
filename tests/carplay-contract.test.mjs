@@ -26,7 +26,7 @@ const SWIFT_TESTS = read('ios/CarPlayLogic/Tests/CarPlayLogicTests/CarPlayLogicT
 
 const NATIVE_AUTH = read('synaplan/frontend/src/services/api/nativeAuth.ts')
 const NATIVE_RUNTIME = read('synaplan/frontend/src/services/api/nativeRuntime.ts')
-const API_SCHEMAS = read('synaplan/frontend/src/generated/api-schemas.ts')
+const CONFIG_CONTROLLER = read('synaplan/backend/src/Controller/ConfigController.php')
 const STREAM_CONTROLLER = read('synaplan/backend/src/Controller/StreamController.php')
 const AUTH_CONTROLLER = read('synaplan/backend/src/Controller/AuthController.php')
 const CHAT_CONTROLLER = read('synaplan/backend/src/Controller/ChatController.php')
@@ -42,13 +42,19 @@ function djb2Scope(url) {
   return (hash >>> 0).toString(36)
 }
 
-/** Body of a generated zod schema constant, up to the next export. */
-function schemaBody(name) {
-  const start = API_SCHEMAS.indexOf(`export const ${name} = `)
-  assert.notEqual(start, -1, `${name} missing from the generated OpenAPI schemas`)
-  const end = API_SCHEMAS.indexOf('\nexport const ', start + 1)
-  return API_SCHEMAS.slice(start, end === -1 ? undefined : end)
+/**
+ * OpenAPI annotation of one operation, up to the next route. The generated zod
+ * schemas are built from these annotations and only exist after `build.sh`.
+ */
+function operationBody(source, verb, path) {
+  const start = source.search(new RegExp(`#\\[OA\\\\${verb}\\(\\s*path: '${path}',`))
+  assert.notEqual(start, -1, `${verb} ${path} missing from the OpenAPI annotations`)
+  const end = source.indexOf('#[Route(', start)
+  return source.slice(start, end === -1 ? undefined : end)
 }
+
+const property = (name, type) =>
+  type ? `property: '${name}', type: '${type}'` : `property: '${name}'`
 
 test('SPA session keys are still djb2-scoped secure-storage items', () => {
   assert.match(NATIVE_AUTH, /let hash = 5381/)
@@ -100,20 +106,20 @@ test('CarPlay User-Agent satisfies the backend token gate', () => {
 })
 
 test('chat list and create responses carry the fields the car reads', () => {
-  const list = schemaBody('get_api_chats_list_Response')
+  const list = operationBody(CHAT_CONTROLLER, 'Get', '/api/v1/chats')
   for (const field of [
-    'chats:',
-    'id: z.number().int()',
-    'title: z.string()',
-    'updatedAt:',
-    'widgetSession:',
-    'source:',
-    'pinned:',
+    property('chats'),
+    property('id', 'integer'),
+    property('title', 'string'),
+    property('updatedAt', 'string'),
+    property('widgetSession'),
+    property('source', 'string'),
+    property('pinned', 'boolean'),
   ]) {
     assert.ok(list.includes(field), `chat list lost ${field}`)
   }
-  const create = schemaBody('post_api_chats_create_Response')
-  assert.ok(create.includes('chat:') && create.includes('id: z.number().int()'))
+  const create = operationBody(CHAT_CONTROLLER, 'Post', '/api/v1/chats')
+  assert.ok(create.includes(property('chat')) && create.includes(property('id', 'integer')))
 
   assert.match(SWIFT_MODELS, /object\["chats"\]/)
   assert.match(SWIFT_MODELS, /chat\["widgetSession"\]/)
@@ -160,7 +166,7 @@ test('refresh, dictation, TTS and runtime config contracts', () => {
   assert.match(read('synaplan/backend/src/Controller/TtsController.php'), /#\[Route\('\/stream'/)
   assert.match(SWIFT_CLIENT, /"\/api\/v1\/tts\/stream"/)
 
-  assert.ok(API_SCHEMAS.includes('speechToTextAvailable: z.boolean()'))
+  assert.match(CONFIG_CONTROLLER, /property: 'speechToTextAvailable',\s+type: 'boolean'/)
   assert.match(SWIFT_MODELS, /speech\["speechToTextAvailable"\]/)
 })
 
