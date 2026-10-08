@@ -43,6 +43,32 @@
 - **Account-deletion URL** (Google requires it in the listing): the public deletion page from
   Epic 9.1 — 👤 confirm final URL.
 
+## CarPlay additions (store build with CarPlay — 👤 apply once Apple grants the entitlement)
+
+Do not publish this copy before the entitlement is granted and a device build has passed the
+CarPlay journey in [`CARPLAY.md`](CARPLAY.md). Add the bullet under "WHY SYNAPLAN" (iOS only;
+Google Play has no CarPlay) and use the release note as "What's New".
+
+| Locale | Description bullet | What's New |
+|--------|--------------------|------------|
+| en | `• CarPlay: talk to Synaplan hands-free in the car — start a new conversation or continue a recent chat. Answers are spoken.` | `Synaplan in CarPlay: hands-free voice conversations in the car. Your conversations appear in your chat history.` |
+| de | `• CarPlay: Sprich im Auto freihändig mit Synaplan – starte ein neues Gespräch oder setze einen Chat fort. Antworten werden vorgelesen.` | `Synaplan in CarPlay: freihändige Sprachgespräche im Auto. Deine Gespräche stehen danach in deinem Chatverlauf.` |
+| es | `• CarPlay: habla con Synaplan en el coche sin usar las manos: inicia una conversación nueva o continúa un chat reciente. Las respuestas se leen en voz alta.` | `Synaplan en CarPlay: conversaciones por voz en el coche sin usar las manos. Tus conversaciones aparecen en tu historial de chats.` |
+| tr | `• CarPlay: Arabada Synaplan ile eller serbest konuşun – yeni bir konuşma başlatın veya son sohbetlerden birine devam edin. Yanıtlar sesli okunur.` | `CarPlay'de Synaplan: arabada eller serbest sesli konuşmalar. Konuşmalarınız sohbet geçmişinizde görünür.` |
+
+Add `carplay` to the iOS keywords only if the 100-character budget allows it.
+
+**App Review notes (CarPlay):** voice-based conversational app. Sign in on the iPhone with the
+demo account once, then open Synaplan on the CarPlay display. The list shows chat titles only;
+answers are spoken and never displayed. The microphone is active only while the voice screen is
+shown. Speech is recognized on the iPhone; if that is not possible, the recording is sent to the
+user's Synaplan server for transcription and deleted afterwards. The Face ID app lock does not
+apply in CarPlay.
+
+**Privacy labels:** "Audio Data" is collected only through the server speech-to-text fallback and
+the existing dictation feature; confirm that the App Privacy answers already declare it for
+dictation before submission.
+
 ---
 
 # Apple App Store

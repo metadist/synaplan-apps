@@ -1,0 +1,267 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "alert.ok" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Aceptar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tamam" } }
+      }
+    },
+    "button.end" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Beenden" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "End" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Finalizar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Terminer" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bitir" } }
+      }
+    },
+    "button.mute" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Stumm" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Mute" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Silenciar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Couper le micro" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sessize al" } }
+      }
+    },
+    "button.unmute" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Mikro an" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unmute" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Activar micrófono" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réactiver le micro" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sesi aç" } }
+      }
+    },
+    "error.failed" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan konnte diesmal nicht antworten. Bitte versuche es erneut." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan couldn't answer this time. Please try again." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan no pudo responder esta vez. Inténtalo de nuevo." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan n'a pas pu répondre cette fois. Veuillez réessayer." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan bu kez yanıt veremedi. Lütfen tekrar dene." } }
+      }
+    },
+    "error.limitReached" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Du hast dein Synaplan-Nutzungslimit vorerst erreicht." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You've reached your Synaplan usage limit for now." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Has alcanzado tu límite de uso de Synaplan por ahora." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vous avez atteint votre limite d'utilisation de Synaplan pour le moment." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Şimdilik Synaplan kullanım sınırına ulaştın." } }
+      }
+    },
+    "error.microphone" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan hat keinen Zugriff auf das Mikrofon." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan doesn't have access to the microphone." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan no tiene acceso al micrófono." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan n'a pas accès au micro." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan'ın mikrofona erişimi yok." } }
+      }
+    },
+    "error.signedOut" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Du bist bei Synaplan abgemeldet." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You're signed out of Synaplan." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Has cerrado sesión en Synaplan." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vous êtes déconnecté de Synaplan." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan oturumun kapalı." } }
+      }
+    },
+    "error.speechUnavailable" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Spracherkennung ist gerade nicht verfügbar." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Speech recognition isn't available right now." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "El reconocimiento de voz no está disponible ahora." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "La reconnaissance vocale n'est pas disponible pour le moment." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Konuşma tanıma şu anda kullanılamıyor." } }
+      }
+    },
+    "error.unreachable" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Verbindung zu Synaplan wurde unterbrochen. Versuche es gleich noch einmal." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The connection to Synaplan was lost. Try again in a moment." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Se perdió la conexión con Synaplan. Inténtalo de nuevo en un momento." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "La connexion à Synaplan a été perdue. Réessayez dans un instant." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan bağlantısı kesildi. Birazdan tekrar dene." } }
+      }
+    },
+    "root.empty" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Noch keine Chats. Starte ein neues Gespräch." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No chats yet. Start a new conversation." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Aún no hay chats. Empieza una nueva conversación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun chat pour l'instant. Commencez une nouvelle conversation." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Henüz sohbet yok. Yeni bir sohbet başlat." } }
+      }
+    },
+    "root.loading" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Chats werden geladen…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading chats…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cargando chats…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chargement des chats…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sohbetler yükleniyor…" } }
+      }
+    },
+    "root.newConversation" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Neues Gespräch" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New conversation" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Nueva conversación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nouvelle conversation" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yeni sohbet" } }
+      }
+    },
+    "root.newConversationDetail" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Mit Synaplan sprechen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Talk to Synaplan" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Habla con Synaplan" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Parler à Synaplan" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan ile konuş" } }
+      }
+    },
+    "root.recentChats" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Letzte Chats" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recent chats" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Chats recientes" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chats récents" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Son sohbetler" } }
+      }
+    },
+    "root.requiresUpdate" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan in CarPlay erfordert iOS 26.4 oder neuer." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan in CarPlay requires iOS 26.4 or later." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan en CarPlay requiere iOS 26.4 o posterior." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan dans CarPlay nécessite iOS 26.4 ou version ultérieure." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "CarPlay'de Synaplan için iOS 26.4 veya üstü gerekir." } }
+      }
+    },
+    "root.retry" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Erneut versuchen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Try again" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reintentar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réessayer" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tekrar dene" } }
+      }
+    },
+    "root.signedOutDetail" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan ist im Auto verfügbar, sobald du angemeldet bist." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan is available in the car once you're signed in." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan estará disponible en el coche cuando hayas iniciado sesión." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan sera disponible en voiture une fois que vous serez connecté." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Oturum açtığında Synaplan arabada kullanılabilir." } }
+      }
+    },
+    "root.signedOutTitle" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Nicht angemeldet" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not signed in" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No has iniciado sesión" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Non connecté" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Oturum açılmadı" } }
+      }
+    },
+    "root.title" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan" } }
+      }
+    },
+    "root.unreachableDetail" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Prüfe die Verbindung und versuche es erneut." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check the connection and try again." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Comprueba la conexión e inténtalo de nuevo." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vérifiez la connexion et réessayez." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlantıyı kontrol edip tekrar dene." } }
+      }
+    },
+    "root.unreachableTitle" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan ist nicht erreichbar" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan can't be reached" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se puede conectar con Synaplan" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan est injoignable" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Synaplan'a ulaşılamıyor" } }
+      }
+    },
+    "root.untitledChat" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Chat ohne Titel" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Untitled chat" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Chat sin título" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chat sans titre" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Başlıksız sohbet" } }
+      }
+    },
+    "voice.connecting" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Verbinde…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connecting…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Conectando…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Connexion…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlanıyor…" } }
+      }
+    },
+    "voice.listening" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ich höre zu" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "I'm listening" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Te escucho" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Je vous écoute" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dinliyorum" } }
+      }
+    },
+    "voice.listeningShort" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zuhören" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Listening" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Escuchando" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Écoute" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dinleniyor" } }
+      }
+    },
+    "voice.muted" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Mikrofon aus" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Microphone off" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Micrófono desactivado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Micro coupé" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mikrofon kapalı" } }
+      }
+    },
+    "voice.speaking" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Antwortet" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Answering" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Respondiendo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réponse en cours" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yanıtlıyor" } }
+      }
+    },
+    "voice.thinking" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Denke nach…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Thinking…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pensando…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réflexion…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Düşünüyor…" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

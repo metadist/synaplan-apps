@@ -61,6 +61,13 @@ Cold-start and warm-start (app already in memory) should both work. A guest
 session hitting Analyze photo must show the existing attach feature-gate, not
 the camera.
 
+## Manual — CarPlay
+
+Maestro cannot drive the CarPlay display, and the Xcode 27 simulator cannot show one at all. Walk
+the journey in [`docs/CARPLAY.md`](CARPLAY.md#journey) on a real iPhone with the CarPlay
+Simulator, or in the Xcode 26.4 Simulator for the iOS 26.4 fallback. The lock step (Cmd+L, then
+repeat the conversation) is mandatory for any change to the session mirror or token handling.
+
 ## Install Maestro
 
 ```bash

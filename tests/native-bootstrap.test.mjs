@@ -204,8 +204,9 @@ function loadBootstrap(options = {}) {
     },
   }
 
-  const storage = new Map()
+  const storage = new Map(Object.entries(options.storage || {}))
   const domReadyListeners = []
+  const visibilityListeners = []
 
   const windowStub = {
     navigator: { userAgent },
@@ -229,6 +230,7 @@ function loadBootstrap(options = {}) {
 
   const documentStub = {
     readyState: 'loading',
+    visibilityState: 'visible',
     documentElement,
     head,
     body,
@@ -242,6 +244,7 @@ function loadBootstrap(options = {}) {
     },
     addEventListener: (type, listener) => {
       if (type === 'DOMContentLoaded') domReadyListeners.push(listener)
+      if (type === 'visibilitychange') visibilityListeners.push(listener)
     },
     removeEventListener() {},
   }
@@ -276,6 +279,10 @@ function loadBootstrap(options = {}) {
     fireDomContentLoaded: () => {
       documentStub.readyState = 'interactive'
       for (const listener of domReadyListeners.slice()) listener()
+    },
+    setVisibility: (state) => {
+      documentStub.visibilityState = state
+      for (const listener of visibilityListeners.slice()) listener()
     },
     // What the SPA does at the end of bootstrap: mount its root into #app.
     paintApp: () => appRoot.appendChild(make('div')),
@@ -485,4 +492,56 @@ test('keyboard inset ignores IME height already taken by a shrunk Android layout
   listeners.keyboardWillHide()
   assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '0px')
   assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-open'), false)
+})
+
+test('CarPlay session bridge pushes the server and UI language on load and when hidden', async () => {
+  const calls = []
+  const env = loadBootstrap({
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test/', language: 'de' },
+    extraPlugins: {
+      SynaplanCarSession: {
+        update(payload) {
+          calls.push(payload)
+          return Promise.resolve()
+        },
+      },
+    },
+  })
+  env.fireDomContentLoaded()
+  await env.flushMicrotasks()
+
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].serverUrl, 'https://chat.example.test')
+  assert.equal(calls[0].language, 'de')
+  // Tokens never cross the bridge; the native store reads the Keychain itself.
+  assert.deepEqual(Object.keys(calls[0]).sort(), ['language', 'serverUrl'])
+
+  env.setVisibility('visible')
+  await env.flushMicrotasks()
+  assert.equal(calls.length, 1)
+
+  env.window.localStorage.setItem('language', 'tr')
+  env.setVisibility('hidden')
+  await env.flushMicrotasks()
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].language, 'tr')
+})
+
+test('CarPlay session bridge tolerates a missing or failing plugin', async () => {
+  const missing = loadBootstrap()
+  missing.fireDomContentLoaded()
+  missing.setVisibility('hidden')
+  await missing.flushMicrotasks()
+
+  const failing = loadBootstrap({
+    extraPlugins: {
+      SynaplanCarSession: {
+        update: () => Promise.reject(new Error('not implemented')),
+      },
+    },
+  })
+  failing.fireDomContentLoaded()
+  failing.setVisibility('hidden')
+  await failing.flushMicrotasks()
+  assert.match(failing.viewportContent(), /user-scalable=no/)
 })

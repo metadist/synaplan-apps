@@ -32,8 +32,39 @@
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
+	<!-- UIScene lifecycle (required when building with the iOS 27 SDK). The phone
+	     window comes from Main.storyboard; CarPlay is a separate template scene
+	     that is native-only and never hosts the WebView. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+			<key>CPTemplateApplicationSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>CarPlay</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>
@@ -56,7 +87,9 @@
 	<!-- Epic 7.1: WKWebView getUserMedia + file picker require these purpose strings.
 	     A MISSING string causes a hard crash/App Store reject on first access. -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Synaplan uses the microphone so you can dictate messages and use voice features.</string>
+	<string>Synaplan uses the microphone so you can dictate messages, use voice features, and talk to Synaplan in CarPlay.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Synaplan turns what you say in CarPlay into text, on this iPhone whenever possible.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Synaplan uses the camera so you can capture photos to attach to your messages.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

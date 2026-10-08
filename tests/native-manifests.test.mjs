@@ -33,6 +33,7 @@ test('Info.plist declares every permission purpose string (missing → crash/rej
     'NSPhotoLibraryUsageDescription',
     'NSPhotoLibraryAddUsageDescription',
     'NSFaceIDUsageDescription',
+    'NSSpeechRecognitionUsageDescription',
   ]
   for (const key of required) {
     const m = plist.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`))
@@ -60,6 +61,48 @@ test('Info.plist keeps the Epic 10.1 build-setting variables (version/bundle id 
 
 test('Info.plist keeps the OAuth deep-link scheme (Epic 3)', () => {
   assert.match(read(INFO_PLIST), /<string>com\.synaplan\.app<\/string>/)
+})
+
+test('Info.plist uses the scene lifecycle with separate phone and CarPlay roles', () => {
+  const plist = read(INFO_PLIST)
+  assert.doesNotMatch(plist, /<key>UIMainStoryboardFile<\/key>/, 'storyboard moves into the scene')
+  assert.match(plist, /<key>UIApplicationSceneManifest<\/key>/)
+  assert.match(plist, /<key>UIApplicationSupportsMultipleScenes<\/key>\s*<false\/>/)
+  assert.match(
+    plist,
+    /<key>UIWindowSceneSessionRoleApplication<\/key>[\s\S]*?<string>\$\(PRODUCT_MODULE_NAME\)\.SceneDelegate<\/string>[\s\S]*?<key>UISceneStoryboardFile<\/key>\s*<string>Main<\/string>/
+  )
+  assert.match(
+    plist,
+    /<key>CPTemplateApplicationSceneSessionRoleApplication<\/key>[\s\S]*?<string>CPTemplateApplicationScene<\/string>[\s\S]*?<string>\$\(PRODUCT_MODULE_NAME\)\.CarPlaySceneDelegate<\/string>/
+  )
+})
+
+// ── iOS entitlements ─────────────────────────────────────────────────────────
+
+const CARPLAY_ENTITLEMENT = 'com.apple.developer.carplay-voice-based-conversation'
+
+test('CarPlay entitlement is limited to Simulator builds until Apple grants it', () => {
+  const device = read('ios/App/App/App.entitlements')
+  const simulator = read('ios/App/App/App-CarPlay.entitlements')
+  assertWellFormed(device, 'App.entitlements')
+  assertWellFormed(simulator, 'App-CarPlay.entitlements')
+
+  // A device/archive build with an ungranted entitlement fails provisioning.
+  assert.doesNotMatch(device, new RegExp(CARPLAY_ENTITLEMENT))
+  assert.match(simulator, new RegExp(`<key>${CARPLAY_ENTITLEMENT}</key>\\s*<true/>`))
+  // Everything the device build has, the Simulator build keeps.
+  for (const key of device.matchAll(/<key>([^<]+)<\/key>/g)) {
+    assert.match(simulator, new RegExp(`<key>${key[1]}</key>`), `simulator lost ${key[1]}`)
+  }
+
+  const pbx = read('ios/App/App.xcodeproj/project.pbxproj')
+  const sim = pbx.match(
+    /"CODE_SIGN_ENTITLEMENTS\[sdk=iphonesimulator\*\]" = "App\/App-CarPlay\.entitlements";/g
+  )
+  const base = pbx.match(/\bCODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/g)
+  assert.equal(sim?.length, 2, 'Debug and Release simulator overrides')
+  assert.equal(base?.length, 2, 'Debug and Release device entitlements')
 })
 
 // ── iOS privacy manifest (Epic 9.2) ──────────────────────────────────────────

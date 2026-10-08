@@ -18,6 +18,9 @@
 # App-repo gate: gates 1 (lint + typecheck) + 3 (parse) + 4 (format-check)
 npm run ci-local
 
+# macOS only, required for changes under ios/App/App/CarPlay/
+npm run test:carplay
+
 # Submodule gate (run inside synaplan/, never a filtered subset)
 make -C backend lint && make -C backend phpstan && make -C backend test
 make -C frontend lint && docker compose exec -T frontend npm run check:types && make -C frontend test
@@ -63,6 +66,7 @@ against it and re-run both repositories' complete gates before changing the app 
 | **7 Native features** | Camera/file/mic/download/share on device; permission-denial degrades (no crash); token in Keychain/Keystore; offline recovers | 2,5 | 🧪 device + **security review (token storage, never logged)** |
 | **7 Native features** | iOS purpose strings present (missing → crash/reject); reCAPTCHA works under `capacitor://`; no white screen | 1,3 | ✅ `Info.plist` purpose-string + well-formedness check (`tests/native-manifests.test.mjs`); 🧪 reCAPTCHA/device |
 | **7 Native features** | iOS App Shortcuts (Open / Start dictation / Analyze photo) appear in the Shortcuts app after first launch and reach the chat composer | 2,3 | ✅ bootstrap contract in `tests/native-bootstrap.test.mjs`; 🧪 Simulator/device — Maestro cannot drive the Shortcuts app |
+| **7 Native features** | CarPlay voice conversation: list of recent chats, voice states, mute/end, chat appears in iPhone history, works while the iPhone is locked, signed-out and unreachable states | 1,2,3 | ✅ `tests/carplay-contract.test.mjs` (API fields, UA, token-storage keys, string parity), scene/entitlement checks in `tests/native-manifests.test.mjs`; ✅ `npm run test:carplay` (Swift logic, **macOS only**, not in CI); 🧪 CarPlay journey on a real iPhone with the CarPlay Simulator (entitlement-gated) or in the Xcode 26.4 Simulator; the Xcode 27 simulator has no CarPlay — [`docs/CARPLAY.md`](CARPLAY.md#where-carplay-can-run) |
 | **8 OTA / forced update** | Self-hosted Capgo delivers the OTA bundle; staged rollout + rollback work; min-version gate blocks too-old then allows | 2,5 | 🧪 device rollout + verified self-hosted upload target + **"no payment/behavior logic via OTA" AI review** |
 | **8 OTA** | `COMPATIBILITY.md` current; `OTA_POLICY.md` exists | 4,5 | ✅ docs present |
 | **9 Store compliance** | In-app account deletion (+ web link for Google); anti-steering verified; restore + manage-via-store present | 2,5 | 🧪 reviewer path (9.4/9.5 code-complete) + AI store-policy review |
