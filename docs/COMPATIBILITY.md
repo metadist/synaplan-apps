@@ -8,7 +8,8 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 4.0.3 | `v5.3.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.1 |
+| 4.0.4 | `v5.3.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.1 |
+| 4.0.3 | `v5.3.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Approved on the App Store; its version train is closed |
 | 4.0.2 | `v4.5.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Released on the App Store; its version train is closed |
 | 4.0.1 | `v4.3.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v4.3.0 |
 | 4.0.0 | `v4.2.4` | v4 runtime config (`client`, `branding`, `mobile`) + Sign in with Apple, content moderation, native-channel IAP anti-steering, `GET /api/v1/subscription/plans` (public) | — | _empty (gate off)_ | Reviewed mobile baseline v4.2.4 |
@@ -17,6 +18,25 @@
 
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
+
+### App 4.0.4 — reopen the version train after 4.0.3 was approved
+
+App-owned only. The reviewed pin is `v5.3.1`, which the source repository classified
+`store-required` (OIDC sign-in restrictions among the changes since `v5.3.0`).
+
+4.0.3 is approved on the App Store, which closes its pre-release train. The store release
+candidate for the `v5.3.1` sync
+([run 37770419436](https://github.com/metadist/synaplan-apps/actions/runs/37770419436))
+uploaded build 193 and App Store Connect rejected it:
+`Invalid Pre-Release Train … closed for new build submissions (90186)` and
+`CFBundleShortVersionString [4.0.3] … must contain a higher version than that of the
+previously approved version [4.0.3] (90062)`. A higher build number cannot reopen that
+train. 4.0.4 is the next marketing version, the same release mechanic as 4.0.3 after 4.0.2.
+
+The `v5.3.1` bundle never reached TestFlight, so the approved 4.0.3 binary stays recorded
+against `v5.3.0`.
+
+- Release classification: **store-required** — it exists to produce a new store binary.
 
 ### App 4.0.3 — reopen a version train after the App Store release
 
