@@ -1,1 +1,1 @@
-Faster start: the app now opens right away instead of waiting on the start screen, even if you have not used it for a few days. Updates are prepared in the background and applied the next time you open the app.
+Talk to Synaplan in the car. CarPlay shows your recent chats and speaks the answers.
