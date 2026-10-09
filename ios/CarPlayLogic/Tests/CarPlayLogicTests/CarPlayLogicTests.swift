@@ -168,6 +168,21 @@ final class UtteranceEndpointerTests: XCTestCase {
         XCTAssertEqual(endpointer.feed(levelDb: -70, at: 6.5), .utteranceEnded)
     }
 
+    func testBargeInNeedsSustainedSpeechAfterTheOnset() {
+        var detector = BargeInDetector()
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.1))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.5))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.8))
+        XCTAssertTrue(detector.feed(levelDb: -10, at: 0.9))
+    }
+
+    func testBargeInIgnoresAShortNoiseSpike() {
+        var detector = BargeInDetector()
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.5))
+        XCTAssertFalse(detector.feed(levelDb: -80, at: 0.6))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.7))
+    }
+
     func testLevelOfSilenceAndFullScale() {
         let silence = [Float](repeating: 0, count: 64)
         let full = [Float](repeating: 1, count: 64)

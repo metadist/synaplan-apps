@@ -40,8 +40,10 @@ protocol VoiceConversationEngineDelegate: AnyObject {
     func voiceEngine(_ engine: VoiceConversationEngine, didEndWith reason: VoiceEndReason, chatId: Int?)
 }
 
-/// Hands-free turn loop for one CarPlay conversation: listen → think → speak,
-/// until the driver ends it, stays silent twice, or something fails.
+/// Hands-free conversation for one CarPlay chat. The driver talks, Synaplan
+/// answers out loud, and talking over the answer stops it and becomes the
+/// next turn. The loop ends when the driver ends it, stays silent twice, or
+/// something fails.
 ///
 /// A new conversation creates its chat lazily on the first utterance, so
 /// opening and closing the voice screen never leaves an empty chat behind.
@@ -56,6 +58,7 @@ final class VoiceConversationEngine {
 
     private let client: SynaplanCarClient
     private let store: CarSessionStore
+    private let graph: VoiceAudioGraph
     private let output: SpeechOutput
     private let cues = AudioCues()
     private var input: SpeechInput?
@@ -68,7 +71,15 @@ final class VoiceConversationEngine {
         self.chatId = chatId
         self.client = client
         self.store = store
-        output = SpeechOutput(client: client)
+        let graph = VoiceAudioGraph()
+        self.graph = graph
+        output = SpeechOutput(client: client, graph: graph)
+    }
+
+    private enum AnswerResult {
+        case done
+        case interrupted(String)
+        case stop(VoiceEndReason)
     }
 
     func start() {
@@ -134,22 +145,27 @@ final class VoiceConversationEngine {
         }
 
         var silentTurns = 0
+        var carried: String?
         while !Task.isCancelled, !ended {
-            set(.listening)
-            await cues.play(.listening)
-            if Task.isCancelled { return }
-
             let transcript: String?
-            do {
-                transcript = try await input.listen(language: store.language)
-            } catch is CancellationError {
-                return
-            } catch SpeechInputError.microphoneDenied {
-                return finish(.microphoneDenied)
-            } catch let error as CarClientError {
-                return finish(Self.reason(for: error))
-            } catch {
-                return finish(.speechUnavailable)
+            if let pending = carried {
+                transcript = pending
+                carried = nil
+            } else {
+                set(.listening)
+                await cues.play(.listening)
+                if Task.isCancelled { return }
+                do {
+                    transcript = try await input.listen(language: store.language, includePreroll: false)
+                } catch is CancellationError {
+                    return
+                } catch SpeechInputError.microphoneDenied {
+                    return finish(.microphoneDenied)
+                } catch let error as CarClientError {
+                    return finish(Self.reason(for: error))
+                } catch {
+                    return finish(.speechUnavailable)
+                }
             }
             if Task.isCancelled { return }
 
@@ -162,14 +178,19 @@ final class VoiceConversationEngine {
             }
             silentTurns = 0
 
-            if let reason = await answer(transcript) {
+            switch await answer(transcript) {
+            case .done:
+                break
+            case let .interrupted(text):
+                carried = text.isEmpty ? nil : text
+            case let .stop(reason):
                 return finish(reason)
             }
         }
     }
 
-    /// Sends one utterance and speaks the reply. Returns a reason to stop.
-    private func answer(_ transcript: String) async -> VoiceEndReason? {
+    /// Sends one utterance and speaks the reply.
+    private func answer(_ transcript: String) async -> AnswerResult {
         set(.thinking)
         await cues.play(.thinking)
         let language = store.language
@@ -185,42 +206,63 @@ final class VoiceConversationEngine {
 
             let (sentences, sentenceSink) = AsyncStream<String>.makeStream()
             let speaker = Task { @MainActor [weak self] in
-                guard let self else { return }
-                await output.speak(sentences, language: language) { [weak self] in
+                guard let self else { return false }
+                return await output.speak(sentences, language: language) { [weak self] in
                     self?.set(.speaking)
                 }
             }
-
-            var chunker = SpokenTextChunker()
-            var outcome: VoiceEndReason?
-            do {
-                for try await event in client.streamMessage(chatId: targetChat, text: transcript, language: language) {
-                    switch event {
-                    case let .text(delta):
-                        chunker.append(delta).forEach { sentenceSink.yield($0) }
-                    case .complete:
-                        break
-                    case .failure:
-                        outcome = .failed
-                    case .limitReached:
-                        outcome = .limitReached
-                    }
+            let streamTask = Task { @MainActor in
+                var chunker = SpokenTextChunker()
+                var outcome: VoiceEndReason?
+                defer {
+                    chunker.finish().forEach { sentenceSink.yield($0) }
+                    sentenceSink.finish()
                 }
-            } catch {
-                sentenceSink.finish()
-                speaker.cancel()
-                throw error
+                do {
+                    for try await event in client.streamMessage(chatId: targetChat, text: transcript, language: language) {
+                        if Task.isCancelled { break }
+                        switch event {
+                        case let .text(delta):
+                            chunker.append(delta).forEach { sentenceSink.yield($0) }
+                        case .complete:
+                            break
+                        case .failure:
+                            outcome = .failed
+                        case .limitReached:
+                            outcome = .limitReached
+                        }
+                    }
+                } catch is CancellationError {
+                    return outcome
+                } catch let error as CarClientError {
+                    return Self.reason(for: error)
+                } catch {
+                    return VoiceEndReason.unreachable
+                }
+                return outcome
             }
-            chunker.finish().forEach { sentenceSink.yield($0) }
-            sentenceSink.finish()
-            await speaker.value
-            return outcome
+
+            let interrupted = await withTaskCancellationHandler {
+                await speaker.value
+            } onCancel: {
+                speaker.cancel()
+                streamTask.cancel()
+            }
+            if interrupted {
+                streamTask.cancel()
+                _ = await streamTask.value
+                set(.listening)
+                let text = try await input?.listen(language: language, includePreroll: true)
+                return .interrupted(text ?? "")
+            }
+            let outcome = await streamTask.value
+            return outcome.map { .stop($0) } ?? .done
         } catch is CancellationError {
-            return nil
+            return .done
         } catch let error as CarClientError {
-            return Self.reason(for: error)
+            return .stop(Self.reason(for: error))
         } catch {
-            return .unreachable
+            return .stop(.unreachable)
         }
     }
 
@@ -237,7 +279,7 @@ final class VoiceConversationEngine {
             switch SpeechPermissions.speechRecognition {
             case .granted:
                 if await OnDeviceSpeechInput.isReady(language: language) {
-                    return OnDeviceSpeechInput()
+                    return OnDeviceSpeechInput(graph: graph)
                 }
                 OnDeviceSpeechInput.prepare(language: language)
             case .undetermined:
@@ -247,7 +289,7 @@ final class VoiceConversationEngine {
             }
         }
         if await client.serverTranscriptionAvailable() {
-            return ServerSpeechInput(client: client)
+            return ServerSpeechInput(client: client, graph: graph)
         }
         return nil
     }
@@ -296,16 +338,15 @@ final class VoiceConversationEngine {
 
     // MARK: - Audio session
 
-    /// Apple's guidance for voice-based conversational CarPlay apps:
-    /// play-and-record, default mode, never mixed with other audio.
+    /// Two-way voice: play-and-record in `voiceChat`, with the microphone and
+    /// the reply on one engine so the driver can interrupt. Released while
+    /// muted and when the conversation ends, so the car gets its audio back.
     private func activateAudioSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [])
-        try session.setActive(true)
+        try graph.activate()
     }
 
     private func deactivateAudioSession() {
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        graph.deactivate()
     }
 
     private func observeAudioSession() {

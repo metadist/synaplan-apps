@@ -15,21 +15,31 @@ final class SpeechOutput: NSObject {
 
     private static let playableContentTypes = ["audio/mpeg", "audio/mp3", "audio/aac", "audio/mp4", "audio/x-m4a", "audio/m4a", "audio/wav", "audio/x-wav"]
 
+    /// AVAudioFile picks the decoder from the extension, not from the bytes.
+    private static func audioExtension(for data: Data) -> String {
+        if data.starts(with: Data("RIFF".utf8)) { return "wav" }
+        if data.starts(with: Data("ID3".utf8)) { return "mp3" }
+        if data.count > 1, data[0] == 0xFF, (data[1] & 0xE0) == 0xE0 { return "mp3" }
+        return "m4a"
+    }
+
     private let client: SynaplanCarClient
+    private let graph: VoiceAudioGraph
     private let synthesizer = AVSpeechSynthesizer()
     private var player: AVAudioPlayer?
     private var playbackContinuation: CheckedContinuation<Void, Never>?
     private var useSystemVoice = false
 
-    init(client: SynaplanCarClient) {
+    init(client: SynaplanCarClient, graph: VoiceAudioGraph) {
         self.client = client
+        self.graph = graph
         super.init()
         synthesizer.delegate = self
     }
 
-    /// Plays every sentence from `sentences` in order; returns when the stream
-    /// has ended and the last sentence finished, or when the task is cancelled.
-    func speak(_ sentences: AsyncStream<String>, language: String, onFirstAudio: @escaping () -> Void) async {
+    /// Plays every sentence from `sentences` in order. Returns true when the
+    /// driver talked over the reply and playback stopped.
+    func speak(_ sentences: AsyncStream<String>, language: String, onFirstAudio: @escaping () -> Void) async -> Bool {
         let (fetches, fetchContinuation) = AsyncStream<Task<Utterance, Never>>.makeStream()
         let producer = Task { @MainActor in
             for await sentence in sentences {
@@ -38,22 +48,26 @@ final class SpeechOutput: NSObject {
             fetchContinuation.finish()
         }
 
+        var interrupted = false
         await withTaskCancellationHandler {
             var started = false
             for await fetch in fetches {
-                if Task.isCancelled { break }
+                if Task.isCancelled || interrupted { break }
                 let utterance = await fetch.value
-                if Task.isCancelled { break }
+                if Task.isCancelled || interrupted { break }
                 if !started {
                     started = true
                     onFirstAudio()
                 }
-                await play(utterance, language: language)
+                if await play(utterance, language: language) == .interrupted {
+                    interrupted = true
+                }
             }
         } onCancel: {
             Task { @MainActor in self.stop() }
         }
         producer.cancel()
+        return interrupted
     }
 
     /// Speaks a short app-generated sentence with the system voice.
@@ -62,6 +76,7 @@ final class SpeechOutput: NSObject {
     }
 
     func stop() {
+        graph.stopPlayback()
         player?.stop()
         player = nil
         if synthesizer.isSpeaking {
@@ -85,7 +100,91 @@ final class SpeechOutput: NSObject {
         return .system(sentence)
     }
 
-    private func play(_ utterance: Utterance, language: String) async {
+    private func play(_ utterance: Utterance, language: String) async -> PlaybackEnd {
+        switch utterance {
+        case let .audio(data):
+            if let buffers = pcmBuffers(from: data), !buffers.isEmpty {
+                return await graph.play(buffers, allowsBargeIn: graph.voiceProcessing)
+            }
+        case let .system(text):
+            guard !text.isEmpty else { return .finished }
+            if let buffers = await systemBuffers(text, language: language), !buffers.isEmpty {
+                return await graph.play(buffers, allowsBargeIn: graph.voiceProcessing)
+            }
+        }
+        await playOutsideTheGraph(utterance, language: language)
+        return .finished
+    }
+
+    /// Decoded reply audio in the engine's playback format, so echo cancellation
+    /// can hear exactly what is coming out of the speaker.
+    private func pcmBuffers(from data: Data) -> [AVAudioPCMBuffer]? {
+        guard let playbackFormat = graph.playbackFormat else { return nil }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("car-tts-\(UUID().uuidString).\(Self.audioExtension(for: data))")
+        do {
+            try data.write(to: url)
+            defer { try? FileManager.default.removeItem(at: url) }
+            let file = try AVAudioFile(forReading: url)
+            guard let converter = AVAudioConverter(from: file.processingFormat, to: playbackFormat) else {
+                return nil
+            }
+            var buffers: [AVAudioPCMBuffer] = []
+            while file.framePosition < file.length {
+                guard let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 4096) else {
+                    return nil
+                }
+                try file.read(into: input)
+                if input.frameLength == 0 { break }
+                let ratio = playbackFormat.sampleRate / file.processingFormat.sampleRate
+                let capacity = AVAudioFrameCount((Double(input.frameLength) * ratio).rounded(.up)) + 32
+                guard let output = AVAudioPCMBuffer(pcmFormat: playbackFormat, frameCapacity: capacity) else {
+                    return nil
+                }
+                var consumed = false
+                var error: NSError?
+                converter.convert(to: output, error: &error) { _, status in
+                    if consumed {
+                        status.pointee = .noDataNow
+                        return nil
+                    }
+                    consumed = true
+                    status.pointee = .haveData
+                    return input
+                }
+                guard error == nil, output.frameLength > 0 else { return nil }
+                buffers.append(output)
+            }
+            return buffers
+        } catch {
+            return nil
+        }
+    }
+
+    /// System-voice audio rendered into buffers. The synthesizer signals the
+    /// end with an empty buffer.
+    private func systemBuffers(_ text: String, language: String) async -> [AVAudioPCMBuffer]? {
+        let rendered: [AVAudioPCMBuffer] = await withCheckedContinuation { continuation in
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.voice = AVSpeechSynthesisVoice(language: language)
+            var buffers: [AVAudioPCMBuffer] = []
+            synthesizer.write(utterance) { buffer in
+                guard let pcm = buffer as? AVAudioPCMBuffer else { return }
+                if pcm.frameLength == 0 {
+                    continuation.resume(returning: buffers)
+                    return
+                }
+                if let copy = VoiceAudioGraph.copy(pcm) {
+                    buffers.append(copy)
+                }
+            }
+        }
+        let converted = rendered.compactMap { graph.converted($0) }
+        return converted.isEmpty ? nil : converted
+    }
+
+    /// Playback the echo canceller cannot see. Barge-in stays off for it.
+    private func playOutsideTheGraph(_ utterance: Utterance, language: String) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             playbackContinuation = continuation
             switch utterance {

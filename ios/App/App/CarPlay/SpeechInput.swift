@@ -9,7 +9,9 @@ enum SpeechInputError: Error {
 
 /// One listening turn: returns the transcript, or nil when nothing was said.
 protocol SpeechInput: AnyObject {
-    func listen(language: String) async throws -> String?
+    /// `includePreroll` feeds the microphone audio from just before this call,
+    /// so words that interrupted the reply are not lost.
+    func listen(language: String, includePreroll: Bool) async throws -> String?
 }
 
 /// CarPlay only reads these states. A permission prompt would appear on the
@@ -97,14 +99,18 @@ final class MicrophoneCapture {
         case noSpeech
     }
 
-    private let engine = AVAudioEngine()
+    private let graph: VoiceAudioGraph
     private let lock = NSLock()
     private var endpointer = UtteranceEndpointer()
     private var continuation: CheckedContinuation<Outcome, Error>?
     private var startTime: TimeInterval = 0
 
+    init(graph: VoiceAudioGraph) {
+        self.graph = graph
+    }
+
     var inputFormat: AVAudioFormat {
-        engine.inputNode.outputFormat(forBus: 0)
+        graph.inputFormat
     }
 
     func noteTranscriptProgress() {
@@ -113,10 +119,12 @@ final class MicrophoneCapture {
         lock.unlock()
     }
 
-    func run(onBuffer: @escaping (AVAudioPCMBuffer) -> Void) async throws -> Outcome {
+    func run(
+        onBuffer: @escaping (AVAudioPCMBuffer) -> Void,
+        preroll: [AVAudioPCMBuffer] = []
+    ) async throws -> Outcome {
         let format = inputFormat
         guard format.sampleRate > 0, format.channelCount > 0 else { throw SpeechInputError.unavailable }
-        startTime = ProcessInfo.processInfo.systemUptime
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -124,33 +132,43 @@ final class MicrophoneCapture {
                 self.continuation = continuation
                 lock.unlock()
 
-                engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-                    guard let self else { return }
+                var virtualTime: TimeInterval = 0
+                for buffer in preroll {
                     onBuffer(buffer)
-                    let level = buffer.floatChannelData.map {
-                        UtteranceEndpointer.levelDb(samples: $0[0], count: Int(buffer.frameLength))
-                    } ?? -160
-                    self.lock.lock()
-                    let decision = self.endpointer.feed(
-                        levelDb: level,
-                        at: ProcessInfo.processInfo.systemUptime - self.startTime
-                    )
-                    self.lock.unlock()
-                    switch decision {
-                    case .keepListening: break
-                    case .utteranceEnded: self.finish(.success(.speech))
-                    case .noSpeech: self.finish(.success(.noSpeech))
+                    virtualTime += Double(buffer.frameLength) / format.sampleRate
+                    if consume(level: UtteranceEndpointer.levelDb(of: buffer), at: virtualTime) {
+                        return
                     }
                 }
-                do {
-                    engine.prepare()
-                    try engine.start()
-                } catch {
-                    finish(.failure(SpeechInputError.unavailable))
+                startTime = ProcessInfo.processInfo.systemUptime - virtualTime
+                graph.setHandler { [weak self] buffer in
+                    guard let self else { return }
+                    onBuffer(buffer)
+                    self.consume(
+                        level: UtteranceEndpointer.levelDb(of: buffer),
+                        at: ProcessInfo.processInfo.systemUptime - self.startTime
+                    )
                 }
             }
         } onCancel: {
             finish(.failure(CancellationError()))
+        }
+    }
+
+    /// Applies one level to the endpointer. Returns true when the turn is over.
+    private func consume(level: Float, at time: TimeInterval) -> Bool {
+        lock.lock()
+        let decision = endpointer.feed(levelDb: level, at: time)
+        lock.unlock()
+        switch decision {
+        case .keepListening:
+            return false
+        case .utteranceEnded:
+            finish(.success(.speech))
+            return true
+        case .noSpeech:
+            finish(.success(.noSpeech))
+            return true
         }
     }
 
@@ -160,8 +178,7 @@ final class MicrophoneCapture {
         continuation = nil
         lock.unlock()
         guard let pending else { return }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        graph.setHandler(nil)
         pending.resume(with: result)
     }
 }
@@ -201,7 +218,13 @@ final class OnDeviceSpeechInput: SpeechInput {
         )
     }
 
-    func listen(language: String) async throws -> String? {
+    private let graph: VoiceAudioGraph
+
+    init(graph: VoiceAudioGraph) {
+        self.graph = graph
+    }
+
+    func listen(language: String, includePreroll: Bool) async throws -> String? {
         guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: language)) else {
             throw SpeechInputError.unavailable
         }
@@ -210,7 +233,7 @@ final class OnDeviceSpeechInput: SpeechInput {
             throw SpeechInputError.unavailable
         }
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        let capture = MicrophoneCapture()
+        let capture = MicrophoneCapture(graph: graph)
         guard let converter = AVAudioConverter(from: capture.inputFormat, to: analyzerFormat) else {
             throw SpeechInputError.unavailable
         }
@@ -228,7 +251,7 @@ final class OnDeviceSpeechInput: SpeechInput {
 
         let outcome: MicrophoneCapture.Outcome
         do {
-            outcome = try await capture.run { buffer in
+            outcome = try await capture.run(preroll: includePreroll ? graph.takePreroll() : []) { buffer in
                 if let converted = Self.convert(buffer, with: converter, to: analyzerFormat) {
                     inputContinuation.yield(AnalyzerInput(buffer: converted))
                 }
@@ -304,13 +327,15 @@ private final class TranscriptAccumulator {
 /// transcribe it (`purpose=dictation`, nothing is stored server-side).
 final class ServerSpeechInput: SpeechInput {
     private let client: SynaplanCarClient
+    private let graph: VoiceAudioGraph
 
-    init(client: SynaplanCarClient) {
+    init(client: SynaplanCarClient, graph: VoiceAudioGraph) {
         self.client = client
+        self.graph = graph
     }
 
-    func listen(language: String) async throws -> String? {
-        let capture = MicrophoneCapture()
+    func listen(language: String, includePreroll: Bool) async throws -> String? {
+        let capture = MicrophoneCapture(graph: graph)
         let format = capture.inputFormat
         let fileUrl = FileManager.default.temporaryDirectory
             .appendingPathComponent("car-dictation-\(UUID().uuidString).m4a")
@@ -328,7 +353,7 @@ final class ServerSpeechInput: SpeechInput {
             commonFormat: format.commonFormat,
             interleaved: format.isInterleaved
         )
-        let outcome = try await capture.run { buffer in
+        let outcome = try await capture.run(preroll: includePreroll ? graph.takePreroll() : []) { buffer in
             try? file?.write(from: buffer)
         }
         file = nil

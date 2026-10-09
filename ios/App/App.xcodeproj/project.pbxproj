@@ -31,6 +31,7 @@
 		B22F0001AABBCCDD0000001B /* UtteranceEndpointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000001A /* UtteranceEndpointer.swift */; };
 		B22F0001AABBCCDD0000001D /* SpeechInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000001C /* SpeechInput.swift */; };
 		B22F0001AABBCCDD0000001F /* SpeechOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000001E /* SpeechOutput.swift */; };
+		B22F0001AABBCCDD0000002F /* VoiceAudioGraph.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000002E /* VoiceAudioGraph.swift */; };
 		B22F0001AABBCCDD00000021 /* VoiceConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000020 /* VoiceConversationEngine.swift */; };
 		B22F0001AABBCCDD00000023 /* CarPlayStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000022 /* CarPlayStrings.swift */; };
 		B22F0001AABBCCDD00000025 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */; };
@@ -73,6 +74,7 @@
 		B22F0001AABBCCDD0000001A /* UtteranceEndpointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtteranceEndpointer.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD0000001C /* SpeechInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechInput.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD0000001E /* SpeechOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechOutput.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD0000002E /* VoiceAudioGraph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceAudioGraph.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000020 /* VoiceConversationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceConversationEngine.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000022 /* CarPlayStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayStrings.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 				B22F0001AABBCCDD00000020 /* VoiceConversationEngine.swift */,
 				B22F0001AABBCCDD0000001C /* SpeechInput.swift */,
 				B22F0001AABBCCDD0000001E /* SpeechOutput.swift */,
+				B22F0001AABBCCDD0000002E /* VoiceAudioGraph.swift */,
 				B22F0001AABBCCDD0000001A /* UtteranceEndpointer.swift */,
 				B22F0001AABBCCDD00000018 /* SynaplanCarClient.swift */,
 				B22F0001AABBCCDD0000002C /* CarAPIModels.swift */,
@@ -270,6 +273,7 @@
 				B22F0001AABBCCDD0000001B /* UtteranceEndpointer.swift in Sources */,
 				B22F0001AABBCCDD0000001D /* SpeechInput.swift in Sources */,
 				B22F0001AABBCCDD0000001F /* SpeechOutput.swift in Sources */,
+				B22F0001AABBCCDD0000002F /* VoiceAudioGraph.swift in Sources */,
 				B22F0001AABBCCDD00000021 /* VoiceConversationEngine.swift in Sources */,
 				B22F0001AABBCCDD00000023 /* CarPlayStrings.swift in Sources */,
 				B22F0001AABBCCDD00000025 /* CarPlaySceneDelegate.swift in Sources */,

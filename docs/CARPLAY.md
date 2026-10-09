@@ -20,7 +20,7 @@ conversation is a normal chat and appears in the iPhone chat history right away.
 | No message content on the display | Rows show the AI-generated chat title (3–5 words) and a relative time; the first-message preview is never read. Widget and channel chats (WhatsApp, email, Telegram — titles may contain phone numbers) are not listed |
 | Never instruct the driver to use the iPhone | Copy only states the condition ("You're signed out of Synaplan."); `tests/carplay-contract.test.mjs` rejects "sign in to", "open", "settings" and "iPhone" in CarPlay strings |
 | All flows possible without the iPhone | CarPlay never triggers a permission prompt (it would appear on the phone). An undetermined microphone or speech permission ends the conversation with one sentence and is requested the next time the app is in the foreground on the iPhone |
-| Audio session only while voice is actively used; `playAndRecord`, mode `default`, no mixing | Activated when listening starts, released while muted and when the conversation ends; generated cues for listening, thinking, ended and error |
+| Audio session only while voice is actively used; `playAndRecord`, mode `voiceChat`, no mixing | One engine for the microphone and the reply, so the driver can talk over the answer. Echo cancellation has to be available; otherwise the reply finishes before the microphone opens again. Released while muted and when the conversation ends |
 | Works while the iPhone is locked | Session mirror with `AfterFirstUnlockThisDeviceOnly` — see [Session](#session-while-the-iphone-is-locked) |
 
 The voice control template uses `CPVoiceControlState.actionButtons` (iOS 26.4). On iOS 27 it is
@@ -47,7 +47,7 @@ All files live in `ios/App/App/CarPlay/`:
 |------|----------------|
 | `CarPlaySceneDelegate.swift` | `CPTemplateApplicationSceneDelegate`; starts and stops the root controller |
 | `CarPlayRootController.swift` | Root list, empty/error states, voice template, alerts |
-| `VoiceConversationEngine.swift` | Turn loop: listen → send → speak; mute, end, interruptions |
+| `VoiceConversationEngine.swift` | Hands-free loop: listen → send → speak, and speech during the reply interrupts it |
 | `SpeechInput.swift` | Microphone capture, on-device `SpeechTranscriber`, server dictation fallback |
 | `SpeechOutput.swift` | Sentence-wise TTS with the user's voice, `AVSpeechSynthesizer` fallback, audio cues |
 | `SynaplanCarClient.swift` | URLSession client, SSE streaming, single-flight token refresh |
@@ -106,7 +106,11 @@ on the reviewed release.
    now".
 
 End of utterance is detected from the input level (−42 dB, 1.4 s of silence after speech, 8 s
-without speech, 60 s maximum). Two silent turns in a row end the conversation.
+without speech, 60 s maximum). Two silent turns in a row end the conversation. While a reply is
+spoken the microphone stays open: speech that holds for about half a second stops the reply and
+becomes the next turn. A short noise does not. This needs the device echo canceller, which removes
+the spoken reply from the microphone. In a car the reply comes from the car speakers, so this has
+to be confirmed on a real head unit; without the canceller the app waits out the reply.
 
 Output: the reply is spoken sentence by sentence while it streams. Markdown, links, code blocks,
 tables and `[Memory:N]` badges are removed first. The client requests `format=mp3`; OpenAI,
