@@ -26,8 +26,18 @@ The environment is selected at build time (Epic 10) together with the API/WS bas
 
 ## Version scheme
 
-- **Human version:** `MAJOR.MINOR.PATCH`, starting on the **v4.0** line. Initial app release:
-  **`4.0.0`**.
+- **Human version:** `MAJOR.MINOR.PATCH`, started on the **v4.0** line (initial app release
+  **`4.0.0`**). Since Synaplan `v5.3.1` it follows the Synaplan release the binary bundles:
+  - a `store-required` synchronization sets it to the Synaplan tag (`v5.3.1` → `5.3.1`);
+  - when the app is already at or above that tag (an app-only release, or a version whose App
+    Store train closed on approval), the patch counts up instead (`5.3.1` → `5.3.2`);
+  - an `ota-candidate` synchronization keeps it: the bundle runs on the installed binary, and
+    its OTA version is derived from the app version;
+  - `npm run release:version` applies the same rule by hand for a release the chain does not
+    open (`-- --dry-run` previews it).
+
+  The app therefore reports two versions in Settings: the installed binary (`App`) and the
+  Synaplan release of the running web bundle (`Web`), which moves with each OTA update.
 - **Build number:** monotonic integer `versionCode` (Android) / `CFBundleVersion` (iOS),
   starting at **`1`** and auto-incremented per build (Epic 10). Never reused, never decreased.
 - **Single source of truth:** the human version lives in this repo's `package.json` `version`

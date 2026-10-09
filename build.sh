@@ -97,10 +97,14 @@ if [[ -f "$INDEX_HTML" && -f "$NATIVE_JS" ]]; then
   APP_ENV="${SYNAPLAN_ENV:-prod}"
   APP_VERSION="$(node -p "require('./package.json').version")"
   APP_BUILD="${SYNAPLAN_BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
+  # The Synaplan release this SPA was built from. It travels with the web bundle,
+  # so an OTA update moves it while the native version stays.
+  WEB_VERSION="$(node --input-type=module -e "import { webVersion } from './scripts/release-lib.mjs'; console.log(webVersion())" 2>/dev/null || true)"
   cat > "$DIST_DIR/synaplan-env.js" <<EOF
 window.__SYNAPLAN_ENV__ = "${APP_ENV}";
 window.__SYNAPLAN_APP_VERSION__ = "${APP_VERSION}";
 window.__SYNAPLAN_BUILD__ = "${APP_BUILD}";
+window.__SYNAPLAN_WEB_VERSION__ = "${WEB_VERSION}";
 EOF
   # Optional build-time server default: lets a dev/staging device build target a
   # LAN backend (e.g. http://192.168.x.x:8000) without any in-app switching. A
@@ -109,7 +113,7 @@ EOF
     echo "window.__SYNAPLAN_API_BASE_URL_DEFAULT__ = \"${SYNAPLAN_API_BASE_URL}\";" >> "$DIST_DIR/synaplan-env.js"
     echo "    Stamped server default=${SYNAPLAN_API_BASE_URL} into $DIST_DIR/synaplan-env.js"
   fi
-  echo "    Stamped env=${APP_ENV} version=${APP_VERSION} build=${APP_BUILD} into $DIST_DIR/synaplan-env.js"
+  echo "    Stamped env=${APP_ENV} version=${APP_VERSION} build=${APP_BUILD} web=${WEB_VERSION} into $DIST_DIR/synaplan-env.js"
 
   if grep -q 'synaplan-native.js' "$INDEX_HTML"; then
     echo "    Bootstrap already present in index.html — skipping inject"

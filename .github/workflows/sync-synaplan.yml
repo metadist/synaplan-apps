@@ -121,8 +121,16 @@ jobs:
           CLASSIFICATION: ${{ steps.source.outputs.classification }}
         run: |
           set -euo pipefail
-          node scripts/sync-synaplan.mjs --ref "$SYNAPLAN_REF"
+          # A store-required release builds a new binary, which takes the
+          # Synaplan version. An OTA bundle runs on the installed binary, so its
+          # version stays.
+          version_args=()
+          if test "$CLASSIFICATION" = "store-required"; then
+            version_args=(--store-version)
+          fi
+          node scripts/sync-synaplan.mjs --ref "$SYNAPLAN_REF" "${version_args[@]}"
           test "$(git -C synaplan rev-parse HEAD)" = "$SYNAPLAN_SHA"
+          echo "app_version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           # Checked before the route is written: the route carries a timestamp and
           # would always differ, which would turn a re-run for an already pinned
           # release into an empty pull request and a second delivery.
@@ -149,7 +157,8 @@ jobs:
           git switch -c "$branch"
           git config user.name "synaplan-mobile-bot"
           git config user.email "synaplan-mobile-bot@users.noreply.github.com"
-          git add synaplan docs/COMPATIBILITY.md docs/IDENTIFIERS.md .github/release-route.json
+          git add synaplan docs/COMPATIBILITY.md docs/IDENTIFIERS.md .github/release-route.json \
+            package.json package-lock.json
           git commit -m "chore: sync Synaplan ${SYNAPLAN_REF}"
           git push origin "HEAD:refs/heads/$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
@@ -159,6 +168,7 @@ jobs:
         env:
           BRANCH: ${{ steps.commit.outputs.branch }}
           CLASSIFICATION: ${{ steps.source.outputs.classification }}
+          APP_VERSION: ${{ steps.sync.outputs.app_version }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
@@ -170,6 +180,7 @@ jobs:
               "Automated synchronization of Synaplan ${SYNAPLAN_REF} at \`${SYNAPLAN_SHA}\`." \
               "" \
               "Release route: \`${CLASSIFICATION}\` (verified against the attested source manifest)." \
+              "App version: \`${APP_VERSION}\`." \
               "" \
               "Auto-merge is enabled. Mobile CI is the gate; nothing merges on a red build." \
               "A \`store-required\` route never publishes an OTA bundle - it builds a store" \

@@ -575,6 +575,39 @@
     },
   }
 
+  // ── App info bridge (Settings → version) ────────────────────────────────────
+  // `app`/`build` come from the installed binary, not from synaplan-env.js: the
+  // stamped values travel with the web bundle and would be stale after an OTA
+  // update. `web` is the Synaplan release the running bundle was built from.
+  // Resolves with empty strings instead of rejecting.
+  function readVersions() {
+    var web = String(window.__SYNAPLAN_WEB_VERSION__ || '')
+    var empty = { app: '', build: '', web: web }
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var appPlugin = plugins && plugins.App
+      if (!appPlugin || typeof appPlugin.getInfo !== 'function') return Promise.resolve(empty)
+      return Promise.resolve(appPlugin.getInfo()).then(
+        function (info) {
+          return {
+            app: String((info && info.version) || ''),
+            build: String((info && info.build) || ''),
+            web: web,
+          }
+        },
+        function () {
+          return empty
+        }
+      )
+    } catch (e) {
+      return Promise.resolve(empty)
+    }
+  }
+
+  window.SynaplanAppInfo = {
+    getVersions: readVersions,
+  }
+
   // ── Shortcuts bridge (iOS App Intents → SPA chat actions) ───────────────────
   // The native plugin persists the latest Shortcuts tap (cold start can run
   // `perform()` before this file, let alone the SPA). Live taps while the app

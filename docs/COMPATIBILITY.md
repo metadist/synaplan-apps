@@ -8,6 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
+| 5.3.1 | `v5.3.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.1 |
 | 4.0.4 | `v5.3.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.1 |
 | 4.0.3 | `v5.3.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Approved on the App Store; its version train is closed |
 | 4.0.2 | `v4.5.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Released on the App Store; its version train is closed |
@@ -19,11 +20,19 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
-### Next store build — CarPlay voice conversations
+### App 5.3.1 — app version follows Synaplan, version display
+
+From this release on the app version follows the Synaplan release it bundles (scheme in
+[`IDENTIFIERS.md`](IDENTIFIERS.md#version-scheme)), so 4.0.4 is followed by 5.3.1 for the
+`v5.3.1` pin. The bundle records its Synaplan release as `window.__SYNAPLAN_WEB_VERSION__`, and
+`window.SynaplanAppInfo.getVersions()` reports it together with the installed binary's version
+and build for the Settings display (needs a Synaplan pin with that display; without it nothing is
+shown).
+
+### App 5.3.1 — CarPlay voice conversations
 
 App-owned only; built against the `v5.3.1` pin (the `pinned` chat field needs `v5.2.0`+ and is
-optional on older servers). The version number is assigned when the
-release candidate is cut — above 4.0.4 once that version is approved.
+optional on older servers).
 
 Adds a native CarPlay surface (iOS 26.4+, overlay on iOS 27): a list of recent chats and a
 voice-only conversation that speaks the answers. Details in [`CARPLAY.md`](CARPLAY.md).

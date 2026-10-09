@@ -14,13 +14,18 @@ import {
   appVersion,
   bundleVersion,
   checkServiceWorkerGuard,
+  nextStoreVersion,
   resolveSubmoduleTag,
   validatePublicOtaConfig,
 } from '../scripts/release-lib.mjs'
 import { createReleaseManifest } from '../scripts/release-manifest.mjs'
 import { stampReleaseSigning } from '../scripts/ios-signing.mjs'
 import { normalizePublicKey, publicKeyProblem } from '../scripts/ota-key.mjs'
-import { rejectMovingBranch, updateReleaseRecords } from '../scripts/sync-synaplan.mjs'
+import {
+  rejectMovingBranch,
+  storeVersionFor,
+  updateReleaseRecords,
+} from '../scripts/sync-synaplan.mjs'
 
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
@@ -209,6 +214,39 @@ test('sync rejects moving main branches and updates release records deterministi
   assert.match(result.identifiers, /Current pin:\*\* `v4\.0\.0`/)
   assert.equal(read('docs/COMPATIBILITY.md'), compatibilityBefore)
   assert.equal(read('docs/IDENTIFIERS.md'), identifiersBefore)
+})
+
+test('a store binary takes the Synaplan version and only counts up on its own when already there', () => {
+  assert.equal(nextStoreVersion('4.0.4', 'v5.3.1'), '5.3.1')
+  assert.equal(nextStoreVersion('4.0.4', 'v5.4'), '5.4.0')
+  assert.equal(nextStoreVersion('5.3.1', 'v5.3.1'), '5.3.2')
+  assert.equal(nextStoreVersion('5.3.2', 'v5.3.1'), '5.3.3')
+  assert.equal(nextStoreVersion('5.3.2', 'v5.3.10'), '5.3.10')
+  assert.equal(nextStoreVersion('5.10.0', 'v5.9.9'), '5.10.1')
+  // A SHA pin or a prerelease tag has no store version of its own.
+  assert.equal(nextStoreVersion('5.3.1', 'a'.repeat(40)), '5.3.2')
+  assert.equal(nextStoreVersion('5.3.1', 'v5.4.0-rc.1'), '5.3.2')
+  assert.throws(() => nextStoreVersion('5.3', 'v5.3.1'), /plain semver/)
+})
+
+test('repeating a synchronization for the pinned release keeps the app version', () => {
+  const sha = 'b'.repeat(40)
+  assert.equal(storeVersionFor({ previousSha: sha, sha, ref: 'v5.3.1', current: '5.3.1' }), '5.3.1')
+  assert.equal(
+    storeVersionFor({ previousSha: 'c'.repeat(40), sha, ref: 'v5.3.1', current: '4.0.4' }),
+    '5.3.1'
+  )
+})
+
+test('a store-required synchronization commits the app version it sets', () => {
+  const workflow = read('.github/workflows/sync-synaplan.yml')
+  assert.match(workflow, /"\$CLASSIFICATION" = "store-required"[\s\S]*?--store-version/)
+  assert.match(workflow, /git add synaplan [^\n]*\\\n\s+package\.json package-lock\.json/)
+})
+
+test('the bundle records the Synaplan release it was built from', () => {
+  assert.match(read('build.sh'), /window\.__SYNAPLAN_WEB_VERSION__ = "\$\{WEB_VERSION\}"/)
+  assert.match(read('scripts/dev-shell.mjs'), /__SYNAPLAN_WEB_VERSION__/)
 })
 
 test('a release route only accepts an immutable delivery decision', () => {

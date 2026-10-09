@@ -4,7 +4,14 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { ROOT, SUBMODULE, appVersion, git } from './release-lib.mjs'
+import {
+  ROOT,
+  SUBMODULE,
+  appVersion,
+  git,
+  nextStoreVersion,
+  writeAppVersion,
+} from './release-lib.mjs'
 
 export function rejectMovingBranch(ref) {
   if (/^(?:refs\/heads\/)?(?:main|master)$/i.test(ref) || /^origin\/(?:main|master)$/i.test(ref)) {
@@ -112,21 +119,36 @@ export function resolveRemoteRef(ref) {
   return sha.toLowerCase()
 }
 
+// A store-required release ships a new binary, so it takes the next store
+// version. Only when the pin moved: repeating a synchronization for the release
+// that is already pinned must not count the version up a second time.
+export function storeVersionFor({ previousSha, sha, ref, current = appVersion() }) {
+  return previousSha === sha ? current : nextStoreVersion(current, ref)
+}
+
 function commitPin(ref, sha) {
-  git(['add', 'synaplan', 'docs/COMPATIBILITY.md', 'docs/IDENTIFIERS.md'])
+  git([
+    'add',
+    'synaplan',
+    'docs/COMPATIBILITY.md',
+    'docs/IDENTIFIERS.md',
+    'package.json',
+    'package-lock.json',
+  ])
   git(['commit', '-m', `chore: pin synaplan to ${ref} (${sha.slice(0, 12)})`])
   console.log(`[sync-synaplan] committed the pin on ${git(['rev-parse', '--abbrev-ref', 'HEAD'])}`)
 }
 
 const USAGE = `Usage:
-  node scripts/sync-synaplan.mjs --ref <tag-or-full-sha> [--dry-run] [--commit]
+  node scripts/sync-synaplan.mjs --ref <tag-or-full-sha> [--store-version] [--dry-run] [--commit]
   node scripts/sync-synaplan.mjs --ref origin/main --resolve [--commit]
 
 Options:
-  --ref <ref>   Exact release tag or full commit SHA to pin
-  --resolve     Read a branch once and pin the commit it currently points at
-  --commit      Create a local commit for the pin and the updated release records
-  --dry-run     Report what would change without touching the worktree
+  --ref <ref>     Exact release tag or full commit SHA to pin
+  --resolve       Read a branch once and pin the commit it currently points at
+  --store-version Set the app version for a new store binary (follows the Synaplan tag)
+  --commit        Create a local commit for the pin and the updated release records
+  --dry-run       Report what would change without touching the worktree
 `
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -142,14 +164,24 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       const resolvedRef = args.includes('--resolve') ? resolveRemoteRef(requestedRef) : requestedRef
       const sha = fetchExplicitRef(resolvedRef, dryRun)
       const recordRef = /^[0-9a-f]{40}$/i.test(resolvedRef) ? sha : resolvedRef
+      const previousSha = git(['rev-parse', 'HEAD'], SUBMODULE)
+      const version = args.includes('--store-version')
+        ? storeVersionFor({ previousSha, sha, ref: recordRef })
+        : appVersion()
       if (!dryRun) {
         git(['checkout', '--detach', sha], SUBMODULE)
-        updateReleaseRecords({ version: appVersion(), ref: recordRef })
+        if (version !== appVersion()) {
+          writeAppVersion(version)
+          console.log(`[sync-synaplan] app version ${version} for the next store binary`)
+        }
+        updateReleaseRecords({ version, ref: recordRef })
         console.log(`[sync-synaplan] pinned synaplan to ${recordRef} (${sha})`)
         if (args.includes('--commit')) commitPin(recordRef, sha)
       } else {
-        updateReleaseRecords({ version: appVersion(), ref: recordRef, dryRun: true })
-        console.log(`[sync-synaplan] dry-run: would pin synaplan to ${recordRef} (${sha})`)
+        updateReleaseRecords({ version, ref: recordRef, dryRun: true })
+        console.log(
+          `[sync-synaplan] dry-run: would pin synaplan to ${recordRef} (${sha}) as app ${version}`
+        )
       }
     } catch (error) {
       console.error(`[sync-synaplan] ${error.message}`)

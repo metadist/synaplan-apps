@@ -23,7 +23,7 @@ import { connect } from 'node:net'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { ROOT, appVersion, buildNumber } from './release-lib.mjs'
+import { ROOT, appVersion, buildNumber, webVersion } from './release-lib.mjs'
 
 const target = new URL(process.env.SYNAPLAN_VITE_URL || 'http://127.0.0.1:5173')
 const port = Number(process.env.SYNAPLAN_DEV_SHELL_PORT || 5174)
@@ -42,6 +42,7 @@ function environmentScript() {
     `window.__SYNAPLAN_ENV__ = ${JSON.stringify(appEnv)};`,
     `window.__SYNAPLAN_APP_VERSION__ = ${JSON.stringify(appVersion())};`,
     `window.__SYNAPLAN_BUILD__ = ${JSON.stringify(buildNumber())};`,
+    `window.__SYNAPLAN_WEB_VERSION__ = ${JSON.stringify(webVersion())};`,
   ]
   if (apiBaseUrl) {
     lines.push(`window.__SYNAPLAN_API_BASE_URL_DEFAULT__ = ${JSON.stringify(apiBaseUrl)};`)
