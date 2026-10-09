@@ -40,9 +40,11 @@ jobs:
   release-candidate:
     name: Build store release candidate
     # Pinned rather than macos-latest: a signed release must not silently move to
-    # a new operating system and Xcode default. The image carries both the Xcode
-    # the step below requires and the Android SDK, so one job covers both stores.
-    runs-on: macos-26
+    # a new operating system and Xcode default. xcode-27 is the arm64 image whose
+    # default toolchain is Xcode 27; it also carries the Android SDK, so one job
+    # covers both stores. macos-26 stops at Xcode 26.6, which cannot see the
+    # iOS 27 CarPlay overlay API.
+    runs-on: xcode-27
     environment: store-qa
     env:
       SYNAPLAN_ENV: prod
@@ -128,11 +130,20 @@ jobs:
           # malformed one aborts the app at launch on every device.
           node scripts/ota-key.mjs
 
-      - name: Require Xcode 26 or newer
+      - name: Require the Xcode 27 release
         run: |
           set -euo pipefail
-          major="$(xcodebuild -version | awk '/Xcode/{split($2,v,"."); print v[1]}')"
-          test "${major:-0}" -ge 26
+          # Betas sit next to the release on this image. A signed binary stays on
+          # the release toolchain even if the image default later points at a beta.
+          if [ -d /Applications/Xcode_27.app ]; then
+            sudo xcode-select -s /Applications/Xcode_27.app
+          fi
+          version="$(xcodebuild -version | awk '/Xcode/{print $2; exit}')"
+          major="${version%%.*}"
+          test "${major:-0}" -ge 27
+          case "$version" in
+            *beta*) echo "::error::Refusing to sign a release with Xcode ${version}." >&2; exit 1 ;;
+          esac
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6

@@ -203,9 +203,11 @@ Two consequences follow from that choice:
   run on `ubuntu-latest`, so an upload or statistics endpoint that only answers inside a private
   network would fail there. The updater endpoint is public by necessity anyway, since installed apps
   fetch from it.
-- **`store-rc.yml` is pinned to `macos-26`, not `macos-latest`.** A signed release must not silently
-  move to a new operating system and Xcode default. The image carries the required Xcode and the
-  Android SDK, so a single job produces both artifacts. macOS minutes are billed at ten times the
+- **`store-rc.yml` is pinned to `xcode-27`, not `macos-latest`.** A signed release must not silently
+  move to a new operating system and Xcode default. `macos-26` only carries Xcode 26, whose SDK
+  does not include the iOS 27 CarPlay overlay API. The `xcode-27` image (arm64, public preview)
+  carries Xcode 27 and the Android SDK, so a single job produces both artifacts. The job selects
+  `Xcode_27.app` and refuses a beta. macOS minutes are billed at ten times the
   Linux rate; store builds are rare enough for that to be cheaper than owning a Mac, but it is the
   reason the frequent OTA path stays on Linux.
 
