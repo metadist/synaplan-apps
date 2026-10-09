@@ -1,4 +1,5 @@
 import CarPlay
+import ObjectiveC
 import UIKit
 
 /// Owns the CarPlay template hierarchy: one list (new conversation + recent
@@ -179,31 +180,31 @@ final class CarPlayRootController {
     }
 
     private func presentVoiceTemplate(_ template: CPVoiceControlTemplate) {
-        if #available(iOS 27.0, *) {
+        if #available(iOS 27.0, *),
+           CarPlayOverlay.show(template, on: interfaceController, completion: { [weak self] success in
+               guard !success else { return }
+               Task { @MainActor in
+                   self?.usesOverlay = false
+                   self?.interfaceController.presentTemplate(template, animated: true, completion: nil)
+               }
+           }) {
             usesOverlay = true
-            interfaceController.showOverlayTemplate(template, animated: true) { [weak self] success, _ in
-                guard !success else { return }
-                Task { @MainActor in
-                    self?.usesOverlay = false
-                    self?.interfaceController.presentTemplate(template, animated: true, completion: nil)
-                }
-            }
-        } else {
-            usesOverlay = false
-            interfaceController.presentTemplate(template, animated: true, completion: nil)
+            return
         }
+        usesOverlay = false
+        interfaceController.presentTemplate(template, animated: true, completion: nil)
     }
 
     private func dismissVoiceTemplate(then next: @escaping () -> Void) {
         voiceTemplate = nil
-        if usesOverlay, #available(iOS 27.0, *) {
-            interfaceController.hideOverlayTemplate(animated: true) { _, _ in
-                Task { @MainActor in next() }
-            }
-        } else {
-            interfaceController.dismissTemplate(animated: true) { _, _ in
-                Task { @MainActor in next() }
-            }
+        if usesOverlay, #available(iOS 27.0, *),
+           CarPlayOverlay.hide(on: interfaceController, completion: {
+               Task { @MainActor in next() }
+           }) {
+            return
+        }
+        interfaceController.dismissTemplate(animated: true) { _, _ in
+            Task { @MainActor in next() }
         }
     }
 
@@ -259,5 +260,51 @@ extension CarPlayRootController: VoiceConversationEngineDelegate {
             }
             reload()
         }
+    }
+}
+
+/// iOS 27 overlay methods, reached without a compile-time reference. The store
+/// build uses the Xcode 26 SDK, which does not declare them; a direct call
+/// fails that archive. On a system without the methods this is a no-op and the
+/// caller presents the template full screen.
+private enum CarPlayOverlay {
+    private static let showSelector = NSSelectorFromString("showOverlayTemplate:animated:completion:")
+    private static let hideSelector = NSSelectorFromString("hideOverlayTemplateAnimated:completion:")
+
+    private typealias Completion = @convention(block) (ObjCBool, NSError?) -> Void
+    private typealias Show = @convention(c) (AnyObject, Selector, AnyObject, ObjCBool, Completion) -> Void
+    private typealias Hide = @convention(c) (AnyObject, Selector, ObjCBool, Completion) -> Void
+
+    static func show(
+        _ template: CPTemplate,
+        on controller: CPInterfaceController,
+        completion: @escaping (Bool) -> Void
+    ) -> Bool {
+        invoke(showSelector, on: controller) { implementation in
+            let call = unsafeBitCast(implementation, to: Show.self)
+            let done: Completion = { success, _ in completion(success.boolValue) }
+            call(controller, showSelector, template, ObjCBool(true), done)
+        }
+    }
+
+    static func hide(on controller: CPInterfaceController, completion: @escaping () -> Void) -> Bool {
+        invoke(hideSelector, on: controller) { implementation in
+            let call = unsafeBitCast(implementation, to: Hide.self)
+            let done: Completion = { _, _ in completion() }
+            call(controller, hideSelector, ObjCBool(true), done)
+        }
+    }
+
+    private static func invoke(
+        _ selector: Selector,
+        on controller: CPInterfaceController,
+        body: (IMP) -> Void
+    ) -> Bool {
+        guard controller.responds(to: selector),
+              let method = class_getInstanceMethod(object_getClass(controller), selector) else {
+            return false
+        }
+        body(method_getImplementation(method))
+        return true
     }
 }
