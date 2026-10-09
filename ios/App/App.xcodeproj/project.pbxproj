@@ -65,7 +65,6 @@
 		A11F0001AABBCCDD00000014 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		A11F0001AABBCCDD00000015 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		B22F0001AABBCCDD00000004 /* App-CarPlay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "App-CarPlay.entitlements"; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000010 /* CarSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarSessionStore.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000012 /* CarSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarSessionPlugin.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000014 /* SynaplanStreamParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanStreamParser.swift; sourceTree = "<group>"; };
@@ -122,7 +121,6 @@
 				A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */,
 				A11F0001AABBCCDD0000000F /* Shortcuts */,
 				B22F0001AABBCCDD00000003 /* CarPlay */,
-				B22F0001AABBCCDD00000004 /* App-CarPlay.entitlements */,
 				A11F0001AABBCCDD0000000B /* AppShortcuts.strings */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -432,7 +430,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "App/App-CarPlay.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 102;
 				DEVELOPMENT_TEAM = X9GM4T2MQG;
@@ -457,7 +454,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "App/App-CarPlay.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 102;
 				DEVELOPMENT_TEAM = X9GM4T2MQG;

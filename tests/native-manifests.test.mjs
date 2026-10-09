@@ -82,27 +82,17 @@ test('Info.plist uses the scene lifecycle with separate phone and CarPlay roles'
 
 const CARPLAY_ENTITLEMENT = 'com.apple.developer.carplay-voice-based-conversation'
 
-test('CarPlay entitlement is limited to Simulator builds until Apple grants it', () => {
-  const device = read('ios/App/App/App.entitlements')
-  const simulator = read('ios/App/App/App-CarPlay.entitlements')
-  assertWellFormed(device, 'App.entitlements')
-  assertWellFormed(simulator, 'App-CarPlay.entitlements')
-
-  // A device/archive build with an ungranted entitlement fails provisioning.
-  assert.doesNotMatch(device, new RegExp(CARPLAY_ENTITLEMENT))
-  assert.match(simulator, new RegExp(`<key>${CARPLAY_ENTITLEMENT}</key>\\s*<true/>`))
-  // Everything the device build has, the Simulator build keeps.
-  for (const key of device.matchAll(/<key>([^<]+)<\/key>/g)) {
-    assert.match(simulator, new RegExp(`<key>${key[1]}</key>`), `simulator lost ${key[1]}`)
-  }
+test('Every build signs with the CarPlay entitlement from one entitlements file', () => {
+  const entitlements = read('ios/App/App/App.entitlements')
+  assertWellFormed(entitlements, 'App.entitlements')
+  assert.match(entitlements, new RegExp(`<key>${CARPLAY_ENTITLEMENT}</key>\\s*<true/>`))
+  assert.match(entitlements, /<key>com\.apple\.developer\.applesignin<\/key>/)
 
   const pbx = read('ios/App/App.xcodeproj/project.pbxproj')
-  const sim = pbx.match(
-    /"CODE_SIGN_ENTITLEMENTS\[sdk=iphonesimulator\*\]" = "App\/App-CarPlay\.entitlements";/g
-  )
   const base = pbx.match(/\bCODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/g)
-  assert.equal(sim?.length, 2, 'Debug and Release simulator overrides')
-  assert.equal(base?.length, 2, 'Debug and Release device entitlements')
+  assert.equal(base?.length, 2, 'Debug and Release entitlements')
+  // An SDK-conditional override would let device and Simulator builds diverge again.
+  assert.doesNotMatch(pbx, /"CODE_SIGN_ENTITLEMENTS\[sdk=/)
 })
 
 // ── iOS privacy manifest (Epic 9.2) ──────────────────────────────────────────

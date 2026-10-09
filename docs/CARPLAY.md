@@ -13,7 +13,7 @@ conversation is a normal chat and appears in the iPhone chat history right away.
 
 | Requirement | How the app meets it |
 |-------------|----------------------|
-| Entitlement `com.apple.developer.carplay-voice-based-conversation` (granted manually by Apple) | Simulator only until granted — see [Entitlement](#entitlement) |
+| Entitlement `com.apple.developer.carplay-voice-based-conversation` (granted manually by Apple) | Granted; every build signs with it — see [Entitlement](#entitlement) |
 | Templates: list, alert, voice control; at most three levels | Root list (level 1) → voice control (level 2) → alert |
 | Primary modality of voice upon launch | Every action on the root list starts a voice conversation; there is no text input or reading surface |
 | Microphone only while the voice control template is visible | `VoiceConversationEngine` starts after the template is shown and stops before it is dismissed |
@@ -127,14 +127,20 @@ content, and the driver cannot authenticate while driving.
 
 ## Entitlement
 
-1. Request the entitlement at [developer.apple.com/carplay](https://developer.apple.com/carplay/),
-   category **Voice-based conversational app**, for `com.synaplan.app`. After the grant, enable the
-   capability for `com.synaplan.app.dev` and `com.synaplan.app.staging` as well.
-2. Until then the key exists only in `ios/App/App/App-CarPlay.entitlements`, selected through
-   `CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]`. Device and release signing keep using
-   `App.entitlements`, so store builds are unaffected.
-3. After the grant: add the key to `App.entitlements`, regenerate the provisioning profiles, and
-   update the manifest test that currently asserts the key is simulator-only.
+Apple granted **Voice-based conversational app** to the team (requested at
+[developer.apple.com/carplay](https://developer.apple.com/carplay/)). The grant is a managed
+capability of the team, not of a single app:
+
+1. The capability is enabled on the App IDs `com.synaplan.app` and `com.synaplan.app.dev`
+   (Certificates, Identifiers & Profiles → Identifiers). A new App ID needs it enabled before its
+   first device build.
+2. `ios/App/App/App.entitlements` carries the key for Debug and Release, device and Simulator
+   alike. `tests/native-manifests.test.mjs` rejects an SDK-conditional override.
+3. Enabling a capability invalidates the existing provisioning profiles. The App Store
+   distribution profile was regenerated and stored in the `IOS_PROVISIONING_PROFILE_BASE64`
+   secret of the `store-qa` environment ([`STORE_SETUP.md`](STORE_SETUP.md)); development profiles come
+   from Xcode automatic signing. A profile without the key fails the export with a missing
+   entitlement error.
 
 ## Testing
 

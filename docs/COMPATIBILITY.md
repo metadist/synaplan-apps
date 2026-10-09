@@ -37,8 +37,9 @@ voice-only conversation that speaks the answers. Details in [`CARPLAY.md`](CARPL
   [metadist/synaplan#2396](https://github.com/metadist/synaplan/pull/2396) (backend-only) lets
   Piper servers answer the client's `format=mp3` with WAV, so the user's voice replaces the system
   voice fallback.
-- The entitlement `com.apple.developer.carplay-voice-based-conversation` is simulator-only until
-  Apple grants it; device builds sign with the unchanged `App.entitlements`.
+- The entitlement `com.apple.developer.carplay-voice-based-conversation` is granted and lives in
+  `App.entitlements` for every build. The App Store distribution profile in the `store-qa`
+  secret was regenerated with it on 2026-10-09.
 - Release classification: **store-required** — native code, scene manifest, entitlement, a new
   privacy purpose string (`NSSpeechRecognitionUsageDescription`) and an app-local plugin.
 
