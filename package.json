@@ -1,6 +1,6 @@
 {
   "name": "synaplan-app",
-  "version": "4.0.3",
+  "version": "4.0.4",
   "private": true,
   "description": "Native iOS + Android shell for the Synaplan platform (Capacitor 8, bundled Vue SPA).",
   "license": "SEE LICENSE IN LICENSE",
