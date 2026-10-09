@@ -1,1 +1,1 @@
-Schnellerer Start: Die App öffnet jetzt sofort und bleibt nicht mehr auf dem Startbildschirm hängen – auch wenn du sie einige Tage nicht benutzt hast. Updates werden im Hintergrund vorbereitet und beim nächsten Öffnen übernommen.
+Sprich mit Synaplan im Auto. CarPlay zeigt deine letzten Chats und spricht die Antworten.
