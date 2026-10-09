@@ -82,19 +82,24 @@ struct UtteranceEndpointer {
 /// speech has to hold for `sustain`. Time is seconds since playback started.
 struct BargeInDetector {
     var speechThresholdDb: Float = -30
-    /// Playback onset is not the driver.
-    var ignoreFor: TimeInterval = 0.3
+    /// The start of the reply measures how much of it the echo canceller
+    /// leaves in the microphone; the driver is not counted during it.
+    var calibrateFor: TimeInterval = 0.8
+    /// How far the driver has to rise above the loudest leak of the reply.
+    var echoMarginDb: Float = 12
     /// How long speech must hold before the reply stops.
     var sustain: TimeInterval = 0.4
 
+    private var echoPeakDb: Float = -160
     private var speechSince: TimeInterval?
 
     mutating func feed(levelDb: Float, at time: TimeInterval) -> Bool {
-        if time < ignoreFor {
+        if time < calibrateFor {
+            echoPeakDb = max(echoPeakDb, levelDb)
             speechSince = nil
             return false
         }
-        guard levelDb >= speechThresholdDb else {
+        guard levelDb >= max(speechThresholdDb, echoPeakDb + echoMarginDb) else {
             speechSince = nil
             return false
         }

@@ -11,8 +11,8 @@ enum PlaybackEnd {
 /// the reply out of the microphone and the driver can talk over it.
 ///
 /// The engine stays running from the first listen until mute or the end.
-/// Call `activate`, `play`, and `deactivate` from the main thread. The tap
-/// calls back on the audio thread.
+/// Call `activate`, `play`, `stopPlayback`, and `deactivate` from the main
+/// thread. The tap calls back on the audio thread.
 final class VoiceAudioGraph {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
@@ -106,9 +106,9 @@ final class VoiceAudioGraph {
                 let detector = BargeInBox()
                 setHandler { [weak self] buffer in
                     let elapsed = ProcessInfo.processInfo.systemUptime - started
-                    if detector.feed(UtteranceEndpointer.levelDb(of: buffer), at: elapsed) {
-                        self?.stopPlayback()
-                    }
+                    guard detector.feed(UtteranceEndpointer.levelDb(of: buffer), at: elapsed) else { return }
+                    // AVAudioPlayerNode.stop() waits for the queue this tap runs on.
+                    DispatchQueue.main.async { self?.interruptPlayback(token: token) }
                 }
             }
 
@@ -131,6 +131,15 @@ final class VoiceAudioGraph {
         lock.unlock()
         player.stop()
         finishPlayback(.interrupted, token: token)
+    }
+
+    /// Stops the reply the driver talked over, unless it already ended.
+    private func interruptPlayback(token: Int) {
+        lock.lock()
+        let current = token == playbackToken && playbackContinuation != nil
+        lock.unlock()
+        guard current else { return }
+        stopPlayback()
     }
 
     /// Converts `buffer` into `playbackFormat` when the formats differ.
@@ -207,6 +216,7 @@ final class VoiceAudioGraph {
     }
 }
 
+
 private final class PlaybackCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Int
@@ -228,10 +238,14 @@ private final class PlaybackCounter: @unchecked Sendable {
 private final class BargeInBox: @unchecked Sendable {
     private let lock = NSLock()
     private var detector = BargeInDetector()
+    private var fired = false
 
+    /// True once, for the first buffer that completes a barge-in.
     func feed(_ levelDb: Float, at time: TimeInterval) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return detector.feed(levelDb: levelDb, at: time)
+        guard !fired, detector.feed(levelDb: levelDb, at: time) else { return false }
+        fired = true
+        return true
     }
 }

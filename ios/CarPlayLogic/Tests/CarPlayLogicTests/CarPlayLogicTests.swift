@@ -168,19 +168,33 @@ final class UtteranceEndpointerTests: XCTestCase {
         XCTAssertEqual(endpointer.feed(levelDb: -70, at: 6.5), .utteranceEnded)
     }
 
-    func testBargeInNeedsSustainedSpeechAfterTheOnset() {
+    func testBargeInNeedsSustainedSpeechAfterCalibration() {
         var detector = BargeInDetector()
-        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.1))
-        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.5))
-        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.8))
-        XCTAssertTrue(detector.feed(levelDb: -10, at: 0.9))
+        XCTAssertFalse(detector.feed(levelDb: -55, at: 0.1))
+        XCTAssertFalse(detector.feed(levelDb: -60, at: 0.5))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.9))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 1.2))
+        XCTAssertTrue(detector.feed(levelDb: -10, at: 1.3))
+    }
+
+    func testBargeInIgnoresTheReplyLeakingIntoTheMicrophone() {
+        var detector = BargeInDetector()
+        XCTAssertFalse(detector.feed(levelDb: -24, at: 0.2))
+        XCTAssertFalse(detector.feed(levelDb: -28, at: 0.6))
+        for step in 0 ..< 30 {
+            XCTAssertFalse(detector.feed(levelDb: -14, at: 0.9 + Double(step) * 0.1))
+        }
+        XCTAssertFalse(detector.feed(levelDb: -8, at: 4.0))
+        XCTAssertTrue(detector.feed(levelDb: -8, at: 4.4))
     }
 
     func testBargeInIgnoresAShortNoiseSpike() {
         var detector = BargeInDetector()
-        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.5))
-        XCTAssertFalse(detector.feed(levelDb: -80, at: 0.6))
-        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.7))
+        XCTAssertFalse(detector.feed(levelDb: -60, at: 0.2))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 0.9))
+        XCTAssertFalse(detector.feed(levelDb: -80, at: 1.0))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 1.1))
+        XCTAssertFalse(detector.feed(levelDb: -10, at: 1.4))
     }
 
     func testLevelOfSilenceAndFullScale() {
