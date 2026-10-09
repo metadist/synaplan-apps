@@ -20,7 +20,7 @@ conversation is a normal chat and appears in the iPhone chat history right away.
 | No message content on the display | Rows show the AI-generated chat title (3–5 words) and a relative time; the first-message preview is never read. Widget and channel chats (WhatsApp, email, Telegram — titles may contain phone numbers) are not listed |
 | Never instruct the driver to use the iPhone | Copy only states the condition ("You're signed out of Synaplan."); `tests/carplay-contract.test.mjs` rejects "sign in to", "open", "settings" and "iPhone" in CarPlay strings |
 | All flows possible without the iPhone | CarPlay never triggers a permission prompt (it would appear on the phone). An undetermined microphone or speech permission ends the conversation with one sentence and is requested the next time the app is in the foreground on the iPhone |
-| Audio session only while voice is actively used; `playAndRecord`, mode `voiceChat`, no mixing | One engine for the microphone and the reply, so the driver can talk over the answer. Echo cancellation has to be available; otherwise the reply finishes before the microphone opens again. Released while muted and when the conversation ends |
+| Audio session only while voice is actively used; `playAndRecord`, mode `voiceChat`, no mixing | One engine for the microphone and the reply, so the driver can talk over the answer. Echo cancellation has to be available; otherwise the reply finishes before the microphone opens again. The first 0.8 s of every sentence measure how much of the reply still reaches the microphone, and only speech 12 dB above that leak for 0.4 s interrupts — a strong echo (e.g. speaker next to the microphone) makes the reply play to the end instead of cutting itself off. Released while muted and when the conversation ends |
 | Works while the iPhone is locked | Session mirror with `AfterFirstUnlockThisDeviceOnly` — see [Session](#session-while-the-iphone-is-locked) |
 
 The voice control template uses `CPVoiceControlState.actionButtons` (iOS 26.4). On iOS 27 it is
@@ -187,7 +187,10 @@ The phone side (session mirror, bootstrap bridge, permission hand-off) runs in a
    7. Lock the simulator (Cmd+L) and repeat — this proves the session mirror.
    8. Quit the app and launch it from the CarPlay display only.
    9. Stop the backend: "Synaplan can't be reached" with a retry row.
-   10. Switch the SPA language to English and German; CarPlay copy follows after the next sync.
+   10. Switch the SPA language to English and German with CarPlay connected; the next
+       conversation listens, answers, and speaks in the new language without leaving the app
+       (the bootstrap pushes every `<html lang>` change, including the account language applied
+       after sign-in).
 
 Screenshots in the Xcode 26.4 Simulator: `xcrun simctl io <device> screenshot --display=external
 out.png`.

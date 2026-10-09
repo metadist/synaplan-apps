@@ -794,12 +794,16 @@
     }
   }
 
+  var lastCarLanguage = null
+
   function pushCarSession() {
     var plugin = getCarSessionPlugin()
     if (!plugin) return
+    var language = readUiLanguage()
+    lastCarLanguage = language
     Promise.resolve()
       .then(function () {
-        return plugin.update({ serverUrl: resolveServerUrl(), language: readUiLanguage() })
+        return plugin.update({ serverUrl: resolveServerUrl(), language: language })
       })
       .catch(function () {
         /* CarPlay keeps its last known session */
@@ -814,6 +818,17 @@
       })
     } catch (e) {
       /* ignore */
+    }
+    // The SPA settles its language after this script ran (first-run default,
+    // then the account language after sign-in), and CarPlay never hides the
+    // phone scene. Every language switch sets <html lang>.
+    try {
+      if (!getCarSessionPlugin() || 'function' !== typeof MutationObserver) return
+      new MutationObserver(function () {
+        if (readUiLanguage() !== lastCarLanguage) pushCarSession()
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
+    } catch (e) {
+      /* the load and hidden pushes remain */
     }
   }
 

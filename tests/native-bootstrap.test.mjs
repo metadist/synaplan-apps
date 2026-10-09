@@ -66,6 +66,7 @@ class StubElement {
 
   setAttribute(name, value) {
     this.attributes[name] = String(value)
+    this.onMutation()
   }
 
   getAttribute(name) {
@@ -525,6 +526,36 @@ test('CarPlay session bridge pushes the server and UI language on load and when 
   await env.flushMicrotasks()
   assert.equal(calls.length, 2)
   assert.equal(calls[1].language, 'tr')
+})
+
+test('CarPlay session bridge follows a language the SPA settles after load', async () => {
+  const calls = []
+  const env = loadBootstrap({
+    extraPlugins: {
+      SynaplanCarSession: {
+        update(payload) {
+          calls.push(payload)
+          return Promise.resolve()
+        },
+      },
+    },
+  })
+  env.fireDomContentLoaded()
+  await env.flushMicrotasks()
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].language, '')
+
+  // Sign-in applies the account language while the phone scene stays visible.
+  env.window.localStorage.setItem('language', 'de')
+  env.document.documentElement.setAttribute('lang', 'de')
+  await env.flushMicrotasks()
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].language, 'de')
+
+  env.document.documentElement.setAttribute('lang', 'de')
+  env.document.body.appendChild(env.document.createElement('div'))
+  await env.flushMicrotasks()
+  assert.equal(calls.length, 2, 'an unchanged language is not pushed again')
 })
 
 test('CarPlay session bridge tolerates a missing or failing plugin', async () => {
