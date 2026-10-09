@@ -33,6 +33,7 @@ test('Info.plist declares every permission purpose string (missing → crash/rej
     'NSPhotoLibraryUsageDescription',
     'NSPhotoLibraryAddUsageDescription',
     'NSFaceIDUsageDescription',
+    'NSSpeechRecognitionUsageDescription',
   ]
   for (const key of required) {
     const m = plist.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`))
@@ -60,6 +61,38 @@ test('Info.plist keeps the Epic 10.1 build-setting variables (version/bundle id 
 
 test('Info.plist keeps the OAuth deep-link scheme (Epic 3)', () => {
   assert.match(read(INFO_PLIST), /<string>com\.synaplan\.app<\/string>/)
+})
+
+test('Info.plist uses the scene lifecycle with separate phone and CarPlay roles', () => {
+  const plist = read(INFO_PLIST)
+  assert.doesNotMatch(plist, /<key>UIMainStoryboardFile<\/key>/, 'storyboard moves into the scene')
+  assert.match(plist, /<key>UIApplicationSceneManifest<\/key>/)
+  assert.match(plist, /<key>UIApplicationSupportsMultipleScenes<\/key>\s*<false\/>/)
+  assert.match(
+    plist,
+    /<key>UIWindowSceneSessionRoleApplication<\/key>[\s\S]*?<string>\$\(PRODUCT_MODULE_NAME\)\.SceneDelegate<\/string>[\s\S]*?<key>UISceneStoryboardFile<\/key>\s*<string>Main<\/string>/
+  )
+  assert.match(
+    plist,
+    /<key>CPTemplateApplicationSceneSessionRoleApplication<\/key>[\s\S]*?<string>CPTemplateApplicationScene<\/string>[\s\S]*?<string>\$\(PRODUCT_MODULE_NAME\)\.CarPlaySceneDelegate<\/string>/
+  )
+})
+
+// ── iOS entitlements ─────────────────────────────────────────────────────────
+
+const CARPLAY_ENTITLEMENT = 'com.apple.developer.carplay-voice-based-conversation'
+
+test('Every build signs with the CarPlay entitlement from one entitlements file', () => {
+  const entitlements = read('ios/App/App/App.entitlements')
+  assertWellFormed(entitlements, 'App.entitlements')
+  assert.match(entitlements, new RegExp(`<key>${CARPLAY_ENTITLEMENT}</key>\\s*<true/>`))
+  assert.match(entitlements, /<key>com\.apple\.developer\.applesignin<\/key>/)
+
+  const pbx = read('ios/App/App.xcodeproj/project.pbxproj')
+  const base = pbx.match(/\bCODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/g)
+  assert.equal(base?.length, 2, 'Debug and Release entitlements')
+  // An SDK-conditional override would let device and Simulator builds diverge again.
+  assert.doesNotMatch(pbx, /"CODE_SIGN_ENTITLEMENTS\[sdk=/)
 })
 
 // ── iOS privacy manifest (Epic 9.2) ──────────────────────────────────────────

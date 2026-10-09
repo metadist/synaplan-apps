@@ -19,6 +19,31 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
+### Next store build — CarPlay voice conversations
+
+App-owned only; built against the `v5.3.1` pin (the `pinned` chat field needs `v5.2.0`+ and is
+optional on older servers). The version number is assigned when the
+release candidate is cut — above 4.0.4 once that version is approved.
+
+Adds a native CarPlay surface (iOS 26.4+, overlay on iOS 27): a list of recent chats and a
+voice-only conversation that speaks the answers. Details in [`CARPLAY.md`](CARPLAY.md).
+
+- Capacitor `8.4.1` → `8.5.3` and the UIScene lifecycle (`SceneDelegate` + scene manifest with a
+  CarPlay role) — required by Xcode 27 regardless of CarPlay.
+- Uses existing endpoints only: `GET/POST /api/v1/chats`, `POST /api/v1/messages/stream`,
+  `GET /api/v1/tts/stream`, `POST /api/v1/messages/upload-file` (`purpose=dictation`),
+  `POST /api/v1/auth/refresh`, runtime-config `speech.speechToTextAvailable`. Guarded by
+  `tests/carplay-contract.test.mjs` against the pinned submodule.
+- Optional backend improvement, not a pin requirement:
+  [metadist/synaplan#2396](https://github.com/metadist/synaplan/pull/2396) (backend-only) lets
+  Piper servers answer the client's `format=mp3` with WAV, so the user's voice replaces the system
+  voice fallback.
+- The entitlement `com.apple.developer.carplay-voice-based-conversation` is granted and lives in
+  `App.entitlements` for every build. The App Store distribution profile in the `store-qa`
+  secret was regenerated with it on 2026-10-09.
+- Release classification: **store-required** — native code, scene manifest, entitlement, a new
+  privacy purpose string (`NSSpeechRecognitionUsageDescription`) and an app-local plugin.
+
 ### App 4.0.4 — reopen the version train after 4.0.3 was approved
 
 App-owned only. The reviewed pin is `v5.3.1`, which the source repository classified

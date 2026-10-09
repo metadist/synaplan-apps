@@ -159,6 +159,8 @@ ios/App/build/
 ios/App/output/
 ios/App/App/public/
 ios/DerivedData/
+ios/CarPlayLogic/.build/
+ios/CarPlayLogic/.swiftpm/
 ios/capacitor-cordova-ios-plugins/
 *.xcuserstate
 *.xcworkspace/xcuserdata/

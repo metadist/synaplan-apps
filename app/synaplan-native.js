@@ -767,6 +767,71 @@
     capturePhoto: captureNativePhoto,
   }
 
+  // ── CarPlay session bridge (iOS) ────────────────────────────────────────────
+  // The CarPlay scene is native and may run while the WebView does not exist.
+  // It needs the active server and the UI language; it reads the tokens from
+  // the Keychain itself, so no credential ever crosses this bridge. Pushed on
+  // every load (a server switch always reloads) and when the app is hidden,
+  // which is also the native cue to re-mirror the session before the phone
+  // locks. A missing plugin (web, Android) is a silent no-op.
+  var UI_LANGUAGE_KEY = 'language'
+
+  function getCarSessionPlugin() {
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var plugin = plugins && plugins.SynaplanCarSession
+      return plugin && typeof plugin.update === 'function' ? plugin : null
+    } catch (e) {
+      return null
+    }
+  }
+
+  function readUiLanguage() {
+    try {
+      return window.localStorage.getItem(UI_LANGUAGE_KEY) || ''
+    } catch (e) {
+      return ''
+    }
+  }
+
+  var lastCarLanguage = null
+
+  function pushCarSession() {
+    var plugin = getCarSessionPlugin()
+    if (!plugin) return
+    var language = readUiLanguage()
+    lastCarLanguage = language
+    Promise.resolve()
+      .then(function () {
+        return plugin.update({ serverUrl: resolveServerUrl(), language: language })
+      })
+      .catch(function () {
+        /* CarPlay keeps its last known session */
+      })
+  }
+
+  function initCarSessionBridge() {
+    pushCarSession()
+    try {
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') pushCarSession()
+      })
+    } catch (e) {
+      /* ignore */
+    }
+    // The SPA settles its language after this script ran (first-run default,
+    // then the account language after sign-in), and CarPlay never hides the
+    // phone scene. Every language switch sets <html lang>.
+    try {
+      if (!getCarSessionPlugin() || 'function' !== typeof MutationObserver) return
+      new MutationObserver(function () {
+        if (readUiLanguage() !== lastCarLanguage) pushCarSession()
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
+    } catch (e) {
+      /* the load and hidden pushes remain */
+    }
+  }
+
   // ── Keyboard inset bridge (float the composer above the keyboard) ───────────
   // With Keyboard.resize = 'none' the WebView keeps its full height, so the
   // page never shrinks. We publish the keyboard height as the CSS variable
@@ -909,6 +974,7 @@
       enforceNoZoomViewport()
       initKeyboardInsetBridge()
       initShortcutBridge()
+      initCarSessionBridge()
       mountEnvBadge()
       // Self-check: if the configured server is unreachable, auto-open the
       // recovery overlay so the user can fix it — the SPA (and the in-app Admin

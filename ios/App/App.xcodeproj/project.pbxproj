@@ -22,6 +22,23 @@
 		A11F0001AABBCCDD00000008 /* SynaplanShortcutsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000007 /* SynaplanShortcutsPlugin.swift */; };
 		A11F0001AABBCCDD0000000A /* SynaplanBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */; };
 		A11F0001AABBCCDD0000000C /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD0000000B /* AppShortcuts.strings */; };
+		B22F0001AABBCCDD00000002 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000001 /* SceneDelegate.swift */; };
+		B22F0001AABBCCDD00000011 /* CarSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000010 /* CarSessionStore.swift */; };
+		B22F0001AABBCCDD00000013 /* CarSessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000012 /* CarSessionPlugin.swift */; };
+		B22F0001AABBCCDD00000015 /* SynaplanStreamParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000014 /* SynaplanStreamParser.swift */; };
+		B22F0001AABBCCDD00000017 /* SpokenTextChunker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000016 /* SpokenTextChunker.swift */; };
+		B22F0001AABBCCDD00000019 /* SynaplanCarClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000018 /* SynaplanCarClient.swift */; };
+		B22F0001AABBCCDD0000001B /* UtteranceEndpointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000001A /* UtteranceEndpointer.swift */; };
+		B22F0001AABBCCDD0000001D /* SpeechInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000001C /* SpeechInput.swift */; };
+		B22F0001AABBCCDD0000001F /* SpeechOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000001E /* SpeechOutput.swift */; };
+		B22F0001AABBCCDD0000002F /* VoiceAudioGraph.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000002E /* VoiceAudioGraph.swift */; };
+		B22F0001AABBCCDD00000021 /* VoiceConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000020 /* VoiceConversationEngine.swift */; };
+		B22F0001AABBCCDD00000023 /* CarPlayStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000022 /* CarPlayStrings.swift */; };
+		B22F0001AABBCCDD00000025 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */; };
+		B22F0001AABBCCDD00000027 /* CarPlayRootController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000026 /* CarPlayRootController.swift */; };
+		B22F0001AABBCCDD00000029 /* CarPlay.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000028 /* CarPlay.xcstrings */; };
+		B22F0001AABBCCDD0000002B /* CarSessionContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000002A /* CarSessionContract.swift */; };
+		B22F0001AABBCCDD0000002D /* CarAPIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000002C /* CarAPIModels.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -47,6 +64,23 @@
 		A11F0001AABBCCDD00000013 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		A11F0001AABBCCDD00000014 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		A11F0001AABBCCDD00000015 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000010 /* CarSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarSessionStore.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000012 /* CarSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarSessionPlugin.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000014 /* SynaplanStreamParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanStreamParser.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000016 /* SpokenTextChunker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpokenTextChunker.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000018 /* SynaplanCarClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanCarClient.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD0000001A /* UtteranceEndpointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtteranceEndpointer.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD0000001C /* SpeechInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechInput.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD0000001E /* SpeechOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechOutput.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD0000002E /* VoiceAudioGraph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceAudioGraph.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000020 /* VoiceConversationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceConversationEngine.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000022 /* CarPlayStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayStrings.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000026 /* CarPlayRootController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayRootController.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000028 /* CarPlay.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = CarPlay.xcstrings; sourceTree = "<group>"; };
+		B22F0001AABBCCDD0000002A /* CarSessionContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarSessionContract.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD0000002C /* CarAPIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarAPIModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,8 +117,10 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				B22F0001AABBCCDD00000001 /* SceneDelegate.swift */,
 				A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */,
 				A11F0001AABBCCDD0000000F /* Shortcuts */,
+				B22F0001AABBCCDD00000003 /* CarPlay */,
 				A11F0001AABBCCDD0000000B /* AppShortcuts.strings */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -107,6 +143,29 @@
 				A11F0001AABBCCDD00000007 /* SynaplanShortcutsPlugin.swift */,
 			);
 			path = Shortcuts;
+			sourceTree = "<group>";
+		};
+		B22F0001AABBCCDD00000003 /* CarPlay */ = {
+			isa = PBXGroup;
+			children = (
+				B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */,
+				B22F0001AABBCCDD00000026 /* CarPlayRootController.swift */,
+				B22F0001AABBCCDD00000020 /* VoiceConversationEngine.swift */,
+				B22F0001AABBCCDD0000001C /* SpeechInput.swift */,
+				B22F0001AABBCCDD0000001E /* SpeechOutput.swift */,
+				B22F0001AABBCCDD0000002E /* VoiceAudioGraph.swift */,
+				B22F0001AABBCCDD0000001A /* UtteranceEndpointer.swift */,
+				B22F0001AABBCCDD00000018 /* SynaplanCarClient.swift */,
+				B22F0001AABBCCDD0000002C /* CarAPIModels.swift */,
+				B22F0001AABBCCDD00000014 /* SynaplanStreamParser.swift */,
+				B22F0001AABBCCDD00000016 /* SpokenTextChunker.swift */,
+				B22F0001AABBCCDD00000010 /* CarSessionStore.swift */,
+				B22F0001AABBCCDD0000002A /* CarSessionContract.swift */,
+				B22F0001AABBCCDD00000012 /* CarSessionPlugin.swift */,
+				B22F0001AABBCCDD00000022 /* CarPlayStrings.swift */,
+				B22F0001AABBCCDD00000028 /* CarPlay.xcstrings */,
+			);
+			path = CarPlay;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -186,6 +245,7 @@
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				7A1F0001AABBCCDD00000002 /* PrivacyInfo.xcprivacy in Resources */,
 				A11F0001AABBCCDD0000000C /* AppShortcuts.strings in Resources */,
+				B22F0001AABBCCDD00000029 /* CarPlay.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -202,6 +262,22 @@
 				A11F0001AABBCCDD00000006 /* SynaplanAppShortcuts.swift in Sources */,
 				A11F0001AABBCCDD00000008 /* SynaplanShortcutsPlugin.swift in Sources */,
 				A11F0001AABBCCDD0000000A /* SynaplanBridgeViewController.swift in Sources */,
+				B22F0001AABBCCDD00000002 /* SceneDelegate.swift in Sources */,
+				B22F0001AABBCCDD00000011 /* CarSessionStore.swift in Sources */,
+				B22F0001AABBCCDD00000013 /* CarSessionPlugin.swift in Sources */,
+				B22F0001AABBCCDD00000015 /* SynaplanStreamParser.swift in Sources */,
+				B22F0001AABBCCDD00000017 /* SpokenTextChunker.swift in Sources */,
+				B22F0001AABBCCDD00000019 /* SynaplanCarClient.swift in Sources */,
+				B22F0001AABBCCDD0000001B /* UtteranceEndpointer.swift in Sources */,
+				B22F0001AABBCCDD0000001D /* SpeechInput.swift in Sources */,
+				B22F0001AABBCCDD0000001F /* SpeechOutput.swift in Sources */,
+				B22F0001AABBCCDD0000002F /* VoiceAudioGraph.swift in Sources */,
+				B22F0001AABBCCDD00000021 /* VoiceConversationEngine.swift in Sources */,
+				B22F0001AABBCCDD00000023 /* CarPlayStrings.swift in Sources */,
+				B22F0001AABBCCDD00000025 /* CarPlaySceneDelegate.swift in Sources */,
+				B22F0001AABBCCDD00000027 /* CarPlayRootController.swift in Sources */,
+				B22F0001AABBCCDD0000002B /* CarSessionContract.swift in Sources */,
+				B22F0001AABBCCDD0000002D /* CarAPIModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
