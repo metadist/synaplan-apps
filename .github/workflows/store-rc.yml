@@ -138,7 +138,10 @@ jobs:
           if [ -d /Applications/Xcode_27.app ]; then
             sudo xcode-select -s /Applications/Xcode_27.app
           fi
-          version="$(xcodebuild -version | awk '/Xcode/{print $2; exit}')"
+          # xcodebuild aborts with a broken pipe when the reader exits before
+          # it has finished writing -version, so the output goes to a file.
+          xcodebuild -version > "$RUNNER_TEMP/xcode-version.txt"
+          version="$(awk '/^Xcode /{print $2; exit}' "$RUNNER_TEMP/xcode-version.txt")"
           major="${version%%.*}"
           test "${major:-0}" -ge 27
           case "$version" in
