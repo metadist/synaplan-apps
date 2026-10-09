@@ -25,7 +25,8 @@ conversation is a normal chat and appears in the iPhone chat history right away.
 
 The voice control template uses `CPVoiceControlState.actionButtons` (iOS 26.4). On iOS 27 it is
 shown with `showOverlayTemplate` over the list; on iOS 26.4–26.x it is presented full screen.
-Below iOS 26.4 the CarPlay scene states that iOS 26.4 or later is required.
+The store archive is built with Xcode 27, so that call compiles. Below iOS 26.4 the CarPlay scene
+states that iOS 26.4 or later is required.
 
 ## Architecture
 
