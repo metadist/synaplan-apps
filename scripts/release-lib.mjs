@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { basename, join, relative } from 'node:path'
 
 export const ROOT = new URL('../', import.meta.url).pathname.replace(/\/$/, '')
@@ -21,6 +21,48 @@ export function git(args, cwd = ROOT) {
 
 export function appVersion() {
   return String(readJson(join(ROOT, 'package.json')).version)
+}
+
+function parseVersion(value) {
+  const parts = /^v?(\d+)\.(\d+)(?:\.(\d+))?$/.exec(String(value ?? '').trim())
+  return parts ? [Number(parts[1]), Number(parts[2]), Number(parts[3] ?? 0)] : null
+}
+
+/**
+ * The marketing version of the next store binary. It follows the Synaplan
+ * release it bundles (`v5.3.1` → `5.3.1`) and only counts the patch up on its
+ * own when the app is already there: an app-only release, or a version whose
+ * App Store train closed when it was approved. Always above `current`, so an
+ * upload never lands on a closed train.
+ */
+export function nextStoreVersion(current, synaplanRef) {
+  const now = parseVersion(current)
+  if (!now || !/^\d+\.\d+\.\d+$/.test(String(current))) {
+    throw new Error(`App version ${current} is not plain semver (major.minor.patch)`)
+  }
+  const release = parseVersion(synaplanRef)
+  const ahead = release && release.findIndex((part, index) => part !== now[index])
+  if (release && ahead >= 0 && release[ahead] > now[ahead]) return release.join('.')
+  return `${now[0]}.${now[1]}.${now[2] + 1}`
+}
+
+/** Writes `version` into package.json and the root entries of package-lock.json. */
+export function writeAppVersion(version) {
+  const packagePath = join(ROOT, 'package.json')
+  const lockPath = join(ROOT, 'package-lock.json')
+  const pkg = readJson(packagePath)
+  pkg.version = version
+  writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`)
+  const lock = readJson(lockPath)
+  lock.version = version
+  if (lock.packages?.['']) lock.packages[''].version = version
+  writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`)
+}
+
+/** The Synaplan version the bundled SPA was built from: the exact tag, else the short SHA. */
+export function webVersion() {
+  const { tag, shortSha } = submoduleIdentity()
+  return tag ? tag.replace(/^v/, '') : shortSha
 }
 
 export function buildNumber(env = process.env) {

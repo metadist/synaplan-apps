@@ -1,6 +1,6 @@
 {
   "name": "synaplan-app",
-  "version": "4.0.4",
+  "version": "5.3.1",
   "private": true,
   "description": "Native iOS + Android shell for the Synaplan platform (Capacitor 8, bundled Vue SPA).",
   "license": "SEE LICENSE IN LICENSE",
@@ -29,6 +29,7 @@
     "release:manifest": "node scripts/release-manifest.mjs",
     "release:drill": "node scripts/release-drill.mjs",
     "release:sync": "node scripts/sync-synaplan.mjs",
+    "release:version": "node scripts/store-version.mjs",
     "release:route": "node scripts/release-route.mjs",
     "openapi:fetch": "node scripts/fetch-openapi.mjs",
     "dev:shell": "node scripts/dev-shell.mjs",

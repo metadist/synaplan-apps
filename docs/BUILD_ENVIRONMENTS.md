@@ -10,9 +10,10 @@ single source. Identifiers are frozen in [`IDENTIFIERS.md`](./IDENTIFIERS.md).
 | `SYNAPLAN_ENV`         | `dev` \| `staging` \| `prod` (default `prod`) | Bundle id suffix + visible app-name suffix + in-app badge |
 | `SYNAPLAN_BUILD_NUMBER`| monotonic integer (default: git commit count, else `1`) | `versionCode` (Android) / `CFBundleVersion` (iOS) |
 
-The **human version** is owned by [`package.json`](../package.json) `version` (currently
-`4.0.4`). It drives `versionName` / `MARKETING_VERSION` **and** the User-Agent token
-(`capacitor.config.ts`), so bumping it in one place updates everything.
+The **human version** is owned by [`package.json`](../package.json) `version`. It drives
+`versionName` / `MARKETING_VERSION` **and** the User-Agent token (`capacitor.config.ts`), so
+bumping it in one place updates everything. It follows the Synaplan release; see the version
+scheme in [`IDENTIFIERS.md`](./IDENTIFIERS.md).
 
 ## Build number offset (store releases)
 

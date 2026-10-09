@@ -576,3 +576,38 @@ test('CarPlay session bridge tolerates a missing or failing plugin', async () =>
   await failing.flushMicrotasks()
   assert.match(failing.viewportContent(), /user-scalable=no/)
 })
+
+test('app info reports the installed binary and the bundled Synaplan release', async () => {
+  const env = loadBootstrap({
+    extraPlugins: { App: { getInfo: () => Promise.resolve({ version: '5.3.1', build: '214' }) } },
+  })
+  env.window.__SYNAPLAN_APP_VERSION__ = '4.0.4'
+  env.window.__SYNAPLAN_WEB_VERSION__ = '5.4.0'
+  const versions = await env.window.SynaplanAppInfo.getVersions()
+  assert.deepEqual({ ...versions }, { app: '5.3.1', build: '214', web: '5.4.0' })
+})
+
+test('app info resolves empty when the App plugin is missing or fails', async () => {
+  const missing = loadBootstrap()
+  missing.window.__SYNAPLAN_WEB_VERSION__ = '5.4.0'
+  assert.deepEqual(
+    { ...(await missing.window.SynaplanAppInfo.getVersions()) },
+    {
+      app: '',
+      build: '',
+      web: '5.4.0',
+    }
+  )
+
+  const failing = loadBootstrap({
+    extraPlugins: { App: { getInfo: () => Promise.reject(new Error('unavailable')) } },
+  })
+  assert.deepEqual(
+    { ...(await failing.window.SynaplanAppInfo.getVersions()) },
+    {
+      app: '',
+      build: '',
+      web: '',
+    }
+  )
+})
