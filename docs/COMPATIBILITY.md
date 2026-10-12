@@ -21,6 +21,23 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
+### Unreleased — live conversations in CarPlay (LV8)
+
+Not a store build yet. The CarPlay voice screen can open a full-duplex relay socket when the
+server says live voice is available, the driver has allowed it, and the monthly budget is not
+used up. CarPlay always uses the relay: the server ignores the WebRTC admin switch for
+`client: carplay`. A dropped socket can resume the same session for 20 seconds
+(`POST /api/v1/voice/live/sessions/{id}/ticket`). A used-up budget is one spoken sentence and
+the conversation ends. A busy or down live service is one spoken sentence, then the existing
+turn-based loop. The screen still shows no message text.
+
+This needs the public Synaplan pin that contains the resume-ticket route. Until that pin moves,
+the app contract test checks the Swift client paths only.
+
+A head-unit echo and barge-in pass is still open. J-LV-7 was not walked.
+
+- Release classification: **store-required** — CarPlay voice behavior in the binary.
+
 ### Unreleased — live conversations in the apps (LV7)
 
 Not a store build yet. Recorded here so the binary is not cut without the matching SPA seam.

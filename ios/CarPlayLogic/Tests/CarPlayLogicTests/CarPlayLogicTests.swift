@@ -204,3 +204,77 @@ final class UtteranceEndpointerTests: XCTestCase {
         XCTAssertEqual(full.withUnsafeBufferPointer { UtteranceEndpointer.levelDb(samples: $0.baseAddress!, count: 64) }, 0, accuracy: 0.001)
     }
 }
+
+final class LiveVoiceCarPlanTests: XCTestCase {
+    func testRouteUsesLiveOnlyWithConsentAndBudget() {
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: true, budgetExhausted: false, consentGiven: true)), .startLive)
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: true, budgetExhausted: false, consentGiven: false)), .turnBased)
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: false, budgetExhausted: false, consentGiven: true)), .turnBased)
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: true, budgetExhausted: true, consentGiven: true)), .endBudget)
+    }
+
+    func testHttpStatusPicksBudgetBusyOrDown() {
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 429, code: "COST_BUDGET_EXCEEDED"), .endBudget)
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 403, code: "VOICE_CONSENT_REQUIRED"), .turnBased)
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 409, code: "VOICE_BUSY"), .speakThenTurnBased(.busy))
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 503, code: "VOICE_CAPACITY"), .speakThenTurnBased(.busy))
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 503, code: "VOICE_UNAVAILABLE"), .speakThenTurnBased(.down))
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 500, code: ""), .speakThenTurnBased(.down))
+    }
+
+    func testStartRequiresTheRelaySocket() {
+        let relay = LiveVoiceStart(sessionId: 4, chatId: 9, ticket: "t", wsUrl: "wss://example.test/voice/ws?ticket=t", inRate: 24000, outRate: 24000, transport: "relay")
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: relay), .startLive)
+        var direct = relay
+        direct.transport = "webrtc"
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: direct), .speakThenTurnBased(.down))
+    }
+
+    func testStopReasons() {
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "limit_budget"), .budget)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "capacity"), .turnBased(.busy))
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "provider_error"), .turnBased(.down))
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "admin_disabled"), .turnBased(.down))
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "network_lost"), .network)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "idle"), .idle)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "user_end"), .quiet)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "max_duration"), .quiet)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "nope"), .failed)
+    }
+
+    func testReconnectWindowIsTwentySeconds() {
+        XCTAssertEqual(LiveVoiceCarPlan.reconnectWindow, 20)
+        let drop = Date(timeIntervalSince1970: 1_000)
+        XCTAssertTrue(LiveVoiceCarPlan.reconnectOpen(since: drop, now: drop.addingTimeInterval(19.9)))
+        XCTAssertFalse(LiveVoiceCarPlan.reconnectOpen(since: drop, now: drop.addingTimeInterval(20)))
+    }
+
+    func testDecodesOptionsStartAndFrames() throws {
+        let options = LiveVoiceCarPlan.options(from: Data(#"{"available":true,"budgetExhausted":false,"consentGiven":true}"#.utf8))
+        XCTAssertEqual(options, LiveVoiceOptions(available: true, budgetExhausted: false, consentGiven: true))
+        XCTAssertEqual(LiveVoiceCarPlan.errorCode(from: Data(#"{"code":"VOICE_BUSY"}"#.utf8)), "VOICE_BUSY")
+        let start = try LiveVoiceCarPlan.start(from: Data(#"{"sessionId":4,"chatId":9,"ticket":"abc","wsUrl":"wss://h/voice/ws?ticket=abc","transport":"relay","audio":{"inRate":16000,"outRate":24000}}"#.utf8))
+        XCTAssertEqual(start.sessionId, 4)
+        XCTAssertEqual(start.chatId, 9)
+        XCTAssertEqual(start.inRate, 16000)
+        XCTAssertEqual(LiveVoiceCarPlan.frame(from: #"{"type":"ended","reason":"limit_budget"}"#), .ended("limit_budget"))
+        XCTAssertEqual(LiveVoiceCarPlan.frame(from: #"{"type":"wrap_up"}"#), .wrapUp)
+        XCTAssertEqual(LiveVoiceCarPlan.frame(from: "nope"), .ignored)
+        XCTAssertThrowsError(try LiveVoiceCarPlan.start(from: Data(#"{"sessionId":1}"#.utf8)))
+    }
+
+    func testPcm16RoundTripAndResample() {
+        let samples: [Float] = [0, 0.5, -1, 1]
+        let decoded = PCM16.decode(PCM16.encode(samples))
+        XCTAssertEqual(decoded.count, samples.count)
+        for (got, want) in zip(decoded, samples) {
+            XCTAssertEqual(got, want, accuracy: 0.001)
+        }
+        let same = PCM16.resample([0.25, -0.25], from: 16000, to: 16000)
+        XCTAssertEqual(same, [0.25, -0.25])
+        let stretched = PCM16.resample([0, 1], from: 16000, to: 32000)
+        XCTAssertEqual(stretched.count, 4)
+        XCTAssertEqual(stretched[0], 0, accuracy: 0.001)
+        XCTAssertEqual(stretched[3], 1, accuracy: 0.001)
+    }
+}

@@ -204,3 +204,14 @@ test('CarPlay copy never asks the driver to use the iPhone', () => {
     assert.doesNotMatch(english, instruction, `${key}: "${english}"`)
   }
 })
+
+test('CarPlay live voice stays on the relay and can resume the same session', () => {
+  const plan = read(`${CARPLAY_DIR}/LiveVoiceCarPlan.swift`)
+  const client = read(`${CARPLAY_DIR}/SynaplanCarClient.swift`)
+  assert.match(plan, /reconnectWindow: TimeInterval = 20/)
+  assert.match(plan, /transport == "relay"/)
+  assert.match(client, /"carplay"/)
+  assert.match(client, /\/api\/v1\/voice\/live\/options/)
+  assert.match(client, /\/api\/v1\/voice\/live\/sessions/)
+  assert.match(client, /\/ticket/)
+})

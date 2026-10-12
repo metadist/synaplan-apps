@@ -124,6 +124,15 @@ final class VoiceAudioGraph {
         }
     }
 
+    /// Streams one provider chunk. Barge-in stays off: the live model stops itself.
+    func enqueue(_ buffer: AVAudioPCMBuffer) {
+        guard engine.isRunning, let playable = converted(buffer), playable.frameLength > 0 else { return }
+        player.scheduleBuffer(playable)
+        if !player.isPlaying {
+            player.play()
+        }
+    }
+
     func stopPlayback() {
         lock.lock()
         playbackToken += 1

@@ -39,7 +39,7 @@ SecureStorage Keychain items ──(app active)──► CarSessionStore (own Ke
                                                                  │
 CarPlay scene ─► CarPlayRootController ─► SynaplanCarClient ─────┴─► Synaplan backend
                          │                     ▲
-                         └─► VoiceConversationEngine (SpeechInput, SpeechOutput)
+                         └─► VoiceConversationEngine (live relay, or SpeechInput + SpeechOutput)
 ```
 
 All files live in `ios/App/App/CarPlay/`:
@@ -48,7 +48,9 @@ All files live in `ios/App/App/CarPlay/`:
 |------|----------------|
 | `CarPlaySceneDelegate.swift` | `CPTemplateApplicationSceneDelegate`; starts and stops the root controller |
 | `CarPlayRootController.swift` | Root list, empty/error states, voice template, alerts |
-| `VoiceConversationEngine.swift` | Hands-free loop: listen → send → speak, and speech during the reply interrupts it |
+| `VoiceConversationEngine.swift` | Hands-free loop. Live relay when the server allows it, otherwise listen → send → speak |
+| `LiveVoiceCarPlan.swift` | Pure live/fallback decisions, unit-tested in `ios/CarPlayLogic` |
+| `LiveVoiceSession.swift` | Relay socket, PCM16 microphone and playback on `VoiceAudioGraph` |
 | `SpeechInput.swift` | Microphone capture, on-device `SpeechTranscriber`, server dictation fallback |
 | `SpeechOutput.swift` | Sentence-wise TTS with the user's voice, `AVSpeechSynthesizer` fallback, audio cues |
 | `SynaplanCarClient.swift` | URLSession client, SSE streaming, single-flight token refresh |
@@ -70,6 +72,10 @@ alone, so nothing in CarPlay depends on the WebView.
 | `POST /api/v1/messages/upload-file` (`purpose=dictation`) | Server speech-to-text fallback |
 | `POST /api/v1/auth/refresh` | Access token renewal (refresh token is not rotated) |
 | `GET /api/v1/config/runtime` | `speech.speechToTextAvailable` decides whether the server fallback exists |
+| `GET /api/v1/voice/live/options` | Whether a live conversation is allowed, consented, and still inside the budget |
+| `POST /api/v1/voice/live/sessions` | Starts one live conversation. Body includes `client: carplay`, which forces the relay socket |
+| `POST /api/v1/voice/live/sessions/{id}/ticket` | A fresh ticket for the same session after a short network drop |
+| `POST /api/v1/voice/live/sessions/{id}/end` | Ends a session the car cannot use |
 
 Every request carries `Synaplan Mobile V<major>.<minor> CarPlay`, so the backend treats it as the
 mobile client. `tests/carplay-contract.test.mjs` fails `ci-local` when any of these fields, routes
@@ -121,6 +127,26 @@ Piper answer an explicit non-WebM format with WAV. Until a server runs that chan
 unplayable response falls back to the system voice (`AVSpeechSynthesizer`) for the rest of the
 conversation.
 
+### Live conversation
+
+When live voice is available, the driver has allowed it, and the monthly budget is not used up,
+the car opens the relay socket instead of the turn-based loop. The microphone is PCM16 into the
+gateway and the provider audio plays on the same graph. Echo cancellation stays on. The voice
+model handles talking over a reply. CarPlay has no WebRTC stack, so the server forces `relay`
+for `client: carplay` even when the admin switch is on.
+
+A used-up budget is one spoken sentence and the conversation ends. The turn-based loop uses the
+same budget, so it is not offered. A busy or down live service is one spoken sentence, then the
+turn-based loop continues in the same chat. Missing consent stays on that loop without a
+sentence. The car screen still shows no message text.
+
+A dropped socket keeps the provider session for 20 seconds. The app asks for a new ticket on the
+same session id and reconnects. After 20 seconds the server ends it with `network_lost` and the
+app says so. A web tab that closes still ends immediately.
+
+Echo and barge-in on a real head unit are still a release gate. This path was not walked on a
+device.
+
 ### Face ID app lock
 
 The app lock does not apply in CarPlay, matching Claude and ChatGPT. CarPlay shows no message
@@ -148,7 +174,7 @@ capability of the team, not of a single app:
 | Layer | Command | Where |
 |-------|---------|-------|
 | Contract, manifests, strings, bootstrap | `npm run ci-local` | Any OS (CI) |
-| Pure Swift logic (SSE parser, chunker, endpointer, scope hash, decoding) | `npm run test:carplay` | macOS only |
+| Pure Swift logic (SSE parser, chunker, endpointer, scope hash, decoding, live route) | `npm run test:carplay` | macOS only |
 | CarPlay journey | Manual, see below | Real iPhone + CarPlay Simulator, or Xcode 26.4 Simulator |
 
 ### Where CarPlay can run

@@ -9,11 +9,14 @@ enum VoiceState: String, CaseIterable {
     case muted
 }
 
-/// Why a conversation stopped. Everything except `.userEnded` and `.idle` is
-/// shown to the driver as an alert with one recovery sentence.
+/// Why a conversation stopped. Budget and a lost connection are already spoken,
+/// so they do not add a screen alert. The driver ending it, or staying quiet,
+/// is silent too. Everything else is one recovery sentence on the car screen.
 enum VoiceEndReason: Equatable {
     case userEnded
     case idle
+    case budget
+    case networkLost
     case signedOut
     case unreachable
     case limitReached
@@ -23,7 +26,7 @@ enum VoiceEndReason: Equatable {
 
     var messageKey: String? {
         switch self {
-        case .userEnded, .idle: return nil
+        case .userEnded, .idle, .budget, .networkLost: return nil
         case .signedOut: return "error.signedOut"
         case .unreachable: return "error.unreachable"
         case .limitReached: return "error.limitReached"
@@ -62,6 +65,7 @@ final class VoiceConversationEngine {
     private let output: SpeechOutput
     private let cues = AudioCues()
     private var input: SpeechInput?
+    private var liveSession: LiveVoiceSession?
     private var loopTask: Task<Void, Never>?
     private var unmuteContinuation: CheckedContinuation<Void, Never>?
     private var observers: [NSObjectProtocol] = []
@@ -92,6 +96,16 @@ final class VoiceConversationEngine {
 
     func toggleMute() {
         guard !ended else { return }
+        if let liveSession {
+            isMuted.toggle()
+            liveSession.setMuted(isMuted)
+            if isMuted {
+                deactivateAudioSession()
+            } else {
+                try? activateAudioSession()
+            }
+            return
+        }
         isMuted.toggle()
         if isMuted {
             let previous = loopTask
@@ -114,6 +128,7 @@ final class VoiceConversationEngine {
     }
 
     func end() {
+        liveSession?.stop()
         finish(.userEnded)
     }
 
@@ -133,16 +148,22 @@ final class VoiceConversationEngine {
             case .denied:
                 return finish(.microphoneDenied)
             }
+            do {
+                try activateAudioSession()
+            } catch {
+                return finish(.failed)
+            }
+            switch await attemptLive() {
+            case let .stop(reason):
+                return finish(reason)
+            case .continueTurnBased:
+                break
+            }
             guard let created = await makeInput() else { return finish(.speechUnavailable) }
             if Task.isCancelled { return }
             input = created
         }
         guard let input else { return finish(.speechUnavailable) }
-        do {
-            try activateAudioSession()
-        } catch {
-            return finish(.failed)
-        }
 
         var silentTurns = 0
         var carried: String?
@@ -187,6 +208,89 @@ final class VoiceConversationEngine {
                 return finish(reason)
             }
         }
+    }
+
+    private enum LiveAttempt {
+        case stop(VoiceEndReason)
+        case continueTurnBased
+    }
+
+    /// Tries the full-duplex path once. A missing allowance stays on the
+    /// turn-based loop without a sentence. A used-up budget ends the drive.
+    private func attemptLive() async -> LiveAttempt {
+        let options = LiveVoiceCarPlan.options(from: await client.liveOptions().data)
+        switch LiveVoiceCarPlan.route(for: options) {
+        case .turnBased:
+            return .continueTurnBased
+        case .endBudget:
+            await speakSentence(.budget)
+            return .stop(.budget)
+        case let .speakThenTurnBased(sentence):
+            await speakSentence(sentence)
+            return .continueTurnBased
+        case .startLive:
+            break
+        }
+
+        let started = await client.liveStart(chatId: chatId, language: store.language)
+        if (200 ..< 300).contains(started.status), let start = try? LiveVoiceCarPlan.start(from: started.data) {
+            guard case .startLive = LiveVoiceCarPlan.route(for: start) else {
+                await client.liveEnd(sessionId: start.sessionId)
+                await speakSentence(.down)
+                return .continueTurnBased
+            }
+            if let chatId = start.chatId { self.chatId = chatId }
+            let session = LiveVoiceSession(client: client, graph: graph) { [weak self] state in
+                self?.set(state)
+            }
+            liveSession = session
+            let result = await session.run(start)
+            liveSession = nil
+            graph.setHandler(nil)
+            return await outcome(result.stop, heardGoodbye: result.heardGoodbye)
+        }
+
+        let code = LiveVoiceCarPlan.errorCode(from: started.data)
+        switch LiveVoiceCarPlan.route(status: started.status, code: code) {
+        case .endBudget:
+            await speakSentence(.budget)
+            return .stop(.budget)
+        case .turnBased:
+            return .continueTurnBased
+        case let .speakThenTurnBased(sentence):
+            await speakSentence(sentence)
+            return .continueTurnBased
+        case .startLive:
+            await speakSentence(.down)
+            return .continueTurnBased
+        }
+    }
+
+    private func outcome(_ stop: LiveVoiceStop, heardGoodbye: Bool) async -> LiveAttempt {
+        switch stop {
+        case .quiet:
+            return .stop(.userEnded)
+        case .idle:
+            return .stop(.idle)
+        case .budget:
+            if !heardGoodbye { await speakSentence(.budget) }
+            return .stop(.budget)
+        case .network:
+            await speakSentence(.networkLost)
+            return .stop(.networkLost)
+        case .failed:
+            return .stop(.failed)
+        case let .turnBased(sentence):
+            await speakSentence(sentence)
+            return .continueTurnBased
+        }
+    }
+
+    private func speakSentence(_ sentence: LiveVoiceSentence) async {
+        let text = CarPlayStrings.text(sentence.rawValue, language: store.language)
+        guard !text.isEmpty, text != sentence.rawValue else { return }
+        set(.speaking)
+        await output.speakLocally(text, language: store.language)
     }
 
     /// Sends one utterance and speaks the reply.
@@ -310,8 +414,13 @@ final class VoiceConversationEngine {
 
         let finalChat = chatId
         Task { @MainActor in
-            if reason != .userEnded {
-                await cues.play(reason == .idle ? .ended : .error)
+            switch reason {
+            case .userEnded, .budget, .networkLost:
+                break
+            case .idle:
+                await cues.play(.ended)
+            default:
+                await cues.play(.error)
             }
             if let key = reason.messageKey {
                 await output.speakLocally(CarPlayStrings.text(key), language: store.language)

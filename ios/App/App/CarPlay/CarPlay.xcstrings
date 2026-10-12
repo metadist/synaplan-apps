@@ -261,6 +261,42 @@
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réflexion…" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Düşünüyor…" } }
       }
+    },
+    "voice.liveBudget" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dein Nutzungsguthaben für diesen Monat ist aufgebraucht." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your usage budget for this month is used up." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Tu presupuesto de uso de este mes se ha agotado." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Votre budget d'utilisation pour ce mois est épuisé." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu ayki kullanım bütçen bitti." } }
+      }
+    },
+    "voice.liveBusy" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Das Live-Gespräch ist gerade ausgelastet. Es geht auf die gewohnte Weise weiter." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Live conversation is busy right now. Continuing in the usual way." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "La conversación en vivo está ocupada ahora. Seguimos de la forma habitual." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "La conversation en direct est occupée pour le moment. On continue de la façon habituelle." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Canlı konuşma şu anda dolu. Alışılmış şekilde devam ediyoruz." } }
+      }
+    },
+    "voice.liveDown" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Das Live-Gespräch ist gerade nicht verfügbar. Es geht auf die gewohnte Weise weiter." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Live conversation is unavailable right now. Continuing in the usual way." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "La conversación en vivo no está disponible ahora. Seguimos de la forma habitual." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "La conversation en direct n'est pas disponible pour le moment. On continue de la façon habituelle." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Canlı konuşma şu anda kullanılamıyor. Alışılmış şekilde devam ediyoruz." } }
+      }
+    },
+    "voice.liveNetwork" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Verbindung ist weg. Dieses Gespräch ist zu Ende." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The connection dropped. This conversation has ended." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Se cortó la conexión. Esta conversación ha terminado." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "La connexion a été coupée. Cette conversation est terminée." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlantı koptu. Bu konuşma bitti." } }
+      }
     }
   },
   "version" : "1.0"
