@@ -40,6 +40,10 @@ test('Info.plist declares every permission purpose string (missing → crash/rej
     assert.ok(m, `Info.plist missing <key>${key}</key>`)
     assert.ok(m[1].trim().length > 0, `Info.plist ${key} purpose string is empty`)
   }
+  assert.match(
+    plist,
+    /<key>NSMicrophoneUsageDescription<\/key>\s*<string>[^<]*live conversation[^<]*<\/string>/
+  )
 })
 
 test('Info.plist keeps the Epic 10.1 build-setting variables (version/bundle id wiring)', () => {
@@ -126,6 +130,7 @@ test('AndroidManifest declares the required permissions (Epic 7)', () => {
   for (const perm of [
     'android.permission.INTERNET',
     'android.permission.RECORD_AUDIO',
+    'android.permission.MODIFY_AUDIO_SETTINGS',
     'android.permission.CAMERA',
   ]) {
     assert.match(
@@ -152,6 +157,24 @@ test('AndroidManifest keeps the OAuth deep-link intent filter (Epic 3)', () => {
     read(ANDROID_MANIFEST),
     /<data android:scheme="com\.synaplan\.app" android:host="oauth"\s*\/>/
   )
+})
+
+test('the live-voice capability is registered in both binaries', () => {
+  const main = read('android/app/src/main/java/com/synaplan/app/MainActivity.java')
+  assert.match(main, /registerPlugin\(SynaplanLiveVoicePlugin\.class\);\s*super\.onCreate/)
+  assert.match(
+    read('android/app/src/main/java/com/synaplan/app/SynaplanLiveVoicePlugin.java'),
+    /@CapacitorPlugin\(name = "SynaplanLiveVoice"\)/
+  )
+
+  const bridge = read('ios/App/App/SynaplanBridgeViewController.swift')
+  assert.match(bridge, /registerPluginInstance\(SynaplanLiveVoicePlugin\(\)\)/)
+  assert.match(
+    read('ios/App/App/LiveVoice/SynaplanLiveVoicePlugin.swift'),
+    /jsName = "SynaplanLiveVoice"/
+  )
+  const pbx = read('ios/App/App.xcodeproj/project.pbxproj')
+  assert.match(pbx, /SynaplanLiveVoicePlugin\.swift in Sources/)
 })
 
 // ── well-formedness checker self-test (so the gate itself is trustworthy) ─────

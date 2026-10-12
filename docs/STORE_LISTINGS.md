@@ -65,9 +65,35 @@ shown. Speech is recognized on the iPhone; if that is not possible, the recordin
 user's Synaplan server for transcription and deleted afterwards. The Face ID app lock does not
 apply in CarPlay.
 
-**Privacy labels:** "Audio Data" is collected only through the server speech-to-text fallback and
-the existing dictation feature; confirm that the App Privacy answers already declare it for
-dictation before submission.
+**Privacy labels:** "Audio Data" is collected for dictation, the server speech-to-text
+fallback, and live conversations. Confirm the App Privacy and Play Data safety answers declare
+audio linked to the user, for app functionality, and shared with the AI provider of that chat
+(OpenAI, Google, or xAI) before submission. Synaplan does not keep the recording.
+
+---
+
+## Live conversations (store build that exposes `SynaplanLiveVoice` — 👤 apply with that binary)
+
+Do not publish this copy before a device build has passed journey J-LV-6 (button, loudspeaker,
+interrupt) on an iPhone and an Android phone. The button stays hidden on older binaries. There
+is no new in-app product: a live conversation draws on the existing plan budget, and a spent
+budget opens the existing store subscription screen. The reviewer account must have budget left;
+supply the credentials in App Store Connect / Play Console, not in this file.
+
+| Locale | Description bullet | What's New |
+|--------|--------------------|------------|
+| en | `• Live conversation: press the waveform button next to the microphone and talk. You can interrupt the answer. The transcript stays in the same chat, and the time counts against your usage budget.` | `Live conversations: talk with Synaplan from the chat, interrupt the answer, and find the transcript in the same chat.` |
+| de | `• Live-Gespräch: Tippe auf die Wellenform neben dem Mikrofon und sprich. Du kannst die Antwort unterbrechen. Das Transkript bleibt im selben Chat, die Zeit geht von deinem Nutzungsguthaben ab.` | `Live-Gespräche: Sprich mit Synaplan direkt im Chat, unterbrich die Antwort, und finde das Transkript im selben Chat.` |
+| es | `• Conversación en vivo: pulsa el botón de onda junto al micrófono y habla. Puedes interrumpir la respuesta. La transcripción se queda en el mismo chat y el tiempo cuenta en tu presupuesto de uso.` | `Conversaciones en vivo: habla con Synaplan desde el chat, interrumpe la respuesta y encuentra la transcripción en el mismo chat.` |
+| tr | `• Canlı konuşma: Mikrofonun yanındaki dalga biçimi düğmesine basın ve konuşun. Yanıtı bölebilirsiniz. Döküm aynı sohbette kalır ve süre kullanım bütçenizden düşer.` | `Canlı konuşmalar: Synaplan ile sohbetten konuşun, yanıtı bölün ve dökümü aynı sohbette bulun.` |
+
+**App Review notes (live conversations):** After sign-in, open a chat and press the waveform
+button beside the microphone. Allow the microphone. Speak, then talk over the answer to
+interrupt it. End from the panel. The transcript is in the same chat. The demo account has
+usage budget remaining. Audio is sent to the AI provider configured for that chat and is not
+stored by Synaplan. No separate purchase: the existing subscription covers it. Google and xAI
+conversations stay on the Synaplan server; an admin switch can send the next OpenAI
+conversation more directly, and it is off by default.
 
 ---
 

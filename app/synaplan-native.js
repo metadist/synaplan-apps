@@ -800,6 +800,25 @@
     capturePhoto: captureNativePhoto,
   }
 
+  // ── Live-voice capability (this binary only) ────────────────────────────────
+  // The SPA stays Capacitor-free. The button is shown only when this binary
+  // registered SynaplanLiveVoice. An OTA of this script onto an older binary
+  // still reports false, because that binary has no plugin. Audio itself stays
+  // in the WebView (getUserMedia + the relay socket).
+  function isNativeLiveVoiceAvailable() {
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var plugin = plugins && plugins.SynaplanLiveVoice
+      return !!(plugin && typeof plugin.isAvailable === 'function')
+    } catch (e) {
+      return false
+    }
+  }
+
+  window.SynaplanLiveVoice = {
+    isAvailable: isNativeLiveVoiceAvailable,
+  }
+
   // ── CarPlay session bridge (iOS) ────────────────────────────────────────────
   // The CarPlay scene is native and may run while the WebView does not exist.
   // It needs the active server and the UI language; it reads the tokens from

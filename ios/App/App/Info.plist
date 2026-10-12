@@ -87,7 +87,7 @@
 	<!-- Epic 7.1: WKWebView getUserMedia + file picker require these purpose strings.
 	     A MISSING string causes a hard crash/App Store reject on first access. -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Synaplan uses the microphone so you can dictate messages, use voice features, and talk to Synaplan in CarPlay.</string>
+	<string>Synaplan uses the microphone so you can dictate messages, hold a live conversation, and talk to Synaplan in CarPlay.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Synaplan turns what you say in CarPlay into text, on this iPhone whenever possible.</string>
 	<key>NSCameraUsageDescription</key>

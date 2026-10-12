@@ -21,6 +21,24 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
+### Unreleased — live conversations in the apps (LV7)
+
+Not a store build yet. Recorded here so the binary is not cut without the matching SPA seam.
+
+The new binary registers an app-local plugin, `SynaplanLiveVoice`, on iOS and Android. The
+bundled SPA shows the waveform button only when that plugin is present. Older binaries keep
+the button hidden, including after an OTA of the bootstrap. Audio stays in the WebView
+(`getUserMedia` on the relay socket). Capacitor's WebChromeClient grants
+`RESOURCE_AUDIO_CAPTURE` from the existing `RECORD_AUDIO` permission. The iOS microphone
+purpose string names live conversations. No new IAP product: the conversation draws on the
+plan budget, and a spent budget opens the existing store subscription screen.
+
+A native audio plugin is not part of this step. Loudspeaker echo cancellation in WKWebView
+is still unmeasured (`STATUS.md` in the live-voice plan). Add that plugin only if the
+measurement says the WebView path is too weak.
+
+- Release classification: **store-required** — native plugin, purpose string, privacy labels.
+
 ### App 5.3.1 — app version follows Synaplan, version display
 
 From this release on the app version follows the Synaplan release it bundles (scheme in
