@@ -21,7 +21,7 @@ credentials this chain needs.
 | 4 | `synaplan-apps` | `ci.yml` | Builds the web bundle and runs the drift gate on the PR. Green means the auto-merge fires. |
 | 5 | `synaplan-apps` | `release-dispatch.yml` | Reads the classification recorded by the sync PR and routes it: `ota-candidate` to `ota.yml`, `store-required` to `store-rc.yml`. |
 | 6a | `synaplan-apps` | `ota.yml` | Builds, signs and publishes the bundle to the production channel. |
-| 6b | `synaplan-apps` | `store-rc.yml` | Builds signed binaries and uploads them to TestFlight and the Play internal track. |
+| 6b | `synaplan-apps` | `store-rc.yml` | Reads App Store Connect before building and refuses an iOS version that is not above the highest closed train. Then builds signed binaries and uploads them to TestFlight and the Play internal track. |
 | 7 | `synaplan-apps` | `ota-health.yml` | Watches the freshly published bundle and rolls back automatically when it fails to become healthy. |
 
 The classification is written to `.github/release-route.json` by the sync workflow, so step 5 routes
@@ -55,6 +55,29 @@ logic, or the update mechanism itself.
 - The one-time credential setup below.
 - Pinning against a `synaplan` feature branch that has not been merged yet. See
   [`DEVELOPMENT.md`](./DEVELOPMENT.md); no pin is needed to build and run locally.
+- Counting the app version up when a store build is not opened by a `store-required` sync. The
+  preflight in `store-rc.yml` stops that build; it does not pick the next version itself.
+
+## When the App Store train is closed
+
+Apple closes a version for new builds once that version is approved. `store-rc.yml` checks this
+before it builds, so a closed train fails in about a minute instead of after the signed archive.
+The check only reads App Store Connect. A dry run warns and still builds, because it never uploads.
+A real upload stops.
+
+The failure names the App Store state. To open the next train:
+
+```bash
+npm run release:version -- --dry-run
+npm run release:version
+```
+
+That writes `package.json`, `package-lock.json`, `docs/COMPATIBILITY.md` and `docs/IDENTIFIERS.md`.
+Commit them on a branch, merge, then start Mobile Store RC again:
+
+```bash
+gh workflow run store-rc.yml -R metadist/synaplan-apps -f dry_run=false
+```
 
 ## One-time setup
 
