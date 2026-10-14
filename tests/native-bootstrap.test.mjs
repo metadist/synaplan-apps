@@ -373,6 +373,51 @@ test('a Capacitor origin without the user-agent marker still publishes the confi
   assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, 'https://chat.example.test')
 })
 
+test('an ionic origin without the user-agent marker publishes the configured server', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    protocol: 'ionic:',
+    hostname: 'localhost',
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, 'https://chat.example.test')
+})
+
+test('Android https://localhost without a port publishes the configured server', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    protocol: 'https:',
+    hostname: 'localhost',
+    port: '',
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, 'https://chat.example.test')
+})
+
+test('localhost with a port is not treated as the native shell', () => {
+  for (const location of [
+    { protocol: 'https:', hostname: 'localhost', port: '5173' },
+    { protocol: 'http:', hostname: 'localhost', port: '5173' },
+    { protocol: 'http:', hostname: 'localhost', port: '' },
+  ]) {
+    const env = loadBootstrap({
+      userAgent: WEB_UA,
+      protocol: location.protocol,
+      hostname: location.hostname,
+      port: location.port,
+      storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+    })
+
+    assert.equal(
+      env.window.__SYNAPLAN_API_BASE_URL__,
+      undefined,
+      `${location.protocol}//${location.hostname}:${location.port} must stay a no-op`
+    )
+  }
+})
+
 test('the plain web deployment does not publish a server URL', () => {
   const env = loadBootstrap({
     userAgent: WEB_UA,
