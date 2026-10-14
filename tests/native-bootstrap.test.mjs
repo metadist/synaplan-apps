@@ -222,7 +222,12 @@ function loadBootstrap(options = {}) {
         options.extraPlugins || {}
       ),
     },
-    location: { reload() {} },
+    location: {
+      reload() {},
+      protocol: options.protocol || '',
+      hostname: options.hostname || '',
+      port: options.port || '',
+    },
     requestAnimationFrame: (fn) => setTimeoutStub(fn, 0),
     dispatchEvent() {},
     addEventListener() {},
@@ -355,6 +360,71 @@ test('splash is hidden when the recovery overlay opens for an unreachable server
   // Idempotent: the ceiling firing afterwards must not hide a second time.
   env.advance(SPLASH_CEILING_MS)
   assert.equal(env.hideCalls.length, 1)
+})
+
+test('a Capacitor origin without the user-agent marker still publishes the configured server', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    protocol: 'capacitor:',
+    hostname: 'localhost',
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, 'https://chat.example.test')
+})
+
+test('an ionic origin without the user-agent marker publishes the configured server', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    protocol: 'ionic:',
+    hostname: 'localhost',
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, 'https://chat.example.test')
+})
+
+test('Android https://localhost without a port publishes the configured server', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    protocol: 'https:',
+    hostname: 'localhost',
+    port: '',
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, 'https://chat.example.test')
+})
+
+test('localhost with a port is not treated as the native shell', () => {
+  for (const location of [
+    { protocol: 'https:', hostname: 'localhost', port: '5173' },
+    { protocol: 'http:', hostname: 'localhost', port: '5173' },
+    { protocol: 'http:', hostname: 'localhost', port: '' },
+  ]) {
+    const env = loadBootstrap({
+      userAgent: WEB_UA,
+      protocol: location.protocol,
+      hostname: location.hostname,
+      port: location.port,
+      storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+    })
+
+    assert.equal(
+      env.window.__SYNAPLAN_API_BASE_URL__,
+      undefined,
+      `${location.protocol}//${location.hostname}:${location.port} must stay a no-op`
+    )
+  }
+})
+
+test('the plain web deployment does not publish a server URL', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, undefined)
 })
 
 test('splash handling is a no-op on the plain web deployment', () => {
