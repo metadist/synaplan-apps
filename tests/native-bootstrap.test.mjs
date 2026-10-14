@@ -222,7 +222,12 @@ function loadBootstrap(options = {}) {
         options.extraPlugins || {}
       ),
     },
-    location: { reload() {} },
+    location: {
+      reload() {},
+      protocol: options.protocol || '',
+      hostname: options.hostname || '',
+      port: options.port || '',
+    },
     requestAnimationFrame: (fn) => setTimeoutStub(fn, 0),
     dispatchEvent() {},
     addEventListener() {},
@@ -355,6 +360,26 @@ test('splash is hidden when the recovery overlay opens for an unreachable server
   // Idempotent: the ceiling firing afterwards must not hide a second time.
   env.advance(SPLASH_CEILING_MS)
   assert.equal(env.hideCalls.length, 1)
+})
+
+test('a Capacitor origin without the user-agent marker still publishes the configured server', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    protocol: 'capacitor:',
+    hostname: 'localhost',
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test/' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, 'https://chat.example.test')
+})
+
+test('the plain web deployment does not publish a server URL', () => {
+  const env = loadBootstrap({
+    userAgent: WEB_UA,
+    storage: { 'synaplan.serverUrl': 'https://chat.example.test' },
+  })
+
+  assert.equal(env.window.__SYNAPLAN_API_BASE_URL__, undefined)
 })
 
 test('splash handling is a no-op on the plain web deployment', () => {
