@@ -34,7 +34,10 @@ The environment is selected at build time (Epic 10) together with the API/WS bas
   - an `ota-candidate` synchronization keeps it: the bundle runs on the installed binary, and
     its OTA version is derived from the app version;
   - `npm run release:version` applies the same rule by hand for a release the chain does not
-    open (`-- --dry-run` previews it).
+    open (`-- --dry-run` previews it) and writes the new row in `docs/COMPATIBILITY.md` plus the
+    pin line in this file;
+  - before a store build, `store-rc.yml` reads App Store Connect and stops when this version is
+    not above the highest closed iOS train.
 
   The app therefore reports two versions in Settings: the installed binary (`App`) and the
   Synaplan release of the running web bundle (`Web`), which moves with each OTA update.

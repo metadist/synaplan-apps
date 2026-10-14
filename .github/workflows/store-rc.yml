@@ -154,6 +154,25 @@ jobs:
           node-version: '22'
           cache: npm
 
+      # Apple closes a version train when that version is approved, and the
+      # upload is the last step of this job. Checking first keeps a closed
+      # train from spending the signed build. The call only reads App Store
+      # Connect; a dry run warns so the archive can still be inspected.
+      - name: Require an open App Store version train
+        if: steps.platforms.outputs.ios == 'true'
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          WARN_ONLY: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$WARN_ONLY" = 'true' ]; then
+            node scripts/store-preflight.mjs --warn-only
+          else
+            node scripts/store-preflight.mjs
+          fi
+
       - name: Install and validate
         run: |
           npm ci

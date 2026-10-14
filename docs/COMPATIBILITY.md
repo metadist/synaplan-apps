@@ -22,6 +22,13 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
+### Store builds check the App Store train first
+
+`store-rc.yml` reads App Store Connect before it builds and refuses an iOS binary whose version
+is not above the highest closed train. `npm run release:version` writes the compatibility row for
+the version it sets, so the strict release check does not depend on a hand-edited matrix line. The
+matrix above is unchanged by this note.
+
 ### App 5.3.1 — app version follows Synaplan, version display
 
 From this release on the app version follows the Synaplan release it bundles (scheme in
