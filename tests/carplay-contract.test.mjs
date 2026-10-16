@@ -10,12 +10,13 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf-8')
+const readIfPresent = (path) => (existsSync(join(ROOT, path)) ? read(path) : '')
 
 const CARPLAY_DIR = 'ios/App/App/CarPlay'
 const SWIFT_CONTRACT = read(`${CARPLAY_DIR}/CarSessionContract.swift`)
@@ -27,7 +28,19 @@ const SWIFT_TESTS = read('ios/CarPlayLogic/Tests/CarPlayLogicTests/CarPlayLogicT
 const NATIVE_AUTH = read('synaplan/frontend/src/services/api/nativeAuth.ts')
 const NATIVE_RUNTIME = read('synaplan/frontend/src/services/api/nativeRuntime.ts')
 const CONFIG_CONTROLLER = read('synaplan/backend/src/Controller/ConfigController.php')
+const RUNTIME_CONFIG_SCHEMA = [
+  CONFIG_CONTROLLER,
+  readIfPresent('synaplan/backend/src/Attribute/OpenApi/Config/RuntimeConfigResponse.php'),
+].join('\n')
 const STREAM_CONTROLLER = read('synaplan/backend/src/Controller/StreamController.php')
+const STREAM_PIPELINE = [
+  STREAM_CONTROLLER,
+  readIfPresent('synaplan/backend/src/Service/Realtime/SseWriter.php'),
+  readIfPresent('synaplan/backend/src/Service/Chat/Stream/ChatStreamOrchestrator.php'),
+  readIfPresent('synaplan/backend/src/Service/Chat/Stream/StreamChunkRelay.php'),
+  readIfPresent('synaplan/backend/src/Service/Chat/Stream/StreamCompletion.php'),
+  readIfPresent('synaplan/backend/src/Service/Chat/Stream/StreamFailureReporter.php'),
+].join('\n')
 const AUTH_CONTROLLER = read('synaplan/backend/src/Controller/AuthController.php')
 const CHAT_CONTROLLER = read('synaplan/backend/src/Controller/ChatController.php')
 const MESSAGE_CONTROLLER = read('synaplan/backend/src/Controller/MessageController.php')
@@ -138,11 +151,11 @@ test('message stream request and SSE envelope are unchanged', () => {
     assert.ok(STREAM_CONTROLLER.includes(property), `stream body lost ${property}`)
   }
   assert.match(STREAM_CONTROLLER, /path: '\/api\/v1\/messages\/stream'/)
-  assert.match(STREAM_CONTROLLER, /'status' => \$status,/)
-  assert.match(STREAM_CONTROLLER, /sendSSE\('data', \['chunk' => /)
-  assert.match(STREAM_CONTROLLER, /sendSSE\('complete', /)
-  assert.match(STREAM_CONTROLLER, /sendSSE\('error', /)
-  assert.match(STREAM_CONTROLLER, /sendSSE\('message', \$rateLimitError\)/)
+  assert.match(STREAM_PIPELINE, /'status' => \$status,/)
+  assert.match(STREAM_PIPELINE, /(?:sendSSE|->send)\('data', \['chunk' => /)
+  assert.match(STREAM_PIPELINE, /(?:sendSSE|->send)\('complete', /)
+  assert.match(STREAM_PIPELINE, /(?:sendSSE|->send)\('error', /)
+  assert.match(STREAM_PIPELINE, /(?:sendSSE|->send)\('message', \$(?:turn->)?rateLimitError\)/)
 
   for (const status of ['"data"', '"complete"', '"error"', '"message"']) {
     assert.ok(SWIFT_PARSER.includes(`case ${status}:`), `parser no longer handles ${status}`)
@@ -166,7 +179,7 @@ test('refresh, dictation, TTS and runtime config contracts', () => {
   assert.match(read('synaplan/backend/src/Controller/TtsController.php'), /#\[Route\('\/stream'/)
   assert.match(SWIFT_CLIENT, /"\/api\/v1\/tts\/stream"/)
 
-  assert.match(CONFIG_CONTROLLER, /property: 'speechToTextAvailable',\s+type: 'boolean'/)
+  assert.match(RUNTIME_CONFIG_SCHEMA, /property: 'speechToTextAvailable',\s+type: 'boolean'/)
   assert.match(SWIFT_MODELS, /speech\["speechToTextAvailable"\]/)
 })
 

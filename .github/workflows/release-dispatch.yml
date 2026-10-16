@@ -25,6 +25,7 @@ jobs:
     outputs:
       classification: ${{ steps.route.outputs.classification }}
       tag: ${{ steps.route.outputs.tag }}
+      skip: ${{ steps.duplicate.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -38,7 +39,30 @@ jobs:
         id: route
         run: node scripts/release-route.mjs --verify >> "$GITHUB_OUTPUT"
 
+      - name: Skip a duplicate delivery of the same commit
+        id: duplicate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Auto-merge can deliver two push events for the same squash commit.
+          # concurrency queues the second run behind the first, so once the
+          # first run succeeds the second would rebuild the same commit count
+          # and fail at TestFlight with a duplicate CFBundleVersion.
+          prior_run="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/release-dispatch.yml/runs?head_sha=${GITHUB_SHA}&status=completed&per_page=20" \
+              --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID} and .conclusion == \"success\")] | first | .id // empty"
+          )"
+          if test -n "$prior_run"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Commit \`${GITHUB_SHA}\` was already delivered by run \`${prior_run}\`; skipping duplicate dispatch." \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Report the route
+        if: steps.duplicate.outputs.skip != 'true'
         run: |
           echo "Routing \`${{ steps.route.outputs.tag }}\` as \`${{ steps.route.outputs.classification }}\`." \
             >> "$GITHUB_STEP_SUMMARY"
@@ -46,7 +70,7 @@ jobs:
   ota:
     name: Publish over the air
     needs: route
-    if: needs.route.outputs.classification == 'ota-candidate'
+    if: needs.route.outputs.skip != 'true' && needs.route.outputs.classification == 'ota-candidate'
     uses: ./.github/workflows/ota.yml
     with:
       operation: publish
@@ -58,7 +82,7 @@ jobs:
   health:
     name: Watch the published bundle
     needs: [route, ota]
-    if: needs.route.outputs.classification == 'ota-candidate'
+    if: needs.route.outputs.skip != 'true' && needs.route.outputs.classification == 'ota-candidate'
     uses: ./.github/workflows/ota-health.yml
     with:
       channel: production
@@ -69,7 +93,7 @@ jobs:
   store:
     name: Build a store release candidate
     needs: route
-    if: needs.route.outputs.classification == 'store-required'
+    if: needs.route.outputs.skip != 'true' && needs.route.outputs.classification == 'store-required'
     uses: ./.github/workflows/store-rc.yml
     with:
       dry_run: false
