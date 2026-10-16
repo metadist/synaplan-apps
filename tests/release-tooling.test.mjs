@@ -829,3 +829,20 @@ test('keyboard overlay is shared: iOS must not resize, Android must not shrink t
   assert.match(config, /resizeOnFullScreen: false/)
   assert.match(manifest, /android:windowSoftInputMode="adjustNothing"/)
 })
+
+test('release dispatch skips a duplicate push run after the commit already succeeded', () => {
+  const workflow = read('.github/workflows/release-dispatch.yml')
+  assert.match(
+    workflow,
+    /actions\/workflows\/release-dispatch\.yml\/runs\?head_sha=\$\{GITHUB_SHA\}/
+  )
+  assert.match(workflow, /select\(\.id != \$\{GITHUB_RUN_ID\} and \.conclusion == \\"success\\"\)/)
+  assert.match(
+    workflow,
+    /needs\.route\.outputs\.skip != 'true' && needs\.route\.outputs\.classification == 'ota-candidate'/
+  )
+  assert.match(
+    workflow,
+    /needs\.route\.outputs\.skip != 'true' && needs\.route\.outputs\.classification == 'store-required'/
+  )
+})
