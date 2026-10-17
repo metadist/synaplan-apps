@@ -34,7 +34,10 @@ The environment is selected at build time (Epic 10) together with the API/WS bas
   - an `ota-candidate` synchronization keeps it: the bundle runs on the installed binary, and
     its OTA version is derived from the app version;
   - `npm run release:version` applies the same rule by hand for a release the chain does not
-    open (`-- --dry-run` previews it).
+    open (`-- --dry-run` previews it) and writes the new row in `docs/COMPATIBILITY.md` plus the
+    pin line in this file;
+  - before a store build, `store-rc.yml` reads App Store Connect and stops when this version is
+    not above the highest closed iOS train.
 
   The app therefore reports two versions in Settings: the installed binary (`App`) and the
   Synaplan release of the running web bundle (`Web`), which moves with each OTA update.
@@ -60,7 +63,7 @@ The environment is selected at build time (Epic 10) together with the API/WS bas
 
 - **Repo:** `synaplan` (public) via **HTTPS** (`https://github.com/metadist/synaplan.git`).
 - **Path:** `./synaplan`
-- **Current pin:** `v5.3.2` (exact release tag/SHA; never a moving branch).
+- **Current pin:** `v5.4.2` (exact release tag/SHA; never a moving branch).
 
 ## Apple / Google account identifiers (fill in Epic 0.1)
 

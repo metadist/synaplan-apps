@@ -66,10 +66,27 @@
   // on the plain web deployment we must be a complete no-op.
   function isNativeShell() {
     try {
-      return navigator.userAgent.indexOf('Synaplan Mobile') !== -1
+      if (navigator.userAgent.indexOf('Synaplan Mobile') !== -1) return true
     } catch (e) {
-      return false
+      /* fall through to the origin check */
     }
+    // The WebView origin is enough when the appended User-Agent is missing.
+    // iOS serves the bundle from capacitor://localhost, Android from
+    // https://localhost with no port. A dev server on another port is not this.
+    try {
+      var protocol = window.location.protocol
+      if (protocol === 'capacitor:' || protocol === 'ionic:') return true
+      if (
+        protocol === 'https:' &&
+        window.location.hostname === 'localhost' &&
+        !window.location.port
+      ) {
+        return true
+      }
+    } catch (e2) {
+      /* not a browser */
+    }
+    return false
   }
 
   // Normalize user input: trim, default to https:// when no scheme is given,

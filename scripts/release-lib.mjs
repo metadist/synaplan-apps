@@ -29,6 +29,21 @@ function parseVersion(value) {
 }
 
 /**
+ * Numeric order of two versions. `1` when `left` is newer, `0` when they match,
+ * `-1` when `right` is newer, and `null` when either side is not semver.
+ * `4.0.10` is newer than `4.0.9`; a string compare would get that backwards.
+ */
+export function compareVersions(left, right) {
+  const a = parseVersion(left)
+  const b = parseVersion(right)
+  if (!a || !b) return null
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return a[index] > b[index] ? 1 : -1
+  }
+  return 0
+}
+
+/**
  * The marketing version of the next store binary. It follows the Synaplan
  * release it bundles (`v5.3.1` → `5.3.1`) and only counts the patch up on its
  * own when the app is already there: an app-only release, or a version whose
@@ -41,8 +56,7 @@ export function nextStoreVersion(current, synaplanRef) {
     throw new Error(`App version ${current} is not plain semver (major.minor.patch)`)
   }
   const release = parseVersion(synaplanRef)
-  const ahead = release && release.findIndex((part, index) => part !== now[index])
-  if (release && ahead >= 0 && release[ahead] > now[ahead]) return release.join('.')
+  if (release && compareVersions(release.join('.'), current) > 0) return release.join('.')
   return `${now[0]}.${now[1]}.${now[2] + 1}`
 }
 

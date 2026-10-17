@@ -8,6 +8,8 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
+| 5.4.1 | `v5.4.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.2 |
+| 5.4.0 | `v5.4.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.0 |
 | 5.3.2 | `v5.3.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.2 |
 | 5.3.1 | `v5.3.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.1 |
 | 4.0.4 | `v5.3.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.1 |
@@ -29,10 +31,12 @@ used up. CarPlay always uses the relay: the server ignores the WebRTC admin swit
 `client: carplay`. A dropped socket can resume the same session for 20 seconds
 (`POST /api/v1/voice/live/sessions/{id}/ticket`). A used-up budget is one spoken sentence and
 the conversation ends. A busy or down live service is one spoken sentence, then the existing
-turn-based loop. The screen still shows no message text.
+turn-based loop. The voice screen is full screen and shows only the phase title, which follows
+the reply audio. Call tones mark opening, ready, question sent, hang-up, and failure. Live
+provider audio plays as one resampled stream, so packet boundaries do not click.
 
-This needs the public Synaplan pin that contains the resume-ticket route. Until that pin moves,
-the app contract test checks the Swift client paths only.
+The resume-ticket route, the CarPlay relay rule, and the SPA's native live-voice seam are in the
+`v5.4.2` pin; no newer Synaplan release is required.
 
 A head-unit echo and barge-in pass is still open. J-LV-7 was not walked.
 
@@ -55,6 +59,13 @@ is still unmeasured (`STATUS.md` in the live-voice plan). Add that plugin only i
 measurement says the WebView path is too weak.
 
 - Release classification: **store-required** — native plugin, purpose string, privacy labels.
+
+### Store builds check the App Store train first
+
+`store-rc.yml` reads App Store Connect before it builds and refuses an iOS binary whose version
+is not above the highest closed train. `npm run release:version` writes the compatibility row for
+the version it sets, so the strict release check does not depend on a hand-edited matrix line. The
+matrix above is unchanged by this note.
 
 ### App 5.3.1 — app version follows Synaplan, version display
 

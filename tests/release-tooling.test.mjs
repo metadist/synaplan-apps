@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { generateKeyPairSync } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,10 +15,19 @@ import {
   appVersion,
   bundleVersion,
   checkServiceWorkerGuard,
+  compareVersions,
   nextStoreVersion,
   resolveSubmoduleTag,
   validatePublicOtaConfig,
 } from '../scripts/release-lib.mjs'
+import {
+  appStoreConnectToken,
+  closedTrainVersion,
+  normalizePrivateKey,
+  preflightProblem,
+  verifyAppStoreConnectToken,
+} from '../scripts/store-preflight.mjs'
+import { planStoreVersion } from '../scripts/store-version.mjs'
 import { createReleaseManifest } from '../scripts/release-manifest.mjs'
 import { stampReleaseSigning } from '../scripts/ios-signing.mjs'
 import { normalizePublicKey, publicKeyProblem } from '../scripts/ota-key.mjs'
@@ -216,6 +226,13 @@ test('sync rejects moving main branches and updates release records deterministi
   assert.equal(read('docs/IDENTIFIERS.md'), identifiersBefore)
 })
 
+test('version order is numeric, so 4.0.10 follows 4.0.9', () => {
+  assert.equal(compareVersions('4.0.10', '4.0.9'), 1)
+  assert.equal(compareVersions('5.4.0', '5.4.0'), 0)
+  assert.equal(compareVersions('v5.3.1', '5.4.0'), -1)
+  assert.equal(compareVersions('latest', '5.4.0'), null)
+})
+
 test('a store binary takes the Synaplan version and only counts up on its own when already there', () => {
   assert.equal(nextStoreVersion('4.0.4', 'v5.3.1'), '5.3.1')
   assert.equal(nextStoreVersion('4.0.4', 'v5.4'), '5.4.0')
@@ -236,6 +253,127 @@ test('repeating a synchronization for the pinned release keeps the app version',
     storeVersionFor({ previousSha: 'c'.repeat(40), sha, ref: 'v5.3.1', current: '4.0.4' }),
     '5.3.1'
   )
+})
+
+test('a manual store version bump records the compatibility row without writing on dry-run', () => {
+  const compatibilityBefore = read('docs/COMPATIBILITY.md')
+  const identifiersBefore = read('docs/IDENTIFIERS.md')
+  const packageBefore = read('package.json')
+  const plan = planStoreVersion({
+    current: '5.4.0',
+    tag: 'v5.4.0',
+    sha: 'd'.repeat(40),
+    dryRun: true,
+  })
+  assert.equal(plan.next, '5.4.1')
+  assert.equal(plan.ref, 'v5.4.0')
+  assert.match(plan.records.compatibility, /\| 5\.4\.1 \|/)
+  assert.match(plan.records.identifiers, /Current pin:\*\* `v5\.4\.0`/)
+  assert.equal(read('docs/COMPATIBILITY.md'), compatibilityBefore)
+  assert.equal(read('docs/IDENTIFIERS.md'), identifiersBefore)
+  assert.equal(read('package.json'), packageBefore)
+})
+
+test('a closed App Store train is the highest version that is not still open', () => {
+  assert.equal(
+    closedTrainVersion([
+      { versionString: '5.4.0', state: 'READY_FOR_SALE' },
+      { versionString: '4.0.3', state: 'READY_FOR_SALE' },
+    ]).version,
+    '5.4.0'
+  )
+  assert.equal(
+    closedTrainVersion([
+      { versionString: '5.4.0', state: 'IN_REVIEW' },
+      { versionString: '4.0.3', state: 'READY_FOR_SALE' },
+    ]).version,
+    '4.0.3'
+  )
+  // A rejected binary has to be uploadable again under the same version.
+  assert.equal(closedTrainVersion([{ versionString: '5.4.0', state: 'INVALID_BINARY' }]), null)
+  assert.equal(closedTrainVersion([{ versionString: '5.4.0', state: 'IN_REVIEW' }]), null)
+  assert.equal(closedTrainVersion([]), null)
+  assert.equal(
+    closedTrainVersion([
+      { versionString: '4.0.10', state: 'READY_FOR_SALE' },
+      { versionString: '4.0.9', state: 'READY_FOR_SALE' },
+    ]).version,
+    '4.0.10'
+  )
+  // A state this list does not know is closed, and the caller can see which one.
+  assert.deepEqual(closedTrainVersion([{ versionString: '5.4.0', state: 'PENDING_CONTRACT' }]), {
+    version: '5.4.0',
+    state: 'PENDING_CONTRACT',
+  })
+  assert.throws(
+    () => closedTrainVersion([{ versionString: 'latest', state: 'READY_FOR_SALE' }]),
+    /plain semver/
+  )
+})
+
+test('the preflight only stops a build that is not above the closed train', () => {
+  const closed = { version: '5.4.0', state: 'READY_FOR_SALE' }
+  assert.match(
+    preflightProblem({ current: '5.4.0', closed }),
+    /not above 5\.4\.0 \(READY_FOR_SALE\)/
+  )
+  assert.match(preflightProblem({ current: '5.4.0', closed }), /npm run release:version/)
+  assert.equal(preflightProblem({ current: '5.4.1', closed }), null)
+  assert.equal(preflightProblem({ current: '5.4.0', closed: null }), null)
+  assert.match(
+    preflightProblem({ current: '4.0.9', closed: { version: '4.0.10', state: 'READY_FOR_SALE' } }),
+    /not above 4\.0\.10/
+  )
+  assert.equal(
+    preflightProblem({ current: '4.0.10', closed: { version: '4.0.9', state: 'READY_FOR_SALE' } }),
+    null
+  )
+})
+
+test('an App Store Connect token is a short-lived ES256 JWT', () => {
+  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' })
+  const token = appStoreConnectToken({
+    keyId: 'KEYID1234',
+    issuerId: 'issuer-id',
+    privateKey: pem,
+    now: 1_700_000_000_000,
+  })
+  const [headerPart, payloadPart, signaturePart] = token.split('.')
+  const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString())
+  const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString())
+  assert.equal(header.alg, 'ES256')
+  assert.equal(header.kid, 'KEYID1234')
+  assert.equal(payload.aud, 'appstoreconnect-v1')
+  assert.equal(payload.iss, 'issuer-id')
+  assert.ok(payload.exp - payload.iat <= 20 * 60)
+  assert.ok(payload.exp > payload.iat)
+  assert.equal(Buffer.from(signaturePart, 'base64url').length, 64)
+  assert.equal(verifyAppStoreConnectToken(token, publicKey), true)
+  // A key pasted into a single-line secret keeps its escaped newlines.
+  assert.match(
+    normalizePrivateKey('-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----'),
+    /\nABC\n/
+  )
+  assert.throws(
+    () => appStoreConnectToken({ keyId: 'k', issuerId: 'i', privateKey: 'not-a-key' }),
+    /not a usable private key/
+  )
+})
+
+test('a store release candidate refuses a closed App Store train before it builds', () => {
+  const workflow = read('.github/workflows/store-rc.yml')
+  const preflight = workflow.indexOf('Require an open App Store version train')
+  const install = workflow.indexOf('npm ci')
+  assert.ok(preflight > 0)
+  assert.ok(install > preflight)
+  assert.match(
+    workflow,
+    /Require an open App Store version train\n\s+if: steps\.platforms\.outputs\.ios == 'true'/
+  )
+  assert.match(workflow, /node scripts\/store-preflight\.mjs --warn-only/)
+  assert.match(workflow, /node scripts\/store-preflight\.mjs\n/)
+  assert.match(workflow, /secrets\.APP_STORE_CONNECT_PRIVATE_KEY/)
 })
 
 test('a store-required synchronization commits the app version it sets', () => {
@@ -690,4 +828,21 @@ test('keyboard overlay is shared: iOS must not resize, Android must not shrink t
   // still translates by --keyboard-inset-height → the page slides up.
   assert.match(config, /resizeOnFullScreen: false/)
   assert.match(manifest, /android:windowSoftInputMode="adjustNothing"/)
+})
+
+test('release dispatch skips a duplicate push run after the commit already succeeded', () => {
+  const workflow = read('.github/workflows/release-dispatch.yml')
+  assert.match(
+    workflow,
+    /actions\/workflows\/release-dispatch\.yml\/runs\?head_sha=\$\{GITHUB_SHA\}/
+  )
+  assert.match(workflow, /select\(\.id != \$\{GITHUB_RUN_ID\} and \.conclusion == \\"success\\"\)/)
+  assert.match(
+    workflow,
+    /needs\.route\.outputs\.skip != 'true' && needs\.route\.outputs\.classification == 'ota-candidate'/
+  )
+  assert.match(
+    workflow,
+    /needs\.route\.outputs\.skip != 'true' && needs\.route\.outputs\.classification == 'store-required'/
+  )
 })
