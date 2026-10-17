@@ -1,1 +1,2 @@
-Talk to Synaplan in the car. CarPlay shows your recent chats and speaks the answers.
+Live conversations: talk with Synaplan from the chat, interrupt the answer, and find the transcript in the same chat.
+In CarPlay, live conversations open full screen, short tones tell you when it is your turn, and the screen shows whether Synaplan is listening, thinking or speaking.
