@@ -217,3 +217,29 @@ test('CarPlay copy never asks the driver to use the iPhone', () => {
     assert.doesNotMatch(english, instruction, `${key}: "${english}"`)
   }
 })
+
+test('CarPlay live voice stays on the relay and can resume the same session', () => {
+  const plan = read(`${CARPLAY_DIR}/LiveVoiceCarPlan.swift`)
+  const client = read(`${CARPLAY_DIR}/SynaplanCarClient.swift`)
+  assert.match(plan, /reconnectWindow: TimeInterval = 20/)
+  assert.match(plan, /transport == "relay"/)
+  assert.match(client, /"carplay"/)
+  assert.match(client, /\/api\/v1\/voice\/live\/options/)
+  assert.match(client, /\/api\/v1\/voice\/live\/sessions/)
+  assert.match(client, /\/ticket/)
+
+  const controller = read('synaplan/backend/src/Controller/VoiceLiveController.php')
+  const transport = read('synaplan/backend/src/Service/Voice/VoiceLiveTransport.php')
+  assert.match(controller, /#\[Route\('\/api\/v1\/voice\/live'/)
+  assert.match(controller, /#\[Route\('\/options'/)
+  assert.match(
+    controller,
+    /#\[Route\('\/sessions', name: 'sessions_start', methods: \['POST'\]\)\]/
+  )
+  assert.match(
+    controller,
+    /#\[Route\('\/sessions\/\{id\}\/ticket', name: 'sessions_ticket', methods: \['POST'\]\)\]/
+  )
+  assert.match(controller, /#\[Route\('\/sessions\/\{id\}\/end'/)
+  assert.match(transport, /'carplay' === \$client/)
+})

@@ -204,3 +204,386 @@ final class UtteranceEndpointerTests: XCTestCase {
         XCTAssertEqual(full.withUnsafeBufferPointer { UtteranceEndpointer.levelDb(samples: $0.baseAddress!, count: 64) }, 0, accuracy: 0.001)
     }
 }
+
+final class LiveVoiceCarPlanTests: XCTestCase {
+    func testRouteUsesLiveOnlyWithConsentAndBudget() {
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: true, budgetExhausted: false, consentGiven: true)), .startLive)
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: true, budgetExhausted: false, consentGiven: false)), .turnBased)
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: false, budgetExhausted: false, consentGiven: true)), .turnBased)
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: LiveVoiceOptions(available: true, budgetExhausted: true, consentGiven: true)), .endBudget)
+    }
+
+    func testHttpStatusPicksBudgetBusyOrDown() {
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 429, code: "COST_BUDGET_EXCEEDED"), .endBudget)
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 403, code: "VOICE_CONSENT_REQUIRED"), .turnBased)
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 409, code: "VOICE_BUSY"), .speakThenTurnBased(.busy))
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 503, code: "VOICE_CAPACITY"), .speakThenTurnBased(.busy))
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 503, code: "VOICE_UNAVAILABLE"), .speakThenTurnBased(.down))
+        XCTAssertEqual(LiveVoiceCarPlan.route(status: 500, code: ""), .speakThenTurnBased(.down))
+    }
+
+    func testStartRequiresTheRelaySocket() {
+        let relay = LiveVoiceStart(sessionId: 4, chatId: 9, ticket: "t", wsUrl: "wss://example.test/voice/ws?ticket=t", inRate: 24000, outRate: 24000, transport: "relay")
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: relay), .startLive)
+        var direct = relay
+        direct.transport = "webrtc"
+        XCTAssertEqual(LiveVoiceCarPlan.route(for: direct), .speakThenTurnBased(.down))
+    }
+
+    func testStopReasons() {
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "limit_budget"), .budget)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "capacity"), .turnBased(.busy))
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "provider_error"), .turnBased(.down))
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "admin_disabled"), .turnBased(.down))
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "network_lost"), .network)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "idle"), .idle)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "user_end"), .quiet)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "max_duration"), .quiet)
+        XCTAssertEqual(LiveVoiceCarPlan.stop(for: "nope"), .failed)
+    }
+
+    func testReconnectWindowIsTwentySeconds() {
+        XCTAssertEqual(LiveVoiceCarPlan.reconnectWindow, 20)
+        let drop = Date(timeIntervalSince1970: 1_000)
+        XCTAssertTrue(LiveVoiceCarPlan.reconnectOpen(since: drop, now: drop.addingTimeInterval(19.9)))
+        XCTAssertFalse(LiveVoiceCarPlan.reconnectOpen(since: drop, now: drop.addingTimeInterval(20)))
+    }
+
+    func testDecodesOptionsStartAndFrames() throws {
+        let options = LiveVoiceCarPlan.options(from: Data(#"{"available":true,"budgetExhausted":false,"consentGiven":true}"#.utf8))
+        XCTAssertEqual(options, LiveVoiceOptions(available: true, budgetExhausted: false, consentGiven: true))
+        XCTAssertEqual(LiveVoiceCarPlan.errorCode(from: Data(#"{"code":"VOICE_BUSY"}"#.utf8)), "VOICE_BUSY")
+        let start = try LiveVoiceCarPlan.start(from: Data(#"{"sessionId":4,"chatId":9,"ticket":"abc","wsUrl":"wss://h/voice/ws?ticket=abc","transport":"relay","audio":{"inRate":16000,"outRate":24000}}"#.utf8))
+        XCTAssertEqual(start.sessionId, 4)
+        XCTAssertEqual(start.chatId, 9)
+        XCTAssertEqual(start.inRate, 16000)
+        XCTAssertEqual(LiveVoiceCarPlan.frame(from: #"{"type":"ended","reason":"limit_budget"}"#), .ended("limit_budget"))
+        XCTAssertEqual(LiveVoiceCarPlan.frame(from: #"{"type":"wrap_up"}"#), .wrapUp)
+        XCTAssertEqual(LiveVoiceCarPlan.frame(from: "nope"), .ignored)
+        XCTAssertThrowsError(try LiveVoiceCarPlan.start(from: Data(#"{"sessionId":1}"#.utf8)))
+    }
+
+    func testPcm16RoundTripAndResample() {
+        let samples: [Float] = [0, 0.5, -1, 1]
+        let decoded = PCM16.decode(PCM16.encode(samples))
+        XCTAssertEqual(decoded.count, samples.count)
+        for (got, want) in zip(decoded, samples) {
+            XCTAssertEqual(got, want, accuracy: 0.001)
+        }
+        let same = PCM16.resample([0.25, -0.25], from: 16000, to: 16000)
+        XCTAssertEqual(same, [0.25, -0.25])
+        let stretched = PCM16.resample([0, 1], from: 16000, to: 32000)
+        XCTAssertEqual(stretched.count, 4)
+        XCTAssertEqual(stretched[0], 0, accuracy: 0.001)
+        XCTAssertEqual(stretched[3], 1, accuracy: 0.001)
+    }
+
+    func testTitleFollowsTheReplyAndReturnsWhenItFinishes() {
+        var phase = LiveVoicePhase.connecting
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .ready)
+        XCTAssertEqual(phase, .listening)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .audio)
+        XCTAssertEqual(phase, .speaking)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .audio)
+        XCTAssertEqual(phase, .speaking)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .playbackIdle)
+        XCTAssertEqual(phase, .listening)
+
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .state("thinking"))
+        XCTAssertEqual(phase, .thinking)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .playbackIdle)
+        XCTAssertEqual(phase, .thinking)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .audio)
+        XCTAssertEqual(phase, .speaking)
+
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .wrapUp)
+        XCTAssertEqual(phase, .ending)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .audio)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .playbackIdle)
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .state("listening"))
+        XCTAssertEqual(phase, .ending)
+
+        phase = .speaking
+        phase = LiveVoiceCarPlan.phase(after: phase, signal: .interrupted)
+        XCTAssertEqual(phase, .listening)
+    }
+}
+
+final class LiveVoiceCuePlanTests: XCTestCase {
+    func testCueMomentsMatchTheChat() {
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .idle, next: .connecting), .open)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .ended, next: .connecting), .open)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .connecting, next: .listening), .ready)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .listening, next: .thinking), .ask)
+        XCTAssertNil(LiveVoiceCuePlan.cue(previous: .thinking, next: .speaking))
+        XCTAssertNil(LiveVoiceCuePlan.cue(previous: .speaking, next: .listening))
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .listening, next: .idle), .end)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .connecting, next: .ended, reason: "provider_error"), .fail)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .listening, next: .ended, reason: "limit_budget"), .end)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .listening, next: .ended, reason: "user_end"), .end)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .listening, next: .ended, reason: "max_duration"), .end)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .listening, next: .ended, reason: "network_lost"), .fail)
+        XCTAssertEqual(LiveVoiceCuePlan.cue(previous: .listening, next: .ended, reason: "mic_denied"), .fail)
+        XCTAssertNil(LiveVoiceCuePlan.cue(previous: .listening, next: .listening))
+        XCTAssertNil(LiveVoiceCuePlan.cue(previous: nil, next: .connecting))
+        XCTAssertNil(LiveVoiceCuePlan.cue(previous: .listening, next: .connecting))
+    }
+
+    func testAskGapAndCabinGate() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        XCTAssertTrue(LiveVoiceCuePlan.allowsAsk(now: now, lastAsk: nil))
+        XCTAssertFalse(LiveVoiceCuePlan.allowsAsk(now: now, lastAsk: now.addingTimeInterval(-0.5)))
+        XCTAssertTrue(LiveVoiceCuePlan.allowsAsk(now: now, lastAsk: now.addingTimeInterval(-0.91)))
+        XCTAssertFalse(LiveVoiceCuePlan.shouldPlayAsk(voiceProcessing: false, playbackBusy: false, now: now, lastAsk: nil))
+        XCTAssertFalse(LiveVoiceCuePlan.shouldPlayAsk(voiceProcessing: true, playbackBusy: true, now: now, lastAsk: nil))
+        XCTAssertTrue(LiveVoiceCuePlan.shouldPlayAsk(voiceProcessing: true, playbackBusy: false, now: now, lastAsk: nil))
+    }
+
+    func testEndingCues() {
+        XCTAssertEqual(LiveVoiceCuePlan.endingCue(for: .userEnded), .end)
+        XCTAssertEqual(LiveVoiceCuePlan.endingCue(for: .idle), .end)
+        XCTAssertEqual(LiveVoiceCuePlan.endingCue(for: .budget), .end)
+        XCTAssertEqual(LiveVoiceCuePlan.endingCue(for: .networkLost), .fail)
+        XCTAssertEqual(LiveVoiceCuePlan.endingCue(for: .failed), .fail)
+    }
+
+    func testCueStepsMatchTheChat() {
+        XCTAssertEqual(LiveVoiceCuePlan.steps(for: .open).map(\.frequency), [392, 523.25])
+        XCTAssertEqual(LiveVoiceCuePlan.steps(for: .open).map(\.duration), [0.08, 0.13])
+        XCTAssertEqual(LiveVoiceCuePlan.steps(for: .ready).map(\.frequency), [523.25, 659.25])
+        let ask = LiveVoiceCuePlan.steps(for: .ask)
+        XCTAssertEqual(ask.first?.frequency, 440)
+        XCTAssertEqual(ask.first?.toFrequency, 659.25)
+        XCTAssertEqual(ask.first?.duration, 0.17)
+        XCTAssertEqual(LiveVoiceCuePlan.steps(for: .end).map(\.frequency), [659.25, 392])
+        XCTAssertEqual(LiveVoiceCuePlan.steps(for: .fail).map(\.frequency), [311, 247])
+    }
+
+    func testCueSamplesStayInsideTheCabinLevelAndAskRises() {
+        let rate = 8_000.0
+        let open = LiveVoiceCuePlan.samples(for: .open, sampleRate: rate)
+        XCTAssertEqual(open.count, Int((LiveVoiceCuePlan.duration(for: .open) * rate).rounded()))
+        let peak = open.map { abs($0) }.max() ?? 0
+        XCTAssertGreaterThan(peak, 0.05)
+        XCTAssertLessThanOrEqual(peak, Float(LiveVoiceCuePlan.cabinGain) + 0.001)
+
+        let ask = LiveVoiceCuePlan.samples(for: .ask, sampleRate: rate)
+        let window = 400
+        XCTAssertGreaterThan(Self.crossings(Array(ask.suffix(window))), Self.crossings(Array(ask.prefix(window))))
+    }
+
+    private static func crossings(_ samples: [Float]) -> Int {
+        var count = 0
+        for index in 1 ..< samples.count where samples[index - 1] <= 0 && samples[index] > 0 {
+            count += 1
+        }
+        return count
+    }
+}
+
+final class PcmPlaybackStreamTests: XCTestCase {
+    private let sourceRate = 24_000.0
+
+    func testOneSignalSoundsTheSameInOneChunkOrMany() {
+        let pcm = Self.ramp(4000)
+        for deviceRate in [48_000.0, 44_100.0] {
+            let whole = play([pcm], deviceRate: deviceRate)
+            for size in [1, 17, 128] {
+                sameSamples(whole, play(Self.chunks(of: pcm, size: size), deviceRate: deviceRate))
+            }
+        }
+    }
+
+    func testSplitSignalHasNoSilenceInsideIt() {
+        let out = play(Self.chunks(of: Self.ramp(4000), size: 10), deviceRate: 48_000)
+        var ended = false
+        for sample in out {
+            if sample == 0 {
+                ended = true
+            } else {
+                XCTAssertFalse(ended)
+            }
+        }
+        XCTAssertTrue(ended)
+    }
+
+    func testPrebufferHoldsAShortTurnUntilItEnds() {
+        let deviceRate = 48_000.0
+        let below = Array(repeating: Int16(16_000), count: Int(sourceRate * PcmPlaybackStream.prebufferSeconds) - 100)
+        let waiting = PcmPlaybackStream()
+        waiting.config(sourceRate)
+        waiting.push(pcm: below)
+        let silent = render(waiting, count: Int(deviceRate * PcmPlaybackStream.startStallSeconds) - 1, deviceRate: deviceRate)
+        XCTAssertTrue(silent.allSatisfy { $0 == 0 })
+
+        waiting.push(pcm: Array(repeating: Int16(16_000), count: 200))
+        let started = render(waiting, count: 480, deviceRate: deviceRate)
+        XCTAssertTrue(started.contains { $0 != 0 })
+
+        let short = PcmPlaybackStream()
+        short.config(sourceRate)
+        short.push(pcm: below)
+        short.endTurn()
+        let played = render(short, count: 480, deviceRate: deviceRate)
+        XCTAssertTrue(played.contains { $0 != 0 })
+    }
+
+    func testUnderrunFadesInsteadOfClicking() {
+        let deviceRate = 48_000.0
+        let samples = Int((sourceRate * PcmPlaybackStream.prebufferSeconds).rounded(.up))
+        let stream = PcmPlaybackStream()
+        stream.config(sourceRate)
+        stream.push(pcm: Array(repeating: Int16(16_000), count: samples))
+        let out = render(
+            stream,
+            count: Int((Double(samples) * deviceRate / sourceRate).rounded(.up)) + 2000,
+            deviceRate: deviceRate
+        )
+
+        var peak: Float = 0
+        var loudAt = 0
+        for index in out.indices where abs(out[index]) > peak {
+            peak = abs(out[index])
+            loudAt = index
+        }
+        XCTAssertGreaterThan(peak, 0.4)
+        let tail = Array(out.suffix(from: loudAt))
+        let silentAt = tail.firstIndex(where: { $0 == 0 }) ?? -1
+        XCTAssertGreaterThan(silentAt, Int(deviceRate * 0.004))
+        if silentAt > 1 {
+            for index in 1 ..< silentAt {
+                XCTAssertLessThanOrEqual(tail[index], tail[index - 1] + 0.000001)
+            }
+        }
+        var biggestStep: Float = 0
+        for index in 1 ..< out.count {
+            biggestStep = max(biggestStep, abs(out[index] - out[index - 1]))
+        }
+        XCTAssertLessThan(biggestStep, 0.02)
+    }
+
+    func testIdleFiresOnceAfterTheReplyDrains() {
+        let deviceRate = 48_000.0
+        let samples = Int((sourceRate * PcmPlaybackStream.prebufferSeconds).rounded(.up))
+        let stream = PcmPlaybackStream()
+        stream.config(sourceRate)
+        stream.push(pcm: Array(repeating: Int16(8_000), count: samples))
+        let played = Int((Double(samples) * deviceRate / sourceRate).rounded(.up))
+        let settle = played + Int(deviceRate * 0.35)
+        _ = render(stream, count: settle, deviceRate: deviceRate)
+        XCTAssertTrue(stream.takeIdle())
+        XCTAssertFalse(stream.takeIdle())
+        XCTAssertFalse(stream.isOutputActive)
+
+        stream.push(pcm: Array(repeating: Int16(8_000), count: samples))
+        XCTAssertFalse(stream.takeIdle())
+        XCTAssertTrue(stream.isOutputActive)
+    }
+
+    func testFlushDropsTheBufferAndTheNextTurnStartsClean() {
+        let deviceRate = 48_000.0
+        let pcm = Self.ramp(4000)
+        let stream = PcmPlaybackStream()
+        stream.config(sourceRate)
+        stream.push(pcm: pcm)
+        _ = render(stream, count: 1000, deviceRate: deviceRate)
+        stream.flush()
+        let silenced = render(stream, count: 200, deviceRate: deviceRate)
+        XCTAssertTrue(silenced.allSatisfy { $0 == 0 })
+
+        stream.push(pcm: pcm)
+        let fresh = PcmPlaybackStream()
+        fresh.config(sourceRate)
+        fresh.push(pcm: pcm)
+        let length = Int((Double(pcm.count) * deviceRate / sourceRate).rounded(.up))
+        sameSamples(render(stream, count: length, deviceRate: deviceRate), render(fresh, count: length, deviceRate: deviceRate))
+    }
+
+    func testOddByteWaitsForTheNextPacket() {
+        var assembler = PcmFrameAssembler()
+        XCTAssertEqual(assembler.push(Data([0x01, 0x00, 0x02])), [1])
+        XCTAssertEqual(assembler.push(Data([0x00])), [2])
+        XCTAssertNil(assembler.push(Data([0xFF])))
+        XCTAssertEqual(assembler.push(Data([0x7F])), [32767])
+        assembler.reset()
+        XCTAssertNil(assembler.push(Data([0x00])))
+    }
+
+    func testOddByteSplitMatchesTheWholeSignal() {
+        let pcm = Self.ramp(4000)
+        var bytes = Data()
+        for sample in pcm {
+            var little = sample.littleEndian
+            withUnsafeBytes(of: &little) { bytes.append(contentsOf: $0) }
+        }
+        let whole = PcmPlaybackStream()
+        whole.config(sourceRate)
+        whole.push(data: bytes)
+        let split = PcmPlaybackStream()
+        split.config(sourceRate)
+        var offset = 0
+        var toggle = true
+        while offset < bytes.count {
+            let size = toggle ? 1 : 17
+            toggle.toggle()
+            let end = min(bytes.count, offset + size)
+            split.push(data: bytes.subdata(in: offset ..< end))
+            offset = end
+        }
+        let length = Int((Double(pcm.count) * 48_000 / sourceRate).rounded(.up)) + Int((48_000 * 0.02).rounded(.up))
+        sameSamples(render(whole, count: length, deviceRate: 48_000), render(split, count: length, deviceRate: 48_000))
+    }
+
+    private func play(_ chunks: [[Int16]], deviceRate: Double) -> [Float] {
+        let stream = PcmPlaybackStream()
+        stream.config(sourceRate)
+        var total = 0
+        for chunk in chunks {
+            stream.push(pcm: chunk)
+            total += chunk.count
+        }
+        let length = Int((Double(total) * deviceRate / sourceRate).rounded(.up)) + Int((deviceRate * 0.02).rounded(.up))
+        return render(stream, count: length, deviceRate: deviceRate)
+    }
+
+    private func render(_ stream: PcmPlaybackStream, count: Int, deviceRate: Double) -> [Float] {
+        var out = [Float](repeating: 0, count: count)
+        let block = 128
+        var offset = 0
+        while offset < out.count {
+            let end = min(out.count, offset + block)
+            out.withUnsafeMutableBufferPointer { buffer in
+                _ = stream.render(into: buffer.baseAddress! + offset, count: end - offset, deviceRate: deviceRate)
+            }
+            offset = end
+        }
+        return out
+    }
+
+    private func sameSamples(_ left: [Float], _ right: [Float]) {
+        XCTAssertEqual(left.count, right.count)
+        for index in 0 ..< min(left.count, right.count) {
+            if left[index] != right[index] {
+                XCTFail("sample \(index): \(left[index]) != \(right[index])")
+                return
+            }
+        }
+    }
+
+    private static func ramp(_ length: Int) -> [Int16] {
+        (0 ..< length).map { index in
+            Int16(1000 + (index % 50) * 300)
+        }
+    }
+
+    private static func chunks(of pcm: [Int16], size: Int) -> [[Int16]] {
+        var chunks: [[Int16]] = []
+        var offset = 0
+        while offset < pcm.count {
+            let end = min(pcm.count, offset + size)
+            chunks.append(Array(pcm[offset ..< end]))
+            offset = end
+        }
+        return chunks
+    }
+}

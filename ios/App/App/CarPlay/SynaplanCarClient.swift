@@ -137,6 +137,61 @@ final class SynaplanCarClient {
         return try CarAPIDecoding.dictationText(try await send(request))
     }
 
+    // MARK: - Live voice
+
+    func liveOptions() async -> (status: Int, data: Data) {
+        guard let url = URL(string: store.serverUrl + "/api/v1/voice/live/options") else {
+            return (0, Data())
+        }
+        return await live(URLRequest(url: url))
+    }
+
+    func liveStart(chatId: Int?, language: String) async -> (status: Int, data: Data) {
+        guard let url = URL(string: store.serverUrl + "/api/v1/voice/live/sessions") else {
+            return (0, Data())
+        }
+        var body: [String: Any] = ["client": "carplay", "language": language]
+        if let chatId { body["chatId"] = chatId }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        return await live(request)
+    }
+
+    func liveResumeTicket(sessionId: Int) async -> LiveVoiceStart? {
+        guard let url = URL(string: store.serverUrl + "/api/v1/voice/live/sessions/\(sessionId)/ticket") else {
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        let response = await live(request)
+        guard (200 ..< 300).contains(response.status) else { return nil }
+        return try? LiveVoiceCarPlan.start(from: response.data)
+    }
+
+    func liveEnd(sessionId: Int) async {
+        guard let url = URL(string: store.serverUrl + "/api/v1/voice/live/sessions/\(sessionId)/end") else {
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data(#"{"reason":"user_end"}"#.utf8)
+        _ = await live(request)
+    }
+
+    private func live(_ request: URLRequest) async -> (status: Int, data: Data) {
+        do {
+            let (data, response) = try await authorizedData(for: request)
+            return ((response as? HTTPURLResponse)?.statusCode ?? 0, data)
+        } catch {
+            return (0, Data())
+        }
+    }
+
     /// `speech.speechToTextAvailable` from the public runtime config.
     func serverTranscriptionAvailable() async -> Bool {
         guard let url = URL(string: store.serverUrl + "/api/v1/config/runtime") else { return false }

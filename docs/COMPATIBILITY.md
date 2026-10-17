@@ -23,6 +23,43 @@
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
 
+### Unreleased — live conversations in CarPlay (LV8)
+
+Not a store build yet. The CarPlay voice screen can open a full-duplex relay socket when the
+server says live voice is available, the driver has allowed it, and the monthly budget is not
+used up. CarPlay always uses the relay: the server ignores the WebRTC admin switch for
+`client: carplay`. A dropped socket can resume the same session for 20 seconds
+(`POST /api/v1/voice/live/sessions/{id}/ticket`). A used-up budget is one spoken sentence and
+the conversation ends. A busy or down live service is one spoken sentence, then the existing
+turn-based loop. The voice screen is full screen and shows only the phase title, which follows
+the reply audio. Call tones mark opening, ready, question sent, hang-up, and failure. Live
+provider audio plays as one resampled stream, so packet boundaries do not click.
+
+The resume-ticket route, the CarPlay relay rule, and the SPA's native live-voice seam are in the
+`v5.4.2` pin; no newer Synaplan release is required.
+
+A head-unit echo and barge-in pass is still open. J-LV-7 was not walked.
+
+- Release classification: **store-required** — CarPlay voice behavior in the binary.
+
+### Unreleased — live conversations in the apps (LV7)
+
+Not a store build yet. Recorded here so the binary is not cut without the matching SPA seam.
+
+The new binary registers an app-local plugin, `SynaplanLiveVoice`, on iOS and Android. The
+bundled SPA shows the waveform button only when that plugin is present. Older binaries keep
+the button hidden, including after an OTA of the bootstrap. Audio stays in the WebView
+(`getUserMedia` on the relay socket). Capacitor's WebChromeClient grants
+`RESOURCE_AUDIO_CAPTURE` from the existing `RECORD_AUDIO` permission. The iOS microphone
+purpose string names live conversations. No new IAP product: the conversation draws on the
+plan budget, and a spent budget opens the existing store subscription screen.
+
+A native audio plugin is not part of this step. Loudspeaker echo cancellation in WKWebView
+is still unmeasured (`STATUS.md` in the live-voice plan). Add that plugin only if the
+measurement says the WebView path is too weak.
+
+- Release classification: **store-required** — native plugin, purpose string, privacy labels.
+
 ### Store builds check the App Store train first
 
 `store-rc.yml` reads App Store Connect before it builds and refuses an iOS binary whose version
@@ -44,7 +81,7 @@ shown).
 App-owned only; built against the `v5.3.1` pin (the `pinned` chat field needs `v5.2.0`+ and is
 optional on older servers).
 
-Adds a native CarPlay surface (iOS 26.4+, overlay on iOS 27): a list of recent chats and a
+Adds a native CarPlay surface (iOS 26.4+): a list of recent chats and a full-screen
 voice-only conversation that speaks the answers. Details in [`CARPLAY.md`](CARPLAY.md).
 
 - Capacitor `8.4.1` → `8.5.3` and the UIScene lifecycle (`SceneDelegate` + scene manifest with a

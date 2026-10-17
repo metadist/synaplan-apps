@@ -13,6 +13,9 @@
   declaration and is filled at submission time (see synaplan-apps LAUNCH_CHECKLIST).
   NSPrivacyCollectedDataTypes is therefore left empty here on purpose — the app's
   own binary collects nothing locally; all data flows through the backend.
+  Live-conversation audio is declared on the App Store nutrition label and in
+  Play Data safety (see docs/STORE_LISTINGS.md), not in this file: the binary
+  does not store the recording.
 -->
 <plist version="1.0">
 <dict>

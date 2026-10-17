@@ -455,6 +455,8 @@ test('Shortcuts and Camera bridges are exposed on the native shell', () => {
   assert.equal(typeof env.window.SynaplanCamera.isAvailable, 'function')
   assert.equal(typeof env.window.SynaplanCamera.capturePhoto, 'function')
   assert.equal(env.window.SynaplanCamera.isAvailable(), false)
+  assert.equal(typeof env.window.SynaplanLiveVoice.isAvailable, 'function')
+  assert.equal(env.window.SynaplanLiveVoice.isAvailable(), false)
 })
 
 test('consumePending returns the native store action and skips a later duplicate token', async () => {
@@ -504,6 +506,23 @@ test('subscribe flushes buffered plugin events and consumePending de-duplicates 
 
   const pending = await env.window.SynaplanShortcuts.consumePending()
   assert.equal(pending.length, 0)
+})
+
+test('live voice is available only when this binary registered the plugin', () => {
+  const missing = loadBootstrap()
+  assert.equal(missing.window.SynaplanLiveVoice.isAvailable(), false)
+
+  const present = loadBootstrap({
+    extraPlugins: {
+      SynaplanLiveVoice: {
+        isAvailable: () => Promise.resolve({ available: true }),
+      },
+    },
+  })
+  assert.equal(present.window.SynaplanLiveVoice.isAvailable(), true)
+
+  const web = loadBootstrap({ userAgent: WEB_UA })
+  assert.equal(web.window.SynaplanLiveVoice.isAvailable(), false)
 })
 
 test('capturePhoto falls back to the photo library when the camera is unavailable', async () => {

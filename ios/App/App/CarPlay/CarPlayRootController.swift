@@ -2,8 +2,8 @@ import CarPlay
 import UIKit
 
 /// Owns the CarPlay template hierarchy: one list (new conversation + recent
-/// chats) and, while talking, the voice control template on top of it. No
-/// chat content is ever shown as text — the car only gets titles and times.
+/// chats) and, while talking, a full-screen voice screen. No chat content is
+/// ever shown as text — the car only gets titles and times.
 @MainActor
 final class CarPlayRootController {
     private let interfaceController: CPInterfaceController
@@ -12,7 +12,9 @@ final class CarPlayRootController {
     private let listTemplate: CPListTemplate
     private var voiceTemplate: CPVoiceControlTemplate?
     private var engine: VoiceConversationEngine?
-    private var usesOverlay = false
+    /// The title that should be on screen. CarPlay drops a change that follows
+    /// another too quickly, so a later pass applies this one again.
+    private var wantedVoiceState: String?
     private var loadTask: Task<Void, Never>?
     private var sessionObserver: NSObjectProtocol?
 
@@ -149,13 +151,16 @@ final class CarPlayRootController {
         engine.start()
     }
 
+    /// Title and the two buttons only. The full-screen voice template on iOS 27
+    /// lays out a custom state image at zero height, so a phase picture would
+    /// not be visible; the title carries the phase instead.
     @available(iOS 26.4, *)
     private func makeVoiceTemplate() -> CPVoiceControlTemplate {
         let states = VoiceState.allCases.map { state -> CPVoiceControlState in
             let control = CPVoiceControlState(
                 identifier: state.rawValue,
                 titleVariants: Self.titleVariants(for: state),
-                image: Self.image(for: state),
+                image: nil,
                 repeats: false
             )
             control.actionButtons = Array(actionButtons(for: state).prefix(CPVoiceControlState.maximumActionButtonCount))
@@ -178,32 +183,16 @@ final class CarPlayRootController {
         return [mute, end]
     }
 
+    /// Full screen, the same presentation as a voice call. The iOS 27 overlay
+    /// keeps the chat list behind a card, which is the wrong place to listen.
     private func presentVoiceTemplate(_ template: CPVoiceControlTemplate) {
-        if #available(iOS 27.0, *) {
-            usesOverlay = true
-            interfaceController.showOverlayTemplate(template, animated: true) { [weak self] success, _ in
-                guard !success else { return }
-                Task { @MainActor in
-                    self?.usesOverlay = false
-                    self?.interfaceController.presentTemplate(template, animated: true, completion: nil)
-                }
-            }
-        } else {
-            usesOverlay = false
-            interfaceController.presentTemplate(template, animated: true, completion: nil)
-        }
+        interfaceController.presentTemplate(template, animated: true, completion: nil)
     }
 
     private func dismissVoiceTemplate(then next: @escaping () -> Void) {
         voiceTemplate = nil
-        if usesOverlay, #available(iOS 27.0, *) {
-            interfaceController.hideOverlayTemplate(animated: true) { _, _ in
-                Task { @MainActor in next() }
-            }
-        } else {
-            interfaceController.dismissTemplate(animated: true) { _, _ in
-                Task { @MainActor in next() }
-            }
+        interfaceController.dismissTemplate(animated: true) { _, _ in
+            Task { @MainActor in next() }
         }
     }
 
@@ -227,16 +216,6 @@ final class CarPlayRootController {
         }
     }
 
-    private static func image(for state: VoiceState) -> UIImage? {
-        switch state {
-        case .connecting: return symbol("antenna.radiowaves.left.and.right", size: 72)
-        case .listening: return symbol("waveform", size: 72)
-        case .thinking: return symbol("ellipsis", size: 72)
-        case .speaking: return symbol("speaker.wave.2.fill", size: 72)
-        case .muted: return symbol("mic.slash.fill", size: 72)
-        }
-    }
-
     private static func symbol(_ name: String, size: CGFloat) -> UIImage {
         let configuration = UIImage.SymbolConfiguration(pointSize: size, weight: .regular)
         return UIImage(systemName: name, withConfiguration: configuration) ?? UIImage()
@@ -246,7 +225,19 @@ final class CarPlayRootController {
 extension CarPlayRootController: VoiceConversationEngineDelegate {
     func voiceEngine(_ engine: VoiceConversationEngine, didChange state: VoiceState) {
         guard engine === self.engine else { return }
-        voiceTemplate?.activateVoiceControlState(withIdentifier: state.rawValue)
+        showVoiceState(state.rawValue)
+    }
+
+    /// CarPlay drops a state change that follows another one too quickly, and
+    /// it does not say so. Apply the wanted title again once.
+    private func showVoiceState(_ identifier: String) {
+        wantedVoiceState = identifier
+        voiceTemplate?.activateVoiceControlState(withIdentifier: identifier)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self, self.wantedVoiceState == identifier else { return }
+            guard self.voiceTemplate?.activeStateIdentifier != identifier else { return }
+            self.voiceTemplate?.activateVoiceControlState(withIdentifier: identifier)
+        }
     }
 
     func voiceEngine(_ engine: VoiceConversationEngine, didEndWith reason: VoiceEndReason, chatId: Int?) {
