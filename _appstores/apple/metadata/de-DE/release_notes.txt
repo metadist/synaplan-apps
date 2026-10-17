@@ -1,1 +1,2 @@
-Sprich mit Synaplan im Auto. CarPlay zeigt deine letzten Chats und spricht die Antworten.
+Live-Gespräche: Sprich mit Synaplan direkt im Chat, unterbrich die Antwort, und finde das Transkript im selben Chat.
+In CarPlay öffnen sich Live-Gespräche im Vollbild, kurze Töne zeigen dir, wann du dran bist, und der Bildschirm zeigt, ob Synaplan zuhört, nachdenkt oder spricht.
