@@ -70,7 +70,7 @@ shown).
 App-owned only; built against the `v5.3.1` pin (the `pinned` chat field needs `v5.2.0`+ and is
 optional on older servers).
 
-Adds a native CarPlay surface (iOS 26.4+, overlay on iOS 27): a list of recent chats and a
+Adds a native CarPlay surface (iOS 26.4+): a list of recent chats and a full-screen
 voice-only conversation that speaks the answers. Details in [`CARPLAY.md`](CARPLAY.md).
 
 - Capacitor `8.4.1` → `8.5.3` and the UIScene lifecycle (`SceneDelegate` + scene manifest with a

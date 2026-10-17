@@ -237,50 +237,56 @@ extension SpeechOutput: AVSpeechSynthesizerDelegate {
     }
 }
 
-/// Short generated tones that tell the driver, without looking, when the
-/// microphone opens, when Synaplan is working, and when something went wrong.
+/// Short generated tones for the moments a driver needs to hear: the call
+/// opening, the line becoming ready, a question going to Synaplan, hang-up,
+/// and a failed start. Played on the voice graph while it is running, so
+/// echo cancellation hears the same tone the cabin does.
 @MainActor
 final class AudioCues {
-    enum Cue {
-        case listening
-        case thinking
-        case ended
-        case error
-    }
-
     private var player: AVAudioPlayer?
-    private lazy var tones: [Cue: Data] = [
-        .listening: Self.wav(frequencies: [660, 880], toneDuration: 0.09),
-        .thinking: Self.wav(frequencies: [520], toneDuration: 0.07),
-        .ended: Self.wav(frequencies: [880, 660], toneDuration: 0.09),
-        .error: Self.wav(frequencies: [330, 247], toneDuration: 0.14),
-    ]
 
-    func play(_ cue: Cue) async {
-        guard let data = tones[cue], let player = try? AVAudioPlayer(data: data) else { return }
+    func play(_ cue: LiveVoiceCue, through graph: VoiceAudioGraph?) async {
+        if let graph, graph.isRunning, let format = graph.playbackFormat,
+           let buffer = Self.buffer(for: cue, format: format) {
+            graph.enqueue(buffer)
+            let seconds = LiveVoiceCuePlan.duration(for: cue) + 0.05
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            return
+        }
+        guard let player = try? AVAudioPlayer(data: Self.wav(for: cue)) else { return }
         self.player = player
         player.play()
         try? await Task.sleep(nanoseconds: UInt64(player.duration * 1_000_000_000))
     }
 
-    /// 16-bit mono PCM WAV with a short fade per tone to avoid clicks.
-    static func wav(frequencies: [Double], toneDuration: Double, sampleRate: Double = 44_100) -> Data {
-        var samples: [Int16] = []
-        let perTone = Int(toneDuration * sampleRate)
-        let fade = max(1, perTone / 8)
-        for frequency in frequencies {
-            for index in 0 ..< perTone {
-                let envelope = min(1, Double(min(index, perTone - index)) / Double(fade))
-                let value = sin(2 * .pi * frequency * Double(index) / sampleRate) * envelope * 0.35
-                samples.append(Int16(value * Double(Int16.max)))
+    private static func buffer(for cue: LiveVoiceCue, format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let samples = LiveVoiceCuePlan.samples(for: cue, sampleRate: format.sampleRate)
+        guard !samples.isEmpty, format.channelCount > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
+              let channels = buffer.floatChannelData else {
+            return nil
+        }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        for channel in 0 ..< Int(format.channelCount) {
+            for index in 0 ..< samples.count {
+                channels[channel][index] = samples[index]
             }
+        }
+        return buffer
+    }
+
+    /// 16-bit mono PCM WAV for a cue played before the voice engine is up.
+    private static func wav(for cue: LiveVoiceCue, sampleRate: Double = 44_100) -> Data {
+        let pcm = LiveVoiceCuePlan.samples(for: cue, sampleRate: sampleRate).map { sample -> Int16 in
+            let clamped = max(-1, min(1, Double(sample)))
+            return Int16((clamped * Double(Int16.max)).rounded())
         }
         var data = Data()
         func append<T: FixedWidthInteger>(_ value: T) {
             var little = value.littleEndian
             data.append(Data(bytes: &little, count: MemoryLayout<T>.size))
         }
-        let byteCount = UInt32(samples.count * 2)
+        let byteCount = UInt32(pcm.count * 2)
         data.append(Data("RIFF".utf8))
         append(UInt32(36) + byteCount)
         data.append(Data("WAVEfmt ".utf8))
@@ -293,7 +299,7 @@ final class AudioCues {
         append(UInt16(16))
         data.append(Data("data".utf8))
         append(byteCount)
-        for sample in samples {
+        for sample in pcm {
             append(sample)
         }
         return data

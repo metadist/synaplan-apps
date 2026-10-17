@@ -1,4 +1,4 @@
-# CarPlay — Voice Conversations (iOS 26.4+, overlay on iOS 27)
+# CarPlay — Voice Conversations (iOS 26.4+)
 
 Synaplan appears on the CarPlay display as a **voice-based conversational app**: a list with
 "New conversation" and the twelve most recent chats, and a voice screen that only shows the state
@@ -23,10 +23,14 @@ conversation is a normal chat and appears in the iPhone chat history right away.
 | Audio session only while voice is actively used; `playAndRecord`, mode `voiceChat`, no mixing | One engine for the microphone and the reply, so the driver can talk over the answer. Echo cancellation has to be available; otherwise the reply finishes before the microphone opens again. The first 0.8 s of every sentence measure how much of the reply still reaches the microphone, and only speech 12 dB above that leak for 0.4 s interrupts — a strong echo (e.g. speaker next to the microphone) makes the reply play to the end instead of cutting itself off. Released while muted and when the conversation ends |
 | Works while the iPhone is locked | Session mirror with `AfterFirstUnlockThisDeviceOnly` — see [Session](#session-while-the-iphone-is-locked) |
 
-The voice control template uses `CPVoiceControlState.actionButtons` (iOS 26.4). On iOS 27 it is
-shown with `showOverlayTemplate` over the list; on iOS 26.4–26.x it is presented full screen.
-The store archive is built with Xcode 27, so that call compiles. Below iOS 26.4 the CarPlay scene
-states that iOS 26.4 or later is required.
+The voice control template uses `CPVoiceControlState.actionButtons` (iOS 26.4) and is presented
+full screen, so the chat list is not visible while the driver is talking. The screen is the phase
+title ("Connecting", "I'm listening", "Thinking", "Answering", "Muted") and the two buttons, mute
+and end. The states carry no image: on iOS 27 the full-screen layout gives a custom state image
+no height (measured with bitmaps from 24 to 150 pt, SF Symbols and asset-catalog images alike),
+so a phase picture there is not visible, and `backgroundImage` is blurred by the system. The
+title and the tones below carry the phase. Below iOS 26.4 the CarPlay scene states that iOS 26.4
+or later is required.
 
 ## Architecture
 
@@ -50,6 +54,7 @@ All files live in `ios/App/App/CarPlay/`:
 | `CarPlayRootController.swift` | Root list, empty/error states, voice template, alerts |
 | `VoiceConversationEngine.swift` | Hands-free loop. Live relay when the server allows it, otherwise listen → send → speak |
 | `LiveVoiceCarPlan.swift` | Pure live/fallback decisions, unit-tested in `ios/CarPlayLogic` |
+| `PcmPlaybackStream.swift` | Continuous PCM16 playback with resampling, unit-tested in `ios/CarPlayLogic` |
 | `LiveVoiceSession.swift` | Relay socket, PCM16 microphone and playback on `VoiceAudioGraph` |
 | `SpeechInput.swift` | Microphone capture, on-device `SpeechTranscriber`, server dictation fallback |
 | `SpeechOutput.swift` | Sentence-wise TTS with the user's voice, `AVSpeechSynthesizer` fallback, audio cues |
@@ -131,14 +136,31 @@ conversation.
 
 When live voice is available, the driver has allowed it, and the monthly budget is not used up,
 the car opens the relay socket instead of the turn-based loop. The microphone is PCM16 into the
-gateway and the provider audio plays on the same graph. Echo cancellation stays on. The voice
-model handles talking over a reply. CarPlay has no WebRTC stack, so the server forces `relay`
+gateway and the provider audio plays on the same graph. A GPT live voice is 24 kHz. Those packets
+are one continuous stream, resampled to the car rate the same way as on the website, so a packet
+boundary does not click. Echo cancellation stays on. The voice
+model handles talking over a reply. The title uses the same moments as the phone: "I'm
+listening" until reply audio arrives, "Thinking" only while Synaplan is working, "Answering"
+while that audio is still playing, and "I'm listening" again once the reply has finished. The
+relay sends no separate listening or speaking mark, so the car reads them from the audio.
+CarPlay has no WebRTC stack, so the server forces `relay`
 for `client: carplay` even when the admin switch is on.
 
-A used-up budget is one spoken sentence and the conversation ends. The turn-based loop uses the
-same budget, so it is not offered. A busy or down live service is one spoken sentence, then the
-turn-based loop continues in the same chat. Missing consent stays on that loop without a
-sentence. The car screen still shows no message text.
+The same short tones as a live call on the phone mark the moments the driver cannot see.
+A rising pair opens the call, a second rising pair means the line is ready, a short sweep
+means the question went to Synaplan, a falling pair is hang-up, and a lower falling pair is
+a failure. Speaking, and listening again after an answer, stay silent. The tones play through
+the voice engine, and the ready tone finishes before the microphone opens, so echo
+cancellation hears them and they are not the first thing the relay transcribes. A reconnect
+inside the same call does not play the opening tone again. Reduce Motion does not mute them:
+in the car the tone is the signal. The turn-based fallback uses the same melodies, including
+one ready tone before each listen. A busy or down live service does not play a closing tone;
+the conversation continues.
+
+A used-up budget is one falling tone, then one spoken sentence, and the conversation ends.
+The turn-based loop uses the same budget, so it is not offered. A busy or down live service
+is one spoken sentence, then the turn-based loop continues in the same chat. Missing consent
+stays on that loop without a sentence. The car screen still shows no message text.
 
 A dropped socket keeps the provider session for 20 seconds. The app asks for a new ticket on the
 same session id and reconnects. After 20 seconds the server ends it with `network_lost` and the
@@ -188,8 +210,8 @@ runtime cannot start a CarPlay session (investigation on Xcode 27.0 and 27.1 bet
 
 | Environment | What it covers | Needs |
 |-------------|----------------|-------|
-| Real iPhone (iOS 27) + **CarPlay Simulator** (Device Hub / Additional Tools for Xcode) | Everything, including the iOS 27 overlay and the lock test | The granted entitlement in a development profile |
-| **Xcode 26.4** side by side, Simulator app, iOS 26.4 runtime | List, full-screen voice template (the 26.4 fallback), alerts, lock test; not the iOS 27 overlay | Xcode 26.4 download (Apple ID) |
+| Real iPhone (iOS 27) + **CarPlay Simulator** (Device Hub / Additional Tools for Xcode) | Everything, including the full-screen voice screen and the lock test | The granted entitlement in a development profile |
+| **Xcode 26.4** side by side, Simulator app, iOS 26.4 runtime | List, full-screen voice template, alerts, lock test | Xcode 26.4 download (Apple ID) |
 | Real car or wireless head unit | Echo cancellation, radio interruption | The granted entitlement |
 
 The phone side (session mirror, bootstrap bridge, permission hand-off) runs in any simulator.
@@ -207,7 +229,13 @@ The phone side (session mirror, bootstrap bridge, permission hand-off) runs in a
       microphone <bundle id>`): the conversation ends with "Synaplan doesn't have access to the
       microphone." and no dialog appears on the phone; the next time the app is opened on the
       phone, the system asks.
-   4. New conversation → connecting → listening (Mac microphone) → thinking → speaking.
+   4. New conversation fills the screen (the chat list is gone). A short rising tone, then
+      "Connecting" → a second rising tone when the line is ready → listening → a short
+      sweep when the question is sent → speaking, with no extra tone under the answer. The
+      title is "I'm listening" while the driver talks, "Thinking" only during a lookup,
+      "Answering" while the reply plays, and "I'm listening" again once it has finished.
+      End plays a falling tone. On a real head
+      unit, those tones must not show up in the chat transcript.
    5. Mute: other audio may resume. Unmute; End. The list reloads and the chat appears at the top
       and in the iPhone history.
    6. Continue an existing chat.

@@ -70,6 +70,9 @@ final class VoiceConversationEngine {
     private var unmuteContinuation: CheckedContinuation<Void, Never>?
     private var observers: [NSObjectProtocol] = []
     private var ended = false
+    private var announcedOpen = false
+    private var playedEndingCue = false
+    private var lastAsk: Date?
 
     init(chatId: Int?, client: SynaplanCarClient = .shared, store: CarSessionStore = .shared) {
         self.chatId = chatId
@@ -162,6 +165,11 @@ final class VoiceConversationEngine {
             guard let created = await makeInput() else { return finish(.speechUnavailable) }
             if Task.isCancelled { return }
             input = created
+            if !announcedOpen {
+                await cues.play(.open, through: graph)
+                announcedOpen = true
+                if Task.isCancelled { return }
+            }
         }
         guard let input else { return finish(.speechUnavailable) }
 
@@ -174,7 +182,7 @@ final class VoiceConversationEngine {
                 carried = nil
             } else {
                 set(.listening)
-                await cues.play(.listening)
+                await cues.play(.ready, through: graph)
                 if Task.isCancelled { return }
                 do {
                     transcript = try await input.listen(language: store.language, includePreroll: false)
@@ -240,11 +248,12 @@ final class VoiceConversationEngine {
                 return .continueTurnBased
             }
             if let chatId = start.chatId { self.chatId = chatId }
-            let session = LiveVoiceSession(client: client, graph: graph) { [weak self] state in
+            let session = LiveVoiceSession(client: client, graph: graph, cues: cues) { [weak self] state in
                 self?.set(state)
             }
             liveSession = session
             let result = await session.run(start)
+            announcedOpen = session.didPlayOpen || announcedOpen
             liveSession = nil
             graph.setHandler(nil)
             return await outcome(result.stop, heardGoodbye: result.heardGoodbye)
@@ -273,10 +282,14 @@ final class VoiceConversationEngine {
         case .idle:
             return .stop(.idle)
         case .budget:
-            if !heardGoodbye { await speakSentence(.budget) }
+            if !heardGoodbye {
+                await playEndingCue(.budget)
+                if !Task.isCancelled { await speakSentence(.budget) }
+            }
             return .stop(.budget)
         case .network:
-            await speakSentence(.networkLost)
+            await playEndingCue(.networkLost)
+            if !Task.isCancelled { await speakSentence(.networkLost) }
             return .stop(.networkLost)
         case .failed:
             return .stop(.failed)
@@ -296,7 +309,10 @@ final class VoiceConversationEngine {
     /// Sends one utterance and speaks the reply.
     private func answer(_ transcript: String) async -> AnswerResult {
         set(.thinking)
-        await cues.play(.thinking)
+        if LiveVoiceCuePlan.allowsAsk(now: Date(), lastAsk: lastAsk) {
+            lastAsk = Date()
+            await cues.play(.ask, through: graph)
+        }
         let language = store.language
 
         do {
@@ -414,24 +430,38 @@ final class VoiceConversationEngine {
 
         let finalChat = chatId
         Task { @MainActor in
-            switch reason {
-            case .userEnded, .budget, .networkLost:
-                break
-            case .idle:
-                await cues.play(.ended)
-            default:
-                await cues.play(.error)
-            }
+            await self.playEndingCue(Self.ending(for: reason))
             if let key = reason.messageKey {
-                await output.speakLocally(CarPlayStrings.text(key), language: store.language)
+                await self.output.speakLocally(CarPlayStrings.text(key), language: self.store.language)
             }
-            deactivateAudioSession()
-            delegate?.voiceEngine(self, didEndWith: reason, chatId: finalChat)
+            self.deactivateAudioSession()
+            self.delegate?.voiceEngine(self, didEndWith: reason, chatId: finalChat)
+        }
+    }
+
+    /// Hang-up, silence and a used-up budget fall. Everything else fails.
+    /// The tone plays once, before a spoken recovery when there is one.
+    private func playEndingCue(_ ending: LiveVoiceEnding) async {
+        guard !playedEndingCue else { return }
+        playedEndingCue = true
+        if !graph.isRunning {
+            try? activateAudioSession()
+        }
+        await cues.play(LiveVoiceCuePlan.endingCue(for: ending), through: graph)
+    }
+
+    private static func ending(for reason: VoiceEndReason) -> LiveVoiceEnding {
+        switch reason {
+        case .userEnded: return .userEnded
+        case .idle: return .idle
+        case .budget: return .budget
+        case .networkLost: return .networkLost
+        default: return .failed
         }
     }
 
     private func set(_ newState: VoiceState) {
-        guard !ended, state != newState || newState == .listening else { return }
+        guard !ended, state != newState else { return }
         state = newState
         delegate?.voiceEngine(self, didChange: newState)
     }

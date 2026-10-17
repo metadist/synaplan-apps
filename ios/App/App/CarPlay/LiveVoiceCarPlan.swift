@@ -45,6 +45,17 @@ struct LiveVoiceStart: Equatable {
     var transport: String
 }
 
+/// What moves the car's phase title. The relay only marks thinking. Speaking
+/// and listening come from the reply audio, the same way as on the phone.
+enum LiveVoiceSignal: Equatable {
+    case ready
+    case state(String)
+    case audio
+    case playbackIdle
+    case interrupted
+    case wrapUp
+}
+
 enum LiveVoiceFrame: Equatable {
     case ready
     case state(String)
@@ -148,6 +159,28 @@ enum LiveVoiceCarPlan {
         }
     }
 
+    /// Same transitions as a live call on the phone. A reply stays "answering"
+    /// until its audio has drained, and thinking is not replaced by that drain.
+    static func phase(after current: LiveVoicePhase, signal: LiveVoiceSignal) -> LiveVoicePhase {
+        switch signal {
+        case .wrapUp:
+            return .ending
+        case .ready:
+            return .listening
+        case let .state(name):
+            if current == .ending { return .ending }
+            if name == "thinking" { return .thinking }
+            if name == "speaking" { return .speaking }
+            return .listening
+        case .audio:
+            return current == .ending ? .ending : .speaking
+        case .playbackIdle:
+            return current == .speaking ? .listening : current
+        case .interrupted:
+            return current == .ending ? .ending : .listening
+        }
+    }
+
     private static func jsonObject(_ data: Data) -> [String: Any]? {
         try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
@@ -156,6 +189,158 @@ enum LiveVoiceCarPlan {
         if let int = value as? Int { return int }
         if let number = value as? NSNumber, !(value is Bool) { return number.intValue }
         return nil
+    }
+}
+
+/// Phases that decide a cue. Same set the chat uses, including the ones that
+/// stay silent (`speaking`, `ending`).
+enum LiveVoicePhase: Equatable {
+    case idle
+    case connecting
+    case listening
+    case thinking
+    case speaking
+    case ending
+    case ended
+}
+
+enum LiveVoiceCue: Equatable {
+    case open
+    case ready
+    case ask
+    case end
+    case fail
+}
+
+/// Why the car conversation stopped, reduced to the two closing tones.
+enum LiveVoiceEnding: Equatable {
+    case userEnded
+    case idle
+    case budget
+    case networkLost
+    case failed
+}
+
+struct LiveVoiceCueStep: Equatable {
+    var frequency: Double
+    var toFrequency: Double?
+    var duration: Double
+}
+
+/// One tone per moment, matching `liveCueForTransition` in the chat.
+///
+/// Rising means the line is opening, falling means it is closing. Speaking
+/// and a return to listening stay silent: the voices are already the sound.
+/// The phone plays these near a gain of 0.05. In the car they use the level
+/// the turn tones already had, so they stay audible over road noise.
+enum LiveVoiceCuePlan {
+    static let askGap: TimeInterval = 0.9
+    /// Silence between the notes of one cue, matching the chat.
+    static let stepGap: TimeInterval = 0.045
+    static let cabinGain: Double = 0.35
+
+    static let failures: Set<String> = [
+        "provider_error",
+        "network_lost",
+        "capacity",
+        "mic_denied",
+        "admin_disabled",
+    ]
+
+    static func cue(previous: LiveVoicePhase?, next: LiveVoicePhase, reason: String = "") -> LiveVoiceCue? {
+        guard let previous, previous != next else { return nil }
+        if next == .connecting, previous == .idle || previous == .ended { return .open }
+        if next == .listening, previous == .connecting { return .ready }
+        if next == .thinking { return .ask }
+        if next == .idle, previous != .ended { return .end }
+        if next == .ended { return failures.contains(reason) ? .fail : .end }
+        return nil
+    }
+
+    static func endingCue(for ending: LiveVoiceEnding) -> LiveVoiceCue {
+        switch ending {
+        case .userEnded, .idle, .budget:
+            return .end
+        case .networkLost, .failed:
+            return .fail
+        }
+    }
+
+    static func allowsAsk(now: Date, lastAsk: Date?) -> Bool {
+        guard let lastAsk else { return true }
+        return now.timeIntervalSince(lastAsk) >= askGap
+    }
+
+    /// Ask overlaps an open microphone. Skip it when the reply is already
+    /// playing, or when echo cancellation cannot take the tone back out.
+    static func shouldPlayAsk(voiceProcessing: Bool, playbackBusy: Bool, now: Date, lastAsk: Date?) -> Bool {
+        voiceProcessing && !playbackBusy && allowsAsk(now: now, lastAsk: lastAsk)
+    }
+
+    static func steps(for cue: LiveVoiceCue) -> [LiveVoiceCueStep] {
+        switch cue {
+        case .open:
+            return [
+                LiveVoiceCueStep(frequency: 392, toFrequency: nil, duration: 0.08),
+                LiveVoiceCueStep(frequency: 523.25, toFrequency: nil, duration: 0.13),
+            ]
+        case .ready:
+            return [
+                LiveVoiceCueStep(frequency: 523.25, toFrequency: nil, duration: 0.07),
+                LiveVoiceCueStep(frequency: 659.25, toFrequency: nil, duration: 0.15),
+            ]
+        case .ask:
+            return [
+                LiveVoiceCueStep(frequency: 440, toFrequency: 659.25, duration: 0.17),
+            ]
+        case .fail:
+            return [
+                LiveVoiceCueStep(frequency: 311, toFrequency: nil, duration: 0.09),
+                LiveVoiceCueStep(frequency: 247, toFrequency: nil, duration: 0.15),
+            ]
+        case .end:
+            return [
+                LiveVoiceCueStep(frequency: 659.25, toFrequency: nil, duration: 0.07),
+                LiveVoiceCueStep(frequency: 392, toFrequency: nil, duration: 0.17),
+            ]
+        }
+    }
+
+    static func duration(for cue: LiveVoiceCue) -> TimeInterval {
+        let steps = steps(for: cue)
+        let tones = steps.reduce(0) { $0 + $1.duration }
+        return tones + stepGap * Double(max(0, steps.count - 1))
+    }
+
+    /// Sine tones with a short fade and, for ask, the chat's rising sweep.
+    static func samples(for cue: LiveVoiceCue, sampleRate: Double) -> [Float] {
+        guard sampleRate > 0 else { return [] }
+        let steps = steps(for: cue)
+        let gapFrames = Int((stepGap * sampleRate).rounded())
+        let fadeFrames = max(1, Int((0.018 * sampleRate).rounded()))
+        var samples: [Float] = []
+        for (index, step) in steps.enumerated() {
+            let frames = max(1, Int((step.duration * sampleRate).rounded()))
+            for frame in 0 ..< frames {
+                let time = Double(frame) / sampleRate
+                let edge = min(frame, frames - 1 - frame)
+                let envelope = min(1, Double(edge) / Double(fadeFrames))
+                let value = sin(2 * .pi * frequency(of: step, at: time) * time) * envelope * cabinGain
+                samples.append(Float(value))
+            }
+            if index + 1 < steps.count, gapFrames > 0 {
+                samples.append(contentsOf: repeatElement(0, count: gapFrames))
+            }
+        }
+        return samples
+    }
+
+    private static func frequency(of step: LiveVoiceCueStep, at time: Double) -> Double {
+        guard let target = step.toFrequency, target > 0, step.frequency > 0, step.duration > 0 else {
+            return step.frequency
+        }
+        let progress = min(1, max(0, time / step.duration))
+        return step.frequency * pow(target / step.frequency, progress)
     }
 }
 
