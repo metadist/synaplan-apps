@@ -8,7 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 5.4.2 | `v5.5.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.5.0 |
+| 5.4.2 | `v5.6.4` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.6.4 |
 | 5.4.1 | `v5.4.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.2 |
 | 5.4.0 | `v5.4.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.0 |
 | 5.3.2 | `v5.3.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.2 |
