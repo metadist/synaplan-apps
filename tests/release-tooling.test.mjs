@@ -361,6 +361,13 @@ test('an App Store Connect token is a short-lived ES256 JWT', () => {
   )
 })
 
+test("the store build gives vue-tsc a heap above Node's default", () => {
+  const workflow = read('.github/workflows/store-rc.yml')
+  const build = workflow.indexOf('npm run build\n')
+  assert.ok(build > 0)
+  assert.match(workflow.slice(0, build), /NODE_OPTIONS: --max-old-space-size=6144/)
+})
+
 test('a store release candidate refuses a closed App Store train before it builds', () => {
   const workflow = read('.github/workflows/store-rc.yml')
   const preflight = workflow.indexOf('Require an open App Store version train')

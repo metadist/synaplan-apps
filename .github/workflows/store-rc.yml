@@ -209,6 +209,9 @@ jobs:
       - name: Build and synchronize native projects
         env:
           SYNAPLAN_OPENAPI_FILE: ${{ steps.openapi.outputs.file }}
+          # vue-tsc aborts at Node's default 2GB heap on the xcode-27 runner.
+          # The limit is V8's, so the machine still has memory left.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
           test -n "$SYNAPLAN_OTA_UPDATE_URL"
           test -n "$SYNAPLAN_OTA_CHANNEL_URL"
