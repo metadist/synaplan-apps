@@ -8,7 +8,8 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 5.4.2 | `v5.6.7` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.6.7 |
+| 5.6.7 | `v5.6.7` | unchanged from 4.0.0 | — | _empty (gate off)_ | Store binary: auth and subscription changes since v5.5.0 |
+| 5.4.2 | `v5.5.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.5.0 |
 | 5.4.1 | `v5.4.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.2 |
 | 5.4.0 | `v5.4.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.0 |
 | 5.3.2 | `v5.3.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.3.2 |
@@ -23,6 +24,15 @@
 
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
+
+### App 5.6.7 — one store binary for the queued releases
+
+Synchronizations v5.5.1 through v5.6.6 stayed open because Mobile CI rejected the CarPlay relay
+contract. They are included in this pin. v5.6.0, v5.6.2, and v5.6.3 changed authentication and
+subscription screens, so the jump from the installed `v5.5.0` pin is store-required. One binary
+covers that queue. Those screens do not go out over the air.
+
+- Release classification: **store-required** — authentication and subscription changes since `v5.5.0`.
 
 ### Unreleased — live conversations in CarPlay (LV8)
 

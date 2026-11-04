@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "tag": "v5.6.7",
   "sha": "644267a350db537327acb719bb1e21de28d8e179",
-  "classification": "ota-candidate",
+  "classification": "store-required",
   "sourceRunId": "41807352590",
   "recordedAt": "2026-11-04T09:26:47.389Z"
 }
