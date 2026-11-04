@@ -952,8 +952,7 @@
   function publishKeyboardInset(cssPx, keyboardPx) {
     try {
       var height = typeof cssPx === 'number' && cssPx > 0 ? Math.round(cssPx) : 0
-      var keyboard =
-        typeof keyboardPx === 'number' && keyboardPx > 0 ? Math.round(keyboardPx) : 0
+      var keyboard = typeof keyboardPx === 'number' && keyboardPx > 0 ? Math.round(keyboardPx) : 0
       keyboardFramePx = height
       document.documentElement.style.setProperty('--keyboard-inset-height', height + 'px')
       // height is the CSS lift (0 when the WebView already shrank). keyboardHeight
