@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         // Before super: BridgeActivity loads the WebView inside onCreate, and
         // only plugins registered by then are injected into the page.
         registerPlugin(SynaplanLiveVoicePlugin.class);
+        registerPlugin(SynaplanKeyboardDockPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

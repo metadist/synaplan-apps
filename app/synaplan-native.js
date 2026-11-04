@@ -904,10 +904,11 @@
   // ── Keyboard inset bridge (float the composer above the keyboard) ───────────
   // With Keyboard.resize = 'none' the WebView keeps its full height, so the
   // page never shrinks. We publish the keyboard height as the CSS variable
-  // `--keyboard-inset-height` on <html>; the SPA (style.css .chat-composer-sticky)
-  // translates the chat composer up by that amount. `keyboardWillShow` fires at
-  // the START of the iOS keyboard animation WITH the final height, so a matching
-  // CSS transition slides the composer up in sync — no lag. Every call is
+  // `--keyboard-inset-height` on <html>; the SPA translates the chat by that
+  // amount. Outside the chat dock, `keyboardWillShow` carries the final height
+  // and a CSS transition eases the composer. During the chat dock the native
+  // shell writes the live overlap via `__synaplanKeyboardFrame` and the page
+  // must not ease: a second animation lags the keyboard. Every call is
   // guarded so a missing plugin / non-native context is a silent no-op.
   // Android 15+ / OEM WebViews still shrink innerHeight when the IME opens.
   // Sticky bottom:0 then already sits above the keyboard; applying the full IME
@@ -915,6 +916,14 @@
   // the subtraction is 0 and the overlay path is unchanged.
   var layoutHeightBaseline = 0
   var lastReportedKeyboardPx = 0
+  var chatKeyboardDocked = false
+  // True from composer focus until the keyboard has finished hiding.
+  // The chat page translates with the IME for that whole span. Resizing the
+  // WebView instead snaps the messages once the keyboard animation ends.
+  var chatKeyboardDockSession = false
+  // Live overlap written by the native shell. Stays 0 when that shell is an
+  // older binary that only reports the final height.
+  var keyboardFramePx = 0
 
   function rememberLayoutHeight() {
     try {
@@ -925,31 +934,35 @@
     }
   }
 
-  function layoutAlreadyGaveWayPx() {
+  // Real WebView resize only. Samsung also pans the visual viewport
+  // (offsetTop) to pin the focused field to the top edge; that is not a
+  // resize, and treating it as one hid the keyboard from the scroll assist.
+  function layoutShrinkPx() {
     var shrink = 0
-    var pan = 0
     try {
       if (layoutHeightBaseline > 0) {
         shrink = Math.max(0, layoutHeightBaseline - window.innerHeight)
       }
-      if (window.visualViewport && window.visualViewport.offsetTop > 0) {
-        pan = Math.round(window.visualViewport.offsetTop)
-      }
     } catch (e) {
       /* ignore */
     }
-    return shrink + pan
+    return shrink
   }
 
-  function publishKeyboardInset(px) {
+  function publishKeyboardInset(cssPx, keyboardPx) {
     try {
-      var height = typeof px === 'number' && px > 0 ? Math.round(px) : 0
+      var height = typeof cssPx === 'number' && cssPx > 0 ? Math.round(cssPx) : 0
+      var keyboard =
+        typeof keyboardPx === 'number' && keyboardPx > 0 ? Math.round(keyboardPx) : 0
+      keyboardFramePx = height
       document.documentElement.style.setProperty('--keyboard-inset-height', height + 'px')
-      // Notify the SPA so keyboard-aware views (chat) can re-pin their scroll to
-      // the bottom once the inset-driven padding has been applied. Fired for both
-      // show (height > 0) and hide (height === 0).
+      // height is the CSS lift (0 when the WebView already shrank). keyboardHeight
+      // is the IME itself, so the SPA can put the focused field back even when
+      // the composer must not translate. Fired for both show and hide.
       window.dispatchEvent(
-        new CustomEvent('synaplan:keyboardinset', { detail: { height: height } })
+        new CustomEvent('synaplan:keyboardinset', {
+          detail: { height: height, keyboardHeight: keyboard },
+        })
       )
     } catch (e) {
       /* best-effort: never throw into the SPA */
@@ -965,7 +978,19 @@
       // the SPA's safe-area padding-bottom would remain and leave a gap above the
       // IME. Collapse it for the duration of the keyboard without touching iOS
       // overlay (that path already zeros padding via the inset var).
-      style.textContent = 'html.synaplan-keyboard-open .chat-composer-sticky{padding-bottom:0;}'
+      // scroll-margin asks the WebView to keep a focused field above the
+      // keyboard. The chat composer is excluded: it is translated by the inset,
+      // and a margin on top of that would lift it twice. Samsung often ignores
+      // the margin and pins the field to the top; keyboardScrollAssist undoes that.
+      style.textContent =
+        'html.synaplan-keyboard-open:not(.synaplan-keyboard-dock) .chat-composer-sticky{padding-bottom:0;}' +
+        'html.synaplan-keyboard-open input,html.synaplan-keyboard-open textarea,' +
+        'html.synaplan-keyboard-open [contenteditable="true"]{' +
+        'scroll-margin-top:16px;scroll-margin-bottom:calc(var(--keyboard-inset-height, 0px) + 16px);}' +
+        'html.synaplan-keyboard-open .chat-composer-sticky input,' +
+        'html.synaplan-keyboard-open .chat-composer-sticky textarea,' +
+        'html.synaplan-keyboard-open .chat-composer-sticky [contenteditable="true"]{' +
+        'scroll-margin-top:0;scroll-margin-bottom:0;}'
       var head = document.head || document.getElementsByTagName('head')[0]
       if (head) head.appendChild(style)
     } catch (e) {
@@ -983,19 +1008,85 @@
     }
     if (reported <= 0) {
       rememberLayoutHeight()
-      publishKeyboardInset(0)
+      publishKeyboardInset(0, 0)
       return
     }
     ensureKeyboardOpenStyle()
-    // IME height includes system bars the WebView never occupied. After the
-    // layout has already shrunk, a remainder translate is the leftover gap on
-    // Samsung; sticky bottom:0 is already correct. iOS never shrinks, so this
-    // branch does not run and the full overlay inset is published.
-    if (layoutAlreadyGaveWayPx() > 8) {
-      publishKeyboardInset(0)
+    // The chat dock follows the keyboard's own frames. Publishing the final
+    // height here would jump the messages to the top while the keyboard is
+    // still moving. An older shell never calls __synaplanKeyboardFrame; the
+    // did-show listener below then publishes the final height once.
+    if (chatKeyboardDockSession) {
       return
     }
-    publishKeyboardInset(reported)
+    // IME height includes system bars the WebView never occupied. After the
+    // layout has actually shrunk, sticky bottom:0 already clears the keyboard
+    // and a translate would leave a gap. A Samsung pan (visualViewport
+    // offsetTop, innerHeight unchanged) is not a shrink: keep the overlay
+    // inset and let the SPA undo the scroll that pinned the field to the top.
+    // A real WebView resize already cleared the keyboard. Publishing the IME
+    // height on top of that would lift the chat a second time. The current
+    // shell does not resize the WebView; the page translates with this height
+    // from the start of the keyboard animation.
+    if (layoutShrinkPx() > 8) {
+      publishKeyboardInset(0, reported)
+      return
+    }
+    publishKeyboardInset(reported, reported)
+  }
+
+  // Native shells call this with the keyboard's current overlap, in CSS pixels,
+  // on each animation frame. No event: the chat scroll pin only runs when the
+  // keyboard finishes, and a per-frame pin would fight the transform.
+  function applyKeyboardFrame(px) {
+    var height = typeof px === 'number' && px > 0 ? Math.round(px) : 0
+    keyboardFramePx = height
+    try {
+      document.documentElement.style.setProperty('--keyboard-inset-height', height + 'px')
+    } catch (e) {
+      /* best-effort */
+    }
+  }
+
+  window.__synaplanKeyboardFrame = applyKeyboardFrame
+
+  function beginChatKeyboardDockSession() {
+    chatKeyboardDockSession = true
+    try {
+      ensureKeyboardOpenStyle()
+      document.documentElement.classList.add('synaplan-keyboard-dock')
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function endChatKeyboardDockSession() {
+    chatKeyboardDockSession = false
+    try {
+      document.documentElement.classList.remove('synaplan-keyboard-dock')
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function setChatKeyboardDocked(enabled) {
+    chatKeyboardDocked = enabled === true
+    if (chatKeyboardDocked) beginChatKeyboardDockSession()
+    else if (lastReportedKeyboardPx <= 0) endChatKeyboardDockSession()
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var plugin = plugins && plugins.SynaplanKeyboardDock
+      if (plugin && typeof plugin.setEnabled === 'function') {
+        Promise.resolve(plugin.setEnabled({ enabled: chatKeyboardDocked })).catch(function () {})
+      }
+    } catch (e) {
+      /* an older binary has no dock plugin; the CSS inset stays as it was */
+    }
+    if (lastReportedKeyboardPx > 0) applyKeyboardInset(lastReportedKeyboardPx)
+  }
+
+  window.SynaplanChatKeyboard = {
+    setDocked: setChatKeyboardDocked,
   }
 
   function onViewportChangedWhileKeyboardOpen() {
@@ -1018,12 +1109,30 @@
       // inset event again here gives the SPA a correctly-timed signal to scroll a
       // focused input clear of the keyboard (keyboardScrollAssist.ts).
       keyboard.addListener('keyboardDidShow', function (info) {
+        if (chatKeyboardDockSession) {
+          // Frames already tracked the keyboard. An older shell never sent
+          // any, so the chat is still at the bottom: place it once, at the end.
+          if (keyboardFramePx <= 0) {
+            var reported =
+              info && typeof info.keyboardHeight === 'number' ? Math.round(info.keyboardHeight) : 0
+            lastReportedKeyboardPx = reported > 0 ? reported : 0
+            publishKeyboardInset(lastReportedKeyboardPx, lastReportedKeyboardPx)
+          }
+          return
+        }
         applyKeyboardInset(info && info.keyboardHeight)
       })
       keyboard.addListener('keyboardWillHide', function () {
+        // The dock session keeps the live frame. Zeroing here snaps the chat
+        // down while the keyboard is still on screen.
+        if (chatKeyboardDockSession) return
         applyKeyboardInset(0)
       })
       keyboard.addListener('keyboardDidHide', function () {
+        // Drop the lift before the dock class. Removing the class while a
+        // leftover overlap is set snaps the chat down after the keyboard.
+        applyKeyboardFrame(0)
+        endChatKeyboardDockSession()
         applyKeyboardInset(0)
       })
       window.addEventListener('resize', onViewportChangedWhileKeyboardOpen)
