@@ -161,7 +161,10 @@ test('AndroidManifest keeps the OAuth deep-link intent filter (Epic 3)', () => {
 
 test('the live-voice capability is registered in both binaries', () => {
   const main = read('android/app/src/main/java/com/synaplan/app/MainActivity.java')
-  assert.match(main, /registerPlugin\(SynaplanLiveVoicePlugin\.class\);\s*super\.onCreate/)
+  assert.match(
+    main,
+    /registerPlugin\(SynaplanLiveVoicePlugin\.class\);(?:\s*registerPlugin\([^)]+\);)*\s*super\.onCreate/
+  )
   assert.match(
     read('android/app/src/main/java/com/synaplan/app/SynaplanLiveVoicePlugin.java'),
     /@CapacitorPlugin\(name = "SynaplanLiveVoice"\)/

@@ -584,6 +584,102 @@ test('keyboard inset ignores IME height already taken by a shrunk Android layout
   assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-open'), false)
 })
 
+test('keyboard inset keeps the overlay height when Samsung only pans the visual viewport', () => {
+  const listeners = {}
+  const env = loadBootstrap({
+    extraPlugins: {
+      Keyboard: {
+        addListener(name, fn) {
+          listeners[name] = fn
+        },
+      },
+    },
+  })
+  env.fireDomContentLoaded()
+  env.window.visualViewport = { offsetTop: 360, height: 440, addEventListener() {} }
+  const events = []
+  env.window.dispatchEvent = (event) => {
+    events.push(event)
+  }
+
+  listeners.keyboardWillShow({ keyboardHeight: 400 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '400px')
+  assert.equal(events.at(-1).detail.height, 400)
+  assert.equal(events.at(-1).detail.keyboardHeight, 400)
+  const style = env.document.getElementById('synaplan-keyboard-open-style')
+  assert.equal(style.textContent.includes('scroll-margin-bottom'), true)
+  assert.equal(style.textContent.includes('.chat-composer-sticky textarea'), true)
+
+  // A real shrink still drops the CSS lift, but the SPA keeps the IME height.
+  env.window.visualViewport = { offsetTop: 0, height: 800, addEventListener() {} }
+  env.window.innerHeight = 440
+  listeners.keyboardDidShow({ keyboardHeight: 400 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '0px')
+  assert.equal(events.at(-1).detail.height, 0)
+  assert.equal(events.at(-1).detail.keyboardHeight, 400)
+})
+
+test('chat keyboard dock follows live keyboard frames instead of easing to the final height', () => {
+  const listeners = {}
+  const enabled = []
+  const env = loadBootstrap({
+    extraPlugins: {
+      Keyboard: {
+        addListener(name, fn) {
+          listeners[name] = fn
+        },
+      },
+      SynaplanKeyboardDock: {
+        setEnabled(options) {
+          enabled.push(options.enabled)
+          return Promise.resolve()
+        },
+      },
+    },
+  })
+  env.fireDomContentLoaded()
+  const events = []
+  env.window.dispatchEvent = (event) => {
+    events.push(event)
+  }
+
+  env.window.SynaplanChatKeyboard.setDocked(true)
+  assert.deepEqual(enabled, [true])
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-dock'), true)
+
+  // The show event carries the final height. Publishing it would jump the chat
+  // to the top while the keyboard is still moving.
+  listeners.keyboardWillShow({ keyboardHeight: 400 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], undefined)
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-open'), true)
+  assert.equal(events.length, 0)
+
+  env.window.__synaplanKeyboardFrame(120)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '120px')
+  assert.equal(events.length, 0)
+  env.window.__synaplanKeyboardFrame(400)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '400px')
+
+  listeners.keyboardDidShow({ keyboardHeight: 400 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '400px')
+  assert.equal(events.length, 0)
+
+  env.window.SynaplanChatKeyboard.setDocked(false)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '400px')
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-dock'), true)
+
+  listeners.keyboardWillHide()
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '400px')
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-dock'), true)
+
+  env.window.__synaplanKeyboardFrame(40)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '40px')
+
+  listeners.keyboardDidHide()
+  assert.equal(env.document.documentElement.classList.contains('synaplan-keyboard-dock'), false)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '0px')
+})
+
 test('CarPlay session bridge pushes the server and UI language on load and when hidden', async () => {
   const calls = []
   const env = loadBootstrap({

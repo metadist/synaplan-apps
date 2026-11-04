@@ -22,6 +22,7 @@
 		A11F0001AABBCCDD00000008 /* SynaplanShortcutsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000007 /* SynaplanShortcutsPlugin.swift */; };
 		C33F0001AABBCCDD00000002 /* SynaplanLiveVoicePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33F0001AABBCCDD00000001 /* SynaplanLiveVoicePlugin.swift */; };
 		A11F0001AABBCCDD0000000A /* SynaplanBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */; };
+		F66F0001AABBCCDD00000002 /* SynaplanKeyboardDockPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66F0001AABBCCDD00000001 /* SynaplanKeyboardDockPlugin.swift */; };
 		A11F0001AABBCCDD0000000C /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = A11F0001AABBCCDD0000000B /* AppShortcuts.strings */; };
 		B22F0001AABBCCDD00000002 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000001 /* SceneDelegate.swift */; };
 		B22F0001AABBCCDD00000011 /* CarSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000010 /* CarSessionStore.swift */; };
@@ -64,6 +65,7 @@
 		A11F0001AABBCCDD00000007 /* SynaplanShortcutsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanShortcutsPlugin.swift; sourceTree = "<group>"; };
 		C33F0001AABBCCDD00000001 /* SynaplanLiveVoicePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanLiveVoicePlugin.swift; sourceTree = "<group>"; };
 		A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanBridgeViewController.swift; sourceTree = "<group>"; };
+		F66F0001AABBCCDD00000001 /* SynaplanKeyboardDockPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynaplanKeyboardDockPlugin.swift; sourceTree = "<group>"; };
 		A11F0001AABBCCDD00000011 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		A11F0001AABBCCDD00000012 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		A11F0001AABBCCDD00000013 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				B22F0001AABBCCDD00000001 /* SceneDelegate.swift */,
 				A11F0001AABBCCDD00000009 /* SynaplanBridgeViewController.swift */,
+				F66F0001AABBCCDD00000001 /* SynaplanKeyboardDockPlugin.swift */,
 				A11F0001AABBCCDD0000000F /* Shortcuts */,
 				C33F0001AABBCCDD00000003 /* LiveVoice */,
 				B22F0001AABBCCDD00000003 /* CarPlay */,
@@ -283,6 +286,7 @@
 				A11F0001AABBCCDD00000008 /* SynaplanShortcutsPlugin.swift in Sources */,
 				C33F0001AABBCCDD00000002 /* SynaplanLiveVoicePlugin.swift in Sources */,
 				A11F0001AABBCCDD0000000A /* SynaplanBridgeViewController.swift in Sources */,
+				F66F0001AABBCCDD00000002 /* SynaplanKeyboardDockPlugin.swift in Sources */,
 				B22F0001AABBCCDD00000002 /* SceneDelegate.swift in Sources */,
 				B22F0001AABBCCDD00000011 /* CarSessionStore.swift in Sources */,
 				B22F0001AABBCCDD00000013 /* CarSessionPlugin.swift in Sources */,
