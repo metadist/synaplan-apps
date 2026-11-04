@@ -241,5 +241,22 @@ test('CarPlay live voice stays on the relay and can resume the same session', ()
     /#\[Route\('\/sessions\/\{id\}\/ticket', name: 'sessions_ticket', methods: \['POST'\]\)\]/
   )
   assert.match(controller, /#\[Route\('\/sessions\/\{id\}\/end'/)
-  assert.match(transport, /'carplay' === \$client/)
+  assert.ok(
+    forcesClientOntoRelay(transport, 'carplay'),
+    'CarPlay live voice must stay on the relay socket'
+  )
 })
+
+// The platform spells the lock two ways. v5.5.0 compares the client directly.
+// From v5.5.1 the same return covers CarPlay together with the mobile apps.
+// Either form keeps the driver off WebRTC; pinning one spelling blocked every
+// later synchronization.
+function forcesClientOntoRelay(source, client) {
+  const equality = new RegExp(
+    `if \\(\\s*['"]${client}['"] === \\$client\\s*\\)\\s*\\{\\s*return 'relay';`
+  )
+  const sharedList = new RegExp(
+    `if \\(\\s*in_array\\(\\s*\\$client,\\s*\\[[^\\]]*['"]${client}['"][^\\]]*\\],\\s*true\\s*\\)\\s*\\)\\s*\\{\\s*return 'relay';`
+  )
+  return equality.test(source) || sharedList.test(source)
+}
