@@ -143,8 +143,10 @@ The branch itself is never pinned; the recorded pin is always an immutable SHA.
 
 - `appId`/`appName`/`webDir` live in `capacitor.config.ts`; identifiers locked in
   `docs/IDENTIFIERS.md`.
-- Native essentials configured: SplashScreen, Keyboard (`resize: native`). StatusBar theming is
-  applied at runtime (light/dark) — wired further in Epic 4 (`--brand`).
+- Native essentials configured: SplashScreen, Keyboard (`resize: 'none'`; the WebView keeps its
+  full height and `app/synaplan-native.js` publishes the keyboard overlap as
+  `--keyboard-inset-height`, which the SPA takes off its content column — the shrink model).
+  StatusBar theming is applied at runtime (light/dark) — wired further in Epic 4 (`--brand`).
 
 ## What is intentionally NOT here yet (later epics)
 
