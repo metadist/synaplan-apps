@@ -919,6 +919,21 @@
   // Every call is guarded so a missing plugin / non-native context is a
   // silent no-op.
   var layoutHeightBaseline = 0
+  // Width at the last baseline; a different width means the device rotated.
+  var layoutWidthBaseline = 0
+  // This WebView gives up height to the keyboard on its own (seen once a
+  // session reported a shrink). Rotating with the keyboard open then has to
+  // estimate the new full height, because the closed height cannot be
+  // measured until the keyboard goes away.
+  var webViewShrinks = false
+  // The baseline was taken under an open keyboard on a shrinking WebView.
+  var layoutBaselineStale = false
+  // A shrinking WebView lays out its smaller height before the keyboard
+  // events reach the page. A height drop with the keyboard "closed" is held
+  // this long; it becomes the baseline only when no keyboard follows
+  // (multi-window resize), otherwise it was the keyboard.
+  var LAYOUT_SHRINK_SETTLE_MS = 600
+  var pendingBaselineTimer = null
   // Final IME height from the last Capacitor show event; 0 after hide.
   var lastReportedKeyboardPx = 0
   // Keyboard is on screen (between will-show and did-hide) / is on its way out.
@@ -935,10 +950,76 @@
   function rememberLayoutHeight() {
     try {
       var h = window.innerHeight
+      var w = window.innerWidth
       if (typeof h === 'number' && h > 0) layoutHeightBaseline = h
+      if (typeof w === 'number' && w > 0) layoutWidthBaseline = w
     } catch (e) {
       /* ignore */
     }
+  }
+
+  function cancelPendingBaseline() {
+    if (pendingBaselineTimer === null) return
+    try {
+      clearTimeout(pendingBaselineTimer)
+    } catch (e) {
+      /* ignore */
+    }
+    pendingBaselineTimer = null
+  }
+
+  function scheduleLayoutHeightMeasure() {
+    cancelPendingBaseline()
+    try {
+      pendingBaselineTimer = setTimeout(function () {
+        pendingBaselineTimer = null
+        if (!keyboardShown) rememberLayoutHeight()
+      }, LAYOUT_SHRINK_SETTLE_MS)
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function shrunkBelowBaseline() {
+    try {
+      var h = window.innerHeight
+      return layoutHeightBaseline > 0 && typeof h === 'number' && h > 0 && h < layoutHeightBaseline
+    } catch (e) {
+      return false
+    }
+  }
+
+  // Keyboard closed (or closing). Rotation, or a page that grew back, is the
+  // new baseline right away. A page that shrank without rotating is held:
+  // a shrinking WebView lays out before its keyboard events arrive, so the
+  // drop is usually the keyboard and only a quiet one is a real resize.
+  function measureClosedLayout() {
+    layoutBaselineStale = false
+    if (rotatedSinceBaseline() || !shrunkBelowBaseline()) {
+      cancelPendingBaseline()
+      rememberLayoutHeight()
+      return
+    }
+    scheduleLayoutHeightMeasure()
+  }
+
+  function rotatedSinceBaseline() {
+    try {
+      var w = window.innerWidth
+      return layoutWidthBaseline > 0 && typeof w === 'number' && w > 0 && w !== layoutWidthBaseline
+    } catch (e) {
+      return false
+    }
+  }
+
+  // Rotation under an open keyboard: the old baseline belongs to the other
+  // orientation. A WebView that keeps its height shows the new full height
+  // right now; one that shrinks on its own cannot be measured until the
+  // keyboard goes away, so its inset stays at 0 (the WebView already made
+  // room) until the next hide records the exact value.
+  function rebaseAfterRotation() {
+    rememberLayoutHeight()
+    layoutBaselineStale = webViewShrinks
   }
 
   // Real WebView resize only. Samsung also pans the visual viewport
@@ -953,11 +1034,13 @@
     } catch (e) {
       /* ignore */
     }
+    if (shrink > 0) webViewShrinks = true
     return shrink
   }
 
   function keyboardInsetPx(overlapPx) {
     var overlap = typeof overlapPx === 'number' && overlapPx > 0 ? Math.round(overlapPx) : 0
+    if (layoutBaselineStale) return 0
     return Math.max(0, overlap - layoutShrinkPx())
   }
 
@@ -1029,7 +1112,7 @@
     keyboardOverlapPx = 0
     lastReportedKeyboardPx = 0
     setKeyboardOpenClass(false)
-    rememberLayoutHeight()
+    measureClosedLayout()
     publishKeyboardInset(0, 0)
   }
 
@@ -1050,6 +1133,9 @@
     // from (near) full height is a stray.
     if (overlap <= 0 && keyboardShown && !keyboardHiding && isStrayKeyboardZero()) return
     if (overlap > 0) {
+      // Frames can lead the show event; the keyboard is on screen either way.
+      cancelPendingBaseline()
+      keyboardShown = true
       keyboardFrameSeen = true
       setKeyboardOpenClass(true)
     }
@@ -1080,11 +1166,11 @@
 
   function onViewportChanged() {
     if (!keyboardShown) {
-      // Rotation or a system-bar change with the keyboard closed: the next
-      // shrink is measured against this height.
-      rememberLayoutHeight()
+      measureClosedLayout()
       return
     }
+    cancelPendingBaseline()
+    if (rotatedSinceBaseline()) rebaseAfterRotation()
     // The WebView shrank (or grew back) under an open keyboard: same overlap,
     // new remainder.
     if (keyboardFrameSeen) setKeyboardInsetVar(keyboardInsetPx(keyboardOverlapPx))
@@ -1100,6 +1186,7 @@
       keyboard.addListener('keyboardWillShow', function (info) {
         var reported =
           info && typeof info.keyboardHeight === 'number' ? Math.round(info.keyboardHeight) : 0
+        cancelPendingBaseline()
         keyboardShown = true
         keyboardHiding = false
         lastReportedKeyboardPx = reported > 0 ? reported : 0
@@ -1117,6 +1204,7 @@
       keyboard.addListener('keyboardDidShow', function (info) {
         var reported =
           info && typeof info.keyboardHeight === 'number' ? Math.round(info.keyboardHeight) : 0
+        cancelPendingBaseline()
         keyboardShown = true
         keyboardHiding = false
         if (reported > 0) lastReportedKeyboardPx = reported

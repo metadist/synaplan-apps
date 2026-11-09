@@ -236,6 +236,7 @@ function loadBootstrap(options = {}) {
       windowListeners[type] = listener
     },
     innerHeight: options.innerHeight || 800,
+    innerWidth: options.innerWidth || 400,
   }
 
   const documentStub = {
@@ -725,9 +726,103 @@ test('keyboard inset re-measures the layout baseline after a rotation with the k
   // the re-measure the 440px difference to the portrait baseline would be
   // mistaken for a shrink and swallow the whole inset.
   env.window.innerHeight = 360
+  env.window.innerWidth = 800
   env.window.listeners.resize()
   listeners.keyboardWillShow({ keyboardHeight: 200 })
   assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '200px')
+})
+
+test('a height drop right before the show event is the keyboard, not a new baseline', () => {
+  const { env, listeners } = loadKeyboardEnv({
+    SynaplanKeyboardDock: { setEnabled: () => Promise.resolve() },
+  })
+  env.window.SynaplanChatKeyboard.setDocked(true)
+  // The WebView lays out its shrunk height before Capacitor's event lands.
+  env.window.innerHeight = 527
+  env.window.listeners.resize()
+  env.window.__synaplanKeyboardFrame(336)
+  listeners.keyboardWillShow({ keyboardHeight: 336 })
+  listeners.keyboardDidShow({ keyboardHeight: 336 })
+  // 800 - 527 = 273 already taken by the WebView; the remainder is the inset.
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '63px')
+
+  // Hide: the did-hide event lands while the WebView is still short. The
+  // short height must not become the baseline for the next show.
+  listeners.keyboardWillHide()
+  env.window.__synaplanKeyboardFrame(0)
+  listeners.keyboardDidHide()
+  env.window.innerHeight = 800
+  env.window.listeners.resize()
+  env.window.innerHeight = 527
+  env.window.listeners.resize()
+  env.window.__synaplanKeyboardFrame(336)
+  listeners.keyboardDidShow({ keyboardHeight: 336 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '63px')
+})
+
+test('a quiet height drop with the keyboard closed becomes the baseline', () => {
+  const { env, listeners } = loadKeyboardEnv()
+  // Multi-window: the page got shorter and no keyboard followed.
+  env.window.innerHeight = 600
+  env.window.listeners.resize()
+  env.advance(600)
+  listeners.keyboardWillShow({ keyboardHeight: 300 })
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '300px')
+})
+
+test('keyboard inset rebases when a shrinking WebView rotates under the open keyboard', () => {
+  const { env, listeners } = loadKeyboardEnv({
+    SynaplanKeyboardDock: { setEnabled: () => Promise.resolve() },
+  })
+  env.window.SynaplanChatKeyboard.setDocked(true)
+  // Landscape, 360px tall; the WebView gives the whole keyboard up itself.
+  env.window.innerHeight = 360
+  env.window.innerWidth = 860
+  env.window.listeners.resize()
+  listeners.keyboardWillShow({ keyboardHeight: 240 })
+  env.window.innerHeight = 120
+  env.window.__synaplanKeyboardFrame(240)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '0px')
+
+  // Rotate to portrait with the keyboard still up. The 360px landscape
+  // baseline must not turn the 527px remainder into "no shrink" and publish
+  // the whole keyboard on top of a WebView that already made room.
+  env.window.innerHeight = 527
+  env.window.innerWidth = 412
+  env.window.listeners.resize()
+  env.window.__synaplanKeyboardFrame(336)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '0px')
+
+  // The hide measures the exact portrait height; the next show is precise.
+  listeners.keyboardWillHide()
+  env.window.__synaplanKeyboardFrame(0)
+  env.window.innerHeight = 839
+  listeners.keyboardDidHide()
+  listeners.keyboardWillShow({ keyboardHeight: 336 })
+  env.window.innerHeight = 527
+  env.window.__synaplanKeyboardFrame(336)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '24px')
+})
+
+test('keyboard inset follows the new keyboard height when an overlay WebView rotates', () => {
+  const { env, listeners } = loadKeyboardEnv({
+    SynaplanKeyboardDock: { setEnabled: () => Promise.resolve() },
+  })
+  env.window.SynaplanChatKeyboard.setDocked(true)
+  // iOS keeps the WebView at full height; landscape keyboard 200px.
+  env.window.innerHeight = 360
+  env.window.innerWidth = 860
+  env.window.listeners.resize()
+  listeners.keyboardWillShow({ keyboardHeight: 200 })
+  env.window.__synaplanKeyboardFrame(200)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '200px')
+
+  // Rotation to portrait: full height again, the frames carry the new height.
+  env.window.innerHeight = 800
+  env.window.innerWidth = 400
+  env.window.listeners.resize()
+  env.window.__synaplanKeyboardFrame(340)
+  assert.equal(env.document.documentElement.styleProps['--keyboard-inset-height'], '340px')
 })
 
 test('CarPlay session bridge pushes the server and UI language on load and when hidden', async () => {
