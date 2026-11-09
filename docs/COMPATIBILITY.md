@@ -8,6 +8,7 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
+| 5.7.2 | `v5.7.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.7.2 |
 | 5.7.1 | `v5.7.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.7.1; first-launch OTA apply in the bootstrap |
 | 5.6.7 | `v5.6.7` | unchanged from 4.0.0 | `v5.7.1` | _empty (gate off)_ | Store binary built from v5.6.7; v5.7.0 and v5.7.1 went out over the air |
 | 5.4.2 | `v5.5.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.5.0 |
