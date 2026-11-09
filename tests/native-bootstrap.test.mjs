@@ -455,6 +455,368 @@ test('a shell without the SplashScreen plugin is tolerated', () => {
   assert.equal(env.hideCalls.length, 0)
 })
 
+// ── First launch of a binary: a pending OTA bundle is applied under the splash ──
+
+const OTA_CHECK_MS = 4000
+const OTA_APPLY_MS = 12000
+const OTA_SEEN_KEY = 'synaplan.ota.nativeSeen'
+
+/**
+ * A stand-in for the Capgo updater in `atBackground` mode: `current()` reports
+ * the loaded bundle, events are pushed by the test, `reload()` is recorded.
+ * `getLatest()` models the update server and does not answer unless told to
+ * (a slow server); `next` may be a value or a function read on every poll.
+ */
+function fakeUpdater({
+  bundleId = 'builtin',
+  native = '5.7.1',
+  next = null,
+  reload,
+  latest = () => new Promise(() => {}),
+} = {}) {
+  const listeners = {}
+  const reloads = []
+  const latestCalls = []
+  return {
+    reloads,
+    latestCalls,
+    emit: (name, data) => {
+      for (const listener of listeners[name] || []) listener(data || {})
+    },
+    plugin: {
+      current: () => Promise.resolve({ bundle: { id: bundleId }, native }),
+      // `next(id)` is the setter in the Capgo API; the pending bundle is read
+      // through getNextBundle(). The setter is present to catch a mix-up.
+      next: () => Promise.reject(new Error('Next called without id')),
+      getNextBundle: () => Promise.resolve(typeof next === 'function' ? next() : next),
+      getLatest: () => {
+        latestCalls.push(Date.now())
+        return latest()
+      },
+      addListener: (name, listener) => {
+        ;(listeners[name] = listeners[name] || []).push(listener)
+        return Promise.resolve({ remove() {} })
+      },
+      reload: () => {
+        reloads.push(Date.now())
+        return reload ? reload() : new Promise(() => {})
+      },
+    },
+  }
+}
+
+function loadFirstLaunch(updaterOptions = {}, options = {}) {
+  const updater = fakeUpdater(updaterOptions)
+  const env = loadBootstrap({ extraPlugins: { CapacitorUpdater: updater.plugin }, ...options })
+  env.fireDomContentLoaded()
+  return { env, updater }
+}
+
+test('first launch holds the splash past the first paint until the updater answers', async () => {
+  const { env, updater } = loadFirstLaunch()
+  await env.flushMicrotasks()
+
+  env.paintApp()
+  env.advance(0)
+  assert.equal(env.hideCalls.length, 0, 'the stale builtin SPA must stay under the splash')
+  assert.equal(env.window.localStorage.getItem(OTA_SEEN_KEY), '5.7.1')
+
+  updater.emit('noNeedUpdate')
+  assert.equal(env.hideCalls.length, 1)
+  assert.equal(updater.reloads.length, 0)
+})
+
+test('first launch applies the downloaded bundle before the splash comes down', async () => {
+  const { env, updater } = loadFirstLaunch()
+  await env.flushMicrotasks()
+  env.paintApp()
+  env.advance(0)
+
+  updater.emit('download', { percent: 40 })
+  env.advance(OTA_CHECK_MS)
+  assert.equal(env.hideCalls.length, 0, 'a running download extends the hold')
+
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+  // reload() never settles: the JavaScript context is gone and the new
+  // bundle's bootstrap hides the splash after its own first paint.
+  env.advance(OTA_APPLY_MS)
+  assert.equal(env.hideCalls.length, 0)
+})
+
+test('a bundle downloaded before the listener was registered is applied too', async () => {
+  const { env, updater } = loadFirstLaunch({ next: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+
+  assert.equal(updater.reloads.length, 1)
+  assert.equal(env.hideCalls.length, 0)
+})
+
+test('a server that is already up to date ends the hold without waiting for the ceiling', async () => {
+  const { env, updater } = loadFirstLaunch({
+    latest: () =>
+      Promise.resolve({ version: '5.7.1', kind: 'up_to_date', error: 'no_new_version_available' }),
+  })
+  await env.flushMicrotasks()
+  assert.equal(updater.latestCalls.length, 1)
+
+  env.paintApp()
+  env.advance(0)
+  assert.equal(env.hideCalls.length, 1, 'nothing is waiting, so the paint hides as usual')
+  assert.equal(updater.reloads.length, 0)
+})
+
+test('an unreachable update server ends the hold without waiting for the ceiling', async () => {
+  for (const latest of [
+    () => Promise.reject(new Error('rate_limit_exceeded')),
+    () => Promise.resolve({ version: '', error: 'no_channel' }),
+    () => Promise.resolve({ version: '5.9.0', url: 'https://ota.example/b.zip', breaking: true }),
+  ]) {
+    const { env, updater } = loadFirstLaunch({ latest })
+    await env.flushMicrotasks()
+
+    env.paintApp()
+    env.advance(0)
+    assert.equal(env.hideCalls.length, 1)
+    assert.equal(updater.reloads.length, 0)
+  }
+})
+
+test('a newer bundle on the server extends the hold until it is pending, then applies it', async () => {
+  let pending = null
+  const { env, updater } = loadFirstLaunch({
+    next: () => pending,
+    latest: () => Promise.resolve({ version: '5.7.2', url: 'https://ota.example/b.zip' }),
+  })
+  await env.flushMicrotasks()
+  env.paintApp()
+  env.advance(0)
+
+  // No `download` event reached us (the native download started before the
+  // listener existed); the server's answer alone keeps the hold past the check ceiling.
+  env.advance(OTA_CHECK_MS)
+  await env.flushMicrotasks()
+  assert.equal(env.hideCalls.length, 0)
+  assert.equal(updater.reloads.length, 0)
+
+  pending = { id: 'ota-2' }
+  env.advance(500)
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+  assert.equal(env.hideCalls.length, 0)
+})
+
+test('a newer bundle that never becomes pending releases at the apply ceiling', async () => {
+  const { env, updater } = loadFirstLaunch({
+    latest: () => Promise.resolve({ version: '5.7.2', url: 'https://ota.example/b.zip' }),
+  })
+  await env.flushMicrotasks()
+  env.paintApp()
+  env.advance(0)
+
+  for (let elapsed = 0; elapsed < OTA_APPLY_MS; elapsed += 500) {
+    env.advance(500)
+    await env.flushMicrotasks()
+  }
+  assert.equal(env.hideCalls.length, 1)
+  assert.equal(updater.reloads.length, 0)
+  // Polling stops with the hold.
+  const timersBefore = env.pendingDelays().length
+  env.advance(5000)
+  assert.equal(env.pendingDelays().length, timersBefore)
+})
+
+test('a failed reload hands over to the builtin bundle', async () => {
+  const { env, updater } = loadFirstLaunch({
+    next: { id: 'ota-1' },
+    reload: () => Promise.reject(new Error('no index.html')),
+  })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+
+  env.paintApp()
+  env.advance(0)
+  assert.equal(env.hideCalls.length, 1)
+})
+
+test('first launch gives up on a silent update check after the check ceiling', async () => {
+  const { env, updater } = loadFirstLaunch()
+  await env.flushMicrotasks()
+  env.paintApp()
+  env.advance(0)
+
+  env.advance(OTA_CHECK_MS - 1)
+  assert.equal(env.hideCalls.length, 0)
+  env.advance(1)
+  assert.equal(env.hideCalls.length, 1)
+
+  // A download that completes later installs at the next background, as before.
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 0)
+})
+
+test('a slow download releases the splash at the apply ceiling and is not applied late', async () => {
+  const { env, updater } = loadFirstLaunch()
+  await env.flushMicrotasks()
+  env.paintApp()
+  env.advance(0)
+  updater.emit('download', { percent: 5 })
+
+  env.advance(OTA_APPLY_MS - 1)
+  assert.equal(env.hideCalls.length, 0)
+  env.advance(1)
+  assert.equal(env.hideCalls.length, 1)
+
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 0)
+})
+
+test('the splash ceiling is deferred by a running download and restored when the hold ends', async () => {
+  const { env, updater } = loadFirstLaunch()
+  await env.flushMicrotasks()
+  updater.emit('download', { percent: 10 })
+
+  // The SPA never paints: the ordinary ceiling is deferred by the hold ...
+  env.advance(SPLASH_CEILING_MS)
+  assert.equal(env.hideCalls.length, 0, 'the hold defers the ceiling')
+  // ... and the hold's own ceiling hides.
+  env.advance(OTA_APPLY_MS - SPLASH_CEILING_MS)
+  assert.equal(env.hideCalls.length, 1)
+})
+
+test('without a download the ordinary ceiling hides an SPA that never paints', async () => {
+  const { env } = loadFirstLaunch()
+  await env.flushMicrotasks()
+
+  env.advance(OTA_CHECK_MS)
+  assert.equal(env.hideCalls.length, 0)
+  env.advance(SPLASH_CEILING_MS - OTA_CHECK_MS)
+  assert.equal(env.hideCalls.length, 1)
+})
+
+test('a download failure releases the hold', async () => {
+  for (const event of ['downloadFailed', 'updateFailed']) {
+    const { env, updater } = loadFirstLaunch()
+    await env.flushMicrotasks()
+    env.paintApp()
+    env.advance(0)
+    updater.emit('download', { percent: 50 })
+
+    updater.emit(event)
+    assert.equal(env.hideCalls.length, 1, `${event} must hand over to the builtin bundle`)
+    assert.equal(updater.reloads.length, 0)
+  }
+})
+
+test('a later launch of the same binary hides on the first paint as usual', async () => {
+  const { env, updater } = loadFirstLaunch({}, { storage: { [OTA_SEEN_KEY]: '5.7.1' } })
+  await env.flushMicrotasks()
+
+  env.paintApp()
+  env.advance(0)
+  assert.equal(env.hideCalls.length, 1)
+
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 0, 'a running launch is never reloaded')
+})
+
+test('a native update is a first launch again', async () => {
+  const { env, updater } = loadFirstLaunch(
+    { native: '5.8.0', next: { id: 'ota-2' } },
+    { storage: { [OTA_SEEN_KEY]: '5.7.1' } }
+  )
+  await env.flushMicrotasks()
+
+  assert.equal(updater.reloads.length, 1)
+  assert.equal(env.window.localStorage.getItem(OTA_SEEN_KEY), '5.8.0')
+})
+
+test('a launch on an OTA bundle is never held, but remembers the native version', async () => {
+  const { env, updater } = loadFirstLaunch({ bundleId: 'ota-1' })
+  await env.flushMicrotasks()
+
+  env.paintApp()
+  env.advance(0)
+  assert.equal(env.hideCalls.length, 1)
+  assert.equal(env.window.localStorage.getItem(OTA_SEEN_KEY), '5.7.1')
+  updater.emit('updateAvailable', { bundle: { id: 'ota-2' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 0)
+})
+
+test('a ready bundle reported before current() answers is applied only once confirmed', async () => {
+  let resolveCurrent
+  const updater = fakeUpdater()
+  updater.plugin.current = () =>
+    new Promise((resolve) => {
+      resolveCurrent = resolve
+    })
+  const env = loadBootstrap({ extraPlugins: { CapacitorUpdater: updater.plugin } })
+  env.fireDomContentLoaded()
+
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  assert.equal(updater.reloads.length, 0)
+
+  resolveCurrent({ bundle: { id: 'builtin' }, native: '5.7.1' })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+})
+
+test('a failing current() hands over to the builtin bundle', async () => {
+  const updater = fakeUpdater()
+  updater.plugin.current = () => Promise.reject(new Error('bridge'))
+  const env = loadBootstrap({ extraPlugins: { CapacitorUpdater: updater.plugin } })
+  env.fireDomContentLoaded()
+  await env.flushMicrotasks()
+
+  env.paintApp()
+  env.advance(0)
+  assert.equal(env.hideCalls.length, 1)
+})
+
+test('a shell without the updater plugin hides on the first paint', () => {
+  const env = loadBootstrap()
+  env.fireDomContentLoaded()
+  env.paintApp()
+  env.advance(0)
+  assert.equal(env.hideCalls.length, 1)
+  assert.equal(env.window.localStorage.getItem(OTA_SEEN_KEY), null)
+})
+
+test('applyNow is idempotent when updateAvailable and pending poll race', async () => {
+  const { env, updater } = loadFirstLaunch({ next: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+
+  // A concurrent updateAvailable event while reload() is in flight must not
+  // trigger a second reload.
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+  assert.equal(env.hideCalls.length, 0)
+})
+
+test('opening the server recovery overlay cancels the first-launch OTA hold', async () => {
+  const { env, updater } = loadFirstLaunch(
+    {},
+    { fetch: () => Promise.reject(new Error('offline')) }
+  )
+  await env.flushMicrotasks()
+
+  assert.ok(env.document.getElementById(OVERLAY_ID), 'recovery overlay should be mounted')
+  assert.equal(env.hideCalls.length, 1)
+
+  // A bundle finishing afterwards must not reload the WebView out from under the
+  // user while they are typing a server URL in the recovery overlay.
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 0)
+})
+
 test('Shortcuts and Camera bridges are exposed on the native shell', () => {
   const env = loadBootstrap()
   assert.equal(typeof env.window.SynaplanShortcuts.consumePending, 'function')

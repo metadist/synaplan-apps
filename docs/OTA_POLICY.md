@@ -114,6 +114,17 @@ signing key, and the default channel through protected release-environment varia
   the current bundle, activated when the app moves to the background, and live the next time the
   user opens the app — a launch never waits for the update check and a session is never reloaded out
   from under the user. Urgent changes go through the forced-update gate, not through OTA.
+- ✅ **First launch of a binary** (`app/synaplan-native.js`, `initFirstLaunchOtaApply`): a fresh
+  install or a native update starts on the builtin bundle, so every fix published over the air since
+  the binary was built would be missing on that one start — the human-check fix of `v5.7.1` was,
+  and sign-in failed on the first start of a freshly installed 5.6.7 until the app was reopened.
+  On that launch only, the launch screen stays up while the updater answers (4 s for the check,
+  12 s in total once a download runs) and a bundle that is pending by then is applied with
+  `reload()` under the launch screen. Either ceiling hands over to the builtin bundle and the
+  download installs at the next background as usual. The native version is remembered in
+  `localStorage` (`synaplan.ota.nativeSeen`), so no later launch waits and no running session is
+  ever reloaded. A sign-in or first-run blocker fixed over the air still warrants a store binary:
+  the OTA repairs the first start only when the device reaches the update server in time.
 - ✅ The launch screen is owned solely by `app/synaplan-native.js` (`launchAutoHide: false`, no
   `autoSplashscreen`): hidden on the SPA's first paint, with a hard ceiling as a safety net. The
   updater's `autoSplashscreen` is deliberately unused because it hides only after the update check

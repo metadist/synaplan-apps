@@ -195,10 +195,18 @@ const config: CapacitorConfig = {
       // user opens the app. A launch NEVER waits for the update check, and a user
       // is never reloaded out of a running session.
       //
+      // One exception, owned by app/synaplan-native.js: the FIRST launch of a
+      // binary (fresh install, native update) keeps the launch screen up for a
+      // bounded moment and applies a bundle that finishes downloading in that
+      // window via `reload()`, so a fresh install never runs the stale builtin
+      // SPA (sign-in fixes that went out over the air were missing on the first
+      // start after an install). The ceilings live in the bootstrap.
+      //
       // The instant-apply modes ('always' / 'atInstall' / 'onLaunch') deliberately
-      // are NOT used: they block the start behind the update check (see the
-      // SplashScreen comment above). Urgent changes go through the forced-update
-      // gate (Epic 8.2), not through a faster OTA apply.
+      // are NOT used: they reload whenever the download completes — mid-input on a
+      // slow connection — and `autoSplashscreen` does not arm on a cold start (see
+      // the SplashScreen comment above). Urgent changes go through the
+      // forced-update gate (Epic 8.2), not through a faster OTA apply.
       //
       // autoSplashscreen is intentionally absent — it only takes effect in the
       // instant-apply modes and would re-couple the splash to the network check.

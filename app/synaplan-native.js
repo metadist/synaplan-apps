@@ -31,6 +31,10 @@
  *      a hard ceiling as a safety net. The launch screen is configured with
  *      `launchAutoHide: false` and the updater's `autoSplashscreen` is not used,
  *      so this file is the single place that takes it down.
+ *   5. On the first launch of a binary (fresh install, native update), keep the
+ *      launch screen up for a bounded moment while the updater fetches a web
+ *      bundle published since the binary was built, and apply that bundle
+ *      before the stale builtin SPA is ever shown (see `initFirstLaunchOtaApply`).
  *
  * Notes:
  *   - The server URL is NOT a secret, and the bootstrap must read it
@@ -140,6 +144,10 @@
   var SPLASH_MAX_WAIT_MS = 5000
   var splashHidden = false
   var splashObserver = null
+  // Set once the SPA has painted / the ceiling has elapsed while a first-launch
+  // OTA hold (below) kept the launch screen up; releasing the hold then hides.
+  var splashPaintSeen = false
+  var splashCeilingElapsed = false
 
   function stopSplashObserver() {
     if (!splashObserver) return
@@ -176,6 +184,10 @@
       }
       var hideAfterPaint = function () {
         stopSplashObserver()
+        splashPaintSeen = true
+        // A first-launch OTA hold hides when it ends (or reloads into the new
+        // bundle, whose own bootstrap hides on its first paint).
+        if (otaHoldActive) return
         if ('function' === typeof window.requestAnimationFrame) {
           window.requestAnimationFrame(hideSplash)
         } else {
@@ -196,12 +208,251 @@
     }
   }
 
+  // ── First launch of a binary: apply a waiting OTA bundle first ──────────────
+  // A store binary ships the web bundle it was built with. Fixes published over
+  // the air since then are downloaded by the updater at launch and, in its
+  // `atBackground` mode, activated only when the app next moves to the
+  // background. A fresh install (and the first launch after a native update,
+  // which resets to the builtin bundle) therefore ran the stale builtin SPA
+  // once — including a sign-in that the OTA had already repaired.
+  //
+  // On that one launch the launch screen stays up a little longer: until the
+  // updater reports that nothing is waiting or the download failed, or until
+  // the downloaded bundle is pending, in which case it is applied right away
+  // while the launch screen still covers the page. Every later launch of the
+  // same binary is untouched (the native version is remembered), so a launch
+  // never waits for the network outside this one window, and a running session
+  // is never reloaded — only a launch screen is.
+  //
+  // Bounded twice over: the update check has OTA_FIRST_LAUNCH_CHECK_MS to answer,
+  // and a download that has started has OTA_FIRST_LAUNCH_APPLY_MS in total. Both
+  // ceilings hand over to the builtin bundle; a download that finishes later
+  // still installs at the next background, exactly as before.
+  var OTA_SEEN_NATIVE_KEY = 'synaplan.ota.nativeSeen'
+  var OTA_FIRST_LAUNCH_CHECK_MS = 4000
+  var OTA_FIRST_LAUNCH_APPLY_MS = 12000
+  var OTA_PENDING_POLL_MS = 500
+  var otaHoldActive = false
+  var otaDownloadStarted = false
+  var otaHoldTimers = []
+
+  function getUpdaterPlugin() {
+    try {
+      var plugins = window.Capacitor && window.Capacitor.Plugins
+      var updater = plugins && plugins.CapacitorUpdater
+      if (
+        !updater ||
+        typeof updater.current !== 'function' ||
+        typeof updater.addListener !== 'function' ||
+        typeof updater.reload !== 'function'
+      ) {
+        return null
+      }
+      return updater
+    } catch (e) {
+      return null
+    }
+  }
+
+  function readSeenNative() {
+    try {
+      return String(window.localStorage.getItem(OTA_SEEN_NATIVE_KEY) || '')
+    } catch (e) {
+      return ''
+    }
+  }
+
+  function rememberSeenNative(version) {
+    try {
+      window.localStorage.setItem(OTA_SEEN_NATIVE_KEY, version)
+    } catch (e) {
+      /* without storage the hold simply repeats on the next launch */
+    }
+  }
+
+  function clearOtaHoldTimers() {
+    for (var i = 0; i < otaHoldTimers.length; i++) {
+      try {
+        clearTimeout(otaHoldTimers[i])
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    otaHoldTimers = []
+  }
+
+  // Hand over to the bundle that is loaded: hide now if the SPA has painted (or
+  // the ceiling has passed) meanwhile, otherwise the paint watch takes over.
+  function releaseOtaHold() {
+    if (!otaHoldActive) return
+    otaHoldActive = false
+    clearOtaHoldTimers()
+    if (splashPaintSeen || splashCeilingElapsed) hideSplash()
+  }
+
+  function initFirstLaunchOtaApply() {
+    var updater = getUpdaterPlugin()
+    if (!updater) return
+
+    // Hold provisionally: current() answers within milliseconds, long before
+    // the SPA's module has loaded and painted. Both ceilings are armed before
+    // anything that could throw, so the hold can never outlive them.
+    otaHoldActive = true
+    otaDownloadStarted = false
+    try {
+      otaHoldTimers.push(
+        setTimeout(function () {
+          if (!otaDownloadStarted) releaseOtaHold()
+        }, OTA_FIRST_LAUNCH_CHECK_MS)
+      )
+      otaHoldTimers.push(setTimeout(releaseOtaHold, OTA_FIRST_LAUNCH_APPLY_MS))
+    } catch (e) {
+      releaseOtaHold()
+      return
+    }
+
+    // The updater has set the downloaded bundle as the pending one; reload()
+    // applies it and destroys this JavaScript context. The launch screen stays
+    // up across the reload and the new bundle's bootstrap hides it on its first
+    // paint. A reload that fails hands over to the builtin bundle. Until
+    // current() has confirmed the first launch, a ready bundle is only noted:
+    // a later launch is never reloaded.
+    var firstLaunchConfirmed = false
+    var applyWhenConfirmed = false
+    var reloadStarted = false
+    var applyNow = function () {
+      if (!otaHoldActive || reloadStarted) return
+      if (!firstLaunchConfirmed) {
+        applyWhenConfirmed = true
+        return
+      }
+      reloadStarted = true
+      clearOtaHoldTimers()
+      var settle = function () {
+        releaseOtaHold()
+      }
+      try {
+        Promise.resolve(updater.reload()).then(settle, settle)
+      } catch (e) {
+        settle()
+      }
+    }
+    var onSettled = function () {
+      releaseOtaHold()
+    }
+
+    // The updater starts its check natively while the WebView is still
+    // loading, so the events for a check that has already concluded are gone
+    // by the time the listeners below exist. The pending bundle and the
+    // server's answer are therefore asked for directly as well.
+    var pendingBundle = function () {
+      if (typeof updater.getNextBundle !== 'function') return Promise.resolve(null)
+      return Promise.resolve(updater.getNextBundle()).then(
+        function (next) {
+          return next && next.id && next.id !== 'builtin' ? next : null
+        },
+        function () {
+          return null
+        }
+      )
+    }
+    var pollPending = function () {
+      if (!otaHoldActive) return
+      pendingBundle().then(function (next) {
+        if (!otaHoldActive) return
+        if (next) {
+          applyNow()
+          return
+        }
+        otaHoldTimers.push(setTimeout(pollPending, OTA_PENDING_POLL_MS))
+      })
+    }
+    // Nothing newer on the server (or no answer): nothing to wait for. A newer
+    // bundle: the updater is downloading it in the background; wait for it to
+    // become pending, within the apply ceiling.
+    var askServer = function () {
+      if (typeof updater.getLatest !== 'function') return
+      Promise.resolve(updater.getLatest()).then(
+        function (latest) {
+          if (!otaHoldActive) return
+          var downloadable =
+            !!latest &&
+            typeof latest.url === 'string' &&
+            latest.url !== '' &&
+            !latest.error &&
+            !latest.breaking &&
+            !latest.major &&
+            latest.kind !== 'up_to_date' &&
+            latest.kind !== 'blocked'
+          if (!downloadable) {
+            releaseOtaHold()
+            return
+          }
+          otaDownloadStarted = true
+          pollPending()
+        },
+        function () {
+          releaseOtaHold()
+        }
+      )
+    }
+
+    try {
+      updater.addListener('download', function () {
+        otaDownloadStarted = true
+      })
+      updater.addListener('updateAvailable', applyNow)
+      updater.addListener('noNeedUpdate', onSettled)
+      updater.addListener('downloadFailed', onSettled)
+      updater.addListener('updateFailed', onSettled)
+    } catch (e) {
+      releaseOtaHold()
+      return
+    }
+
+    try {
+      Promise.resolve(updater.current()).then(function (info) {
+        var bundle = info && info.bundle
+        var native = String((info && info.native) || '')
+        var builtin = !bundle || !bundle.id || bundle.id === 'builtin'
+        var firstLaunch = native !== '' && readSeenNative() !== native
+        if (native !== '') rememberSeenNative(native)
+        if (!builtin || !firstLaunch) {
+          releaseOtaHold()
+          return
+        }
+        firstLaunchConfirmed = true
+        if (applyWhenConfirmed) {
+          applyNow()
+          return
+        }
+        // An event may already have ended the hold while current() was in flight.
+        if (!otaHoldActive) return
+        pendingBundle().then(function (next) {
+          if (!otaHoldActive) return
+          if (next) {
+            applyNow()
+            return
+          }
+          askServer()
+        })
+      }, onSettled)
+    } catch (e) {
+      releaseOtaHold()
+    }
+  }
+
   // ── 1. Synchronous bootstrap: expose the resolved server to the SPA ─────────
   if (isNativeShell()) {
     // FIRST, before any other native initialization: arm the ceiling. Everything
-    // below may throw; the launch screen must come down regardless.
+    // below may throw; the launch screen must come down regardless. A
+    // first-launch OTA hold defers this once; its own ceilings then hide.
     try {
-      setTimeout(hideSplash, SPLASH_MAX_WAIT_MS)
+      setTimeout(function () {
+        splashCeilingElapsed = true
+        if (otaHoldActive) return
+        hideSplash()
+      }, SPLASH_MAX_WAIT_MS)
     } catch (e) {
       /* ignore */
     }
@@ -349,7 +600,10 @@
 
     // The overlay hangs off <body>, not off #app, so the paint watch above never
     // sees it. Without this the recovery flow would sit invisibly behind the
-    // launch screen whenever the configured server is unreachable.
+    // launch screen whenever the configured server is unreachable. Releasing a
+    // first-launch OTA hold at the same time prevents a late OTA bundle from
+    // reloading the WebView while the user is editing the server address.
+    releaseOtaHold()
     hideSplash()
 
     var current = resolveServerUrl()
@@ -1238,6 +1492,13 @@
   // ── Mount UI + connectivity self-check (native only) ────────────────────────
   if (isNativeShell()) {
     var onReady = function () {
+      // Before the paint watch, so a first launch can hold the launch screen
+      // for the pending OTA bundle instead of hiding it on the stale SPA.
+      try {
+        initFirstLaunchOtaApply()
+      } catch (e) {
+        releaseOtaHold()
+      }
       initSplashPaintWatch()
       enforceNoZoomViewport()
       initKeyboardInsetBridge()
