@@ -289,11 +289,12 @@
   // honor a viewport meta updated after DOMContentLoaded.
   // `interactive-widget=overlays-content`: on Android the soft keyboard OVERLAYS
   // the content (the layout viewport keeps full height) to match iOS's
-  // Keyboard.resize = 'none'. The SPA floats the chat composer above the keyboard
-  // via the --keyboard-inset-height var (see initKeyboardInsetBridge below), so
-  // the page never shrinks on either platform. Android also needs
+  // Keyboard.resize = 'none'. The bootstrap publishes the keyboard overlap as
+  // `--keyboard-inset-height` (see initKeyboardInsetBridge below), which the SPA
+  // subtracts from its content column (the shrink model). Android also needs
   // Keyboard.resizeOnFullScreen = false and windowSoftInputMode=adjustNothing —
-  // otherwise the WebView shrinks/pans AND this inset still lifts the composer.
+  // otherwise the WebView shrinks/pans; `layoutShrinkPx()` subtracts any shrink
+  // an OEM WebView still applies so the page is never lifted twice.
   var LOCKED_VIEWPORT =
     'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, ' +
     'viewport-fit=cover, interactive-widget=overlays-content'
@@ -357,7 +358,10 @@
     root.setAttribute(
       'style',
       'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.55);' +
-        'display:flex;align-items:center;justify-content:center;padding:24px;' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'padding:max(env(safe-area-inset-top,0px),24px) 24px ' +
+        'calc(max(env(safe-area-inset-bottom,0px),24px) + var(--keyboard-inset-height,0px));' +
+        'overflow-y:auto;' +
         'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;'
     )
 
@@ -365,7 +369,7 @@
     card.setAttribute(
       'style',
       'background:#fff;color:#111;max-width:420px;width:100%;border-radius:14px;' +
-        'box-shadow:0 12px 40px rgba(0,0,0,.3);padding:22px;box-sizing:border-box;'
+        'box-shadow:0 12px 40px rgba(0,0,0,.3);padding:22px;box-sizing:border-box;margin:auto;'
     )
 
     card.appendChild(

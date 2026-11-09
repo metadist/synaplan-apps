@@ -359,7 +359,9 @@ test('splash is hidden when the recovery overlay opens for an unreachable server
   env.fireDomContentLoaded()
   await env.flushMicrotasks()
 
-  assert.ok(env.document.getElementById(OVERLAY_ID), 'recovery overlay should be mounted')
+  const overlay = env.document.getElementById(OVERLAY_ID)
+  assert.ok(overlay, 'recovery overlay should be mounted')
+  assert.match(overlay.getAttribute('style'), /--keyboard-inset-height/)
   assert.equal(env.hideCalls.length, 1)
 
   // Idempotent: the ceiling firing afterwards must not hide a second time.
