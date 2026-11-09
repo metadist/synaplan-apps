@@ -319,12 +319,14 @@
     // a later launch is never reloaded.
     var firstLaunchConfirmed = false
     var applyWhenConfirmed = false
+    var reloadStarted = false
     var applyNow = function () {
-      if (!otaHoldActive) return
+      if (!otaHoldActive || reloadStarted) return
       if (!firstLaunchConfirmed) {
         applyWhenConfirmed = true
         return
       }
+      reloadStarted = true
       clearOtaHoldTimers()
       var settle = function () {
         releaseOtaHold()
@@ -597,7 +599,10 @@
 
     // The overlay hangs off <body>, not off #app, so the paint watch above never
     // sees it. Without this the recovery flow would sit invisibly behind the
-    // launch screen whenever the configured server is unreachable.
+    // launch screen whenever the configured server is unreachable. Releasing a
+    // first-launch OTA hold at the same time prevents a late OTA bundle from
+    // reloading the WebView while the user is editing the server address.
+    releaseOtaHold()
     hideSplash()
 
     var current = resolveServerUrl()

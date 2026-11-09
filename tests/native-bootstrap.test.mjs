@@ -780,6 +780,36 @@ test('a shell without the updater plugin hides on the first paint', () => {
   assert.equal(env.window.localStorage.getItem(OTA_SEEN_KEY), null)
 })
 
+test('applyNow is idempotent when updateAvailable and pending poll race', async () => {
+  const { env, updater } = loadFirstLaunch({ next: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+
+  // A concurrent updateAvailable event while reload() is in flight must not
+  // trigger a second reload.
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 1)
+  assert.equal(env.hideCalls.length, 0)
+})
+
+test('opening the server recovery overlay cancels the first-launch OTA hold', async () => {
+  const { env, updater } = loadFirstLaunch(
+    {},
+    { fetch: () => Promise.reject(new Error('offline')) }
+  )
+  await env.flushMicrotasks()
+
+  assert.ok(env.document.getElementById(OVERLAY_ID), 'recovery overlay should be mounted')
+  assert.equal(env.hideCalls.length, 1)
+
+  // A bundle finishing afterwards must not reload the WebView out from under the
+  // user while they are typing a server URL in the recovery overlay.
+  updater.emit('updateAvailable', { bundle: { id: 'ota-1' } })
+  await env.flushMicrotasks()
+  assert.equal(updater.reloads.length, 0)
+})
+
 test('Shortcuts and Camera bridges are exposed on the native shell', () => {
   const env = loadBootstrap()
   assert.equal(typeof env.window.SynaplanShortcuts.consumePending, 'function')
