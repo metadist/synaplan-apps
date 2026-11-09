@@ -1,2 +1,3 @@
-Live conversations: talk with Synaplan from the chat, interrupt the answer, and find the transcript in the same chat.
-In CarPlay, live conversations open full screen, short tones tell you when it is your turn, and the screen shows whether Synaplan is listening, thinking or speaking.
+The keyboard no longer pushes the chat up twice, and the composer sits on the keyboard.
+Signing in works on the first open after a new install.
+Assistants are now called agents. Phone settings are in one place, and AI replies and generated media are marked as such.

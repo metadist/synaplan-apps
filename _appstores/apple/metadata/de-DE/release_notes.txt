@@ -1,2 +1,3 @@
-Live-Gespräche: Sprich mit Synaplan direkt im Chat, unterbrich die Antwort, und finde das Transkript im selben Chat.
-In CarPlay öffnen sich Live-Gespräche im Vollbild, kurze Töne zeigen dir, wann du dran bist, und der Bildschirm zeigt, ob Synaplan zuhört, nachdenkt oder spricht.
+Die Tastatur schiebt den Chat nicht mehr doppelt nach oben, das Eingabefeld sitzt auf der Tastatur.
+Die Anmeldung klappt beim ersten Öffnen nach einer Neuinstallation.
+Assistenten heißen jetzt Agenten. Die Telefoneinstellungen sind an einem Ort, und KI-Antworten sowie erzeugte Medien sind als solche gekennzeichnet.
