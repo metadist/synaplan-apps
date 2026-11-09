@@ -8,7 +8,8 @@
 
 | App version (UA `Synaplan Mobile Vx.x`) | Pinned `synaplan` submodule tag | Min. backend API contract | Current OTA bundle | Min. supported app version | Notes |
 |-----------------------------------------|---------------------------------|---------------------------|--------------------|----------------------------|-------|
-| 5.6.7 | `v5.7.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.7.1 |
+| 5.7.1 | `v5.7.1` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.7.1; first-launch OTA apply in the bootstrap |
+| 5.6.7 | `v5.6.7` | unchanged from 4.0.0 | `v5.7.1` | _empty (gate off)_ | Store binary built from v5.6.7; v5.7.0 and v5.7.1 went out over the air |
 | 5.4.2 | `v5.5.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.5.0 |
 | 5.4.1 | `v5.4.2` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.2 |
 | 5.4.0 | `v5.4.0` | unchanged from 4.0.0 | — | _empty (gate off)_ | Reviewed mobile baseline v5.4.0 |
@@ -24,6 +25,32 @@
 
 Newest first. The sync automation rewrites the matrix row above but not this prose, so a section
 titled after "the current pin" goes stale on the next release — append here instead of editing.
+
+### App 5.7.1 — a fresh install applies the waiting OTA bundle before its first paint
+
+App-owned; the `synaplan` pin stays at `v5.7.1`, which `main` already records.
+
+A freshly installed 5.6.7 could not sign in on its first start: the store binary bundles the
+`v5.6.7` SPA, which runs the human check inside the WebView, and the fix
+([metadist/synaplan#2994](https://github.com/metadist/synaplan/pull/2994), in `v5.7.1`) reached
+devices only over the air. In `atBackground` mode the updater downloads that bundle at the first
+launch and activates it at the next background, so the first start ran the stale SPA and sign-in
+failed with "we could not confirm you are human"; reopening the app fixed it. Both platforms share
+the exposure (`localhost` is not, and must not be, on the Turnstile widget).
+
+Two changes:
+
+1. This binary bundles `v5.7.1`, so the builtin SPA carries the fix.
+2. `app/synaplan-native.js` keeps the launch screen up on the first launch of a binary (fresh
+   install, native update) until the updater has answered — 4 s for the check, 12 s in total once
+   a download runs — and applies a bundle that is pending by then with `reload()` under the launch
+   screen. The native version is remembered (`localStorage` `synaplan.ota.nativeSeen`); every later
+   launch hides on the first paint as before and a running session is never reloaded. The
+   instant-apply modes of the updater are still not used: they reload whenever the download
+   finishes, including mid-input, and `autoSplashscreen` does not arm on a cold start.
+
+- Release classification: **store-required** — the update mechanism itself (`docs/OTA_POLICY.md`),
+  and the binary exists to refresh the builtin bundle.
 
 ### App 5.6.7 — one store binary for the queued releases
 
