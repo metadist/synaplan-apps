@@ -86,6 +86,10 @@ Every request carries `Synaplan Mobile V<major>.<minor> CarPlay`, so the backend
 mobile client. `tests/carplay-contract.test.mjs` fails `ci-local` when any of these fields, routes
 or the User-Agent pattern change in the pinned submodule.
 
+The car opens the live socket on the server it is signed in to. Only the path and the ticket come
+from `wsUrl`; scheme and host come from the server URL (`https` gives `wss`), the same as the web
+client. A server behind a TLS-terminating proxy may answer `ws://`, and iOS refuses that socket.
+
 ### Session while the iPhone is locked
 
 The SPA stores its tokens through `@aparajita/capacitor-secure-storage` with
