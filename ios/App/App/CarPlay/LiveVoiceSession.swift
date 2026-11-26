@@ -97,7 +97,7 @@ final class LiveVoiceSession {
     }
 
     private func connect(_ start: LiveVoiceStart) async -> SocketEnd {
-        guard let url = URL(string: start.wsUrl) else { return .failed }
+        guard let url = URL(string: client.liveSocketUrl(start.wsUrl)) else { return .failed }
         inRate = start.inRate
         outRate = start.outRate
         let task = URLSession.shared.webSocketTask(with: url)

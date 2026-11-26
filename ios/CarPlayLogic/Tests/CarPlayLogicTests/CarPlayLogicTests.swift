@@ -230,6 +230,36 @@ final class LiveVoiceCarPlanTests: XCTestCase {
         XCTAssertEqual(LiveVoiceCarPlan.route(for: direct), .speakThenTurnBased(.down))
     }
 
+    func testTheSocketTakesSchemeAndHostFromTheSignedInServer() {
+        XCTAssertEqual(
+            LiveVoiceCarPlan.socketUrl("ws://web.example.test/voice/ws?ticket=a.b.c", serverUrl: "https://web.example.test"),
+            "wss://web.example.test/voice/ws?ticket=a.b.c"
+        )
+        XCTAssertEqual(
+            LiveVoiceCarPlan.socketUrl("wss://web.example.test/voice/ws?ticket=a.b.c", serverUrl: "https://web.example.test"),
+            "wss://web.example.test/voice/ws?ticket=a.b.c"
+        )
+        XCTAssertEqual(
+            LiveVoiceCarPlan.socketUrl("ws://internal:80/voice/ws?ticket=a%20b", serverUrl: "https://web.example.test:8443"),
+            "wss://web.example.test:8443/voice/ws?ticket=a%20b"
+        )
+        XCTAssertEqual(
+            LiveVoiceCarPlan.socketUrl("ws://192.168.1.20:8000/voice/ws?ticket=t", serverUrl: "http://192.168.1.20:8000"),
+            "ws://192.168.1.20:8000/voice/ws?ticket=t"
+        )
+    }
+
+    func testAnUnusableServerUrlLeavesTheSocketAsGiven() {
+        XCTAssertEqual(
+            LiveVoiceCarPlan.socketUrl("wss://h/voice/ws?ticket=t", serverUrl: ""),
+            "wss://h/voice/ws?ticket=t"
+        )
+        XCTAssertEqual(
+            LiveVoiceCarPlan.socketUrl("wss://h/voice/ws?ticket=t", serverUrl: "ftp://h"),
+            "wss://h/voice/ws?ticket=t"
+        )
+    }
+
     func testStopReasons() {
         XCTAssertEqual(LiveVoiceCarPlan.stop(for: "limit_budget"), .budget)
         XCTAssertEqual(LiveVoiceCarPlan.stop(for: "capacity"), .turnBased(.busy))

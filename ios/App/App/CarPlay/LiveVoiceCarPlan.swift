@@ -92,6 +92,26 @@ enum LiveVoiceCarPlan {
         return .speakThenTurnBased(.down)
     }
 
+    /// The socket the car opens. Path and ticket come from the server. Scheme
+    /// and host come from the server the app is signed in to, the same as the
+    /// web client, so a server that answers `ws://` behind a TLS proxy still
+    /// gets a secure socket.
+    static func socketUrl(_ wsUrl: String, serverUrl: String) -> String {
+        guard let server = URLComponents(string: serverUrl),
+              let scheme = server.scheme?.lowercased(), scheme == "https" || scheme == "http",
+              let host = server.host, !host.isEmpty,
+              let given = URLComponents(string: wsUrl) else {
+            return wsUrl
+        }
+        var socket = URLComponents()
+        socket.scheme = scheme == "https" ? "wss" : "ws"
+        socket.host = host
+        socket.port = server.port
+        socket.percentEncodedPath = given.percentEncodedPath
+        socket.percentEncodedQuery = given.percentEncodedQuery
+        return socket.string ?? wsUrl
+    }
+
     static func stop(for reason: String) -> LiveVoiceStop {
         switch reason {
         case "limit_budget": return .budget

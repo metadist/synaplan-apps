@@ -172,6 +172,11 @@ final class SynaplanCarClient {
         return try? LiveVoiceCarPlan.start(from: response.data)
     }
 
+    /// The live socket on the signed-in server, whatever scheme the API answered.
+    func liveSocketUrl(_ wsUrl: String) -> String {
+        LiveVoiceCarPlan.socketUrl(wsUrl, serverUrl: store.serverUrl)
+    }
+
     func liveEnd(sessionId: Int) async {
         guard let url = URL(string: store.serverUrl + "/api/v1/voice/live/sessions/\(sessionId)/end") else {
             return
