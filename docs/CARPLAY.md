@@ -26,10 +26,15 @@ conversation is a normal chat and appears in the iPhone chat history right away.
 The voice control template uses `CPVoiceControlState.actionButtons` (iOS 26.4) and is presented
 full screen, so the chat list is not visible while the driver is talking. The screen is the phase
 title ("Connecting", "I'm listening", "Thinking", "Answering", "Muted") and the two buttons, mute
-and end. The states carry no image: on iOS 27 the full-screen layout gives a custom state image
-no height (measured with bitmaps from 24 to 150 pt, SF Symbols and asset-catalog images alike),
-so a phase picture there is not visible, and `backgroundImage` is blurred by the system. The
-title and the tones below carry the phase. Below iOS 26.4 the CarPlay scene states that iOS 26.4
+and end. Each state also carries the Synaplan bird as a looping animation
+(`CarPlayBirdArtwork.swift`): 20 frames over 1.6 s, 150 pt, drawn at run time from the bird outline
+for the car screen's light or dark appearance — an arc while connecting, rings while listening,
+a running spoke ring while thinking, an equalizer ring while answering, a dimmed bird while muted.
+A **still** state image gets no height in the iOS 27 full-screen layout (measured with bitmaps
+from 24 to 150 pt, SF Symbols and asset-catalog images alike), and `backgroundImage` is blurred
+by the system; whether the animated sequence is laid out has to be confirmed on a real iPhone
+with the CarPlay Simulator, because CarPlay does not run in the Xcode 27 simulator. The title and
+the tones below carry the phase either way. Below iOS 26.4 the CarPlay scene states that iOS 26.4
 or later is required.
 
 ## Architecture
@@ -52,6 +57,7 @@ All files live in `ios/App/App/CarPlay/`:
 |------|----------------|
 | `CarPlaySceneDelegate.swift` | `CPTemplateApplicationSceneDelegate`; starts and stops the root controller |
 | `CarPlayRootController.swift` | Root list, empty/error states, voice template, alerts |
+| `CarPlayBirdArtwork.swift` | The animated bird of each voice state, drawn frame by frame with Core Graphics |
 | `VoiceConversationEngine.swift` | Hands-free loop. Live relay when the server allows it, otherwise listen → send → speak |
 | `LiveVoiceCarPlan.swift` | Pure live/fallback decisions, unit-tested in `ios/CarPlayLogic` |
 | `PcmPlaybackStream.swift` | Continuous PCM16 playback with resampling, unit-tested in `ios/CarPlayLogic` |

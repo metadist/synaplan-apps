@@ -151,17 +151,18 @@ final class CarPlayRootController {
         engine.start()
     }
 
-    /// Title and the two buttons only. The full-screen voice template on iOS 27
-    /// lays out a custom state image at zero height, so a phase picture would
-    /// not be visible; the title carries the phase instead.
+    /// Title, the animated bird and the two buttons. CarPlay expects the state
+    /// picture to be an animation, so every state carries a looping frame
+    /// sequence, the muted one included.
     @available(iOS 26.4, *)
     private func makeVoiceTemplate() -> CPVoiceControlTemplate {
+        let traits = interfaceController.carTraitCollection
         let states = VoiceState.allCases.map { state -> CPVoiceControlState in
             let control = CPVoiceControlState(
                 identifier: state.rawValue,
                 titleVariants: Self.titleVariants(for: state),
-                image: nil,
-                repeats: false
+                image: CarPlayBirdArtwork.image(for: state, traits: traits),
+                repeats: true
             )
             control.actionButtons = Array(actionButtons(for: state).prefix(CPVoiceControlState.maximumActionButtonCount))
             return control
