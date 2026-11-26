@@ -41,6 +41,7 @@
 		B22F0001AABBCCDD00000023 /* CarPlayStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000022 /* CarPlayStrings.swift */; };
 		B22F0001AABBCCDD00000025 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */; };
 		B22F0001AABBCCDD00000027 /* CarPlayRootController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000026 /* CarPlayRootController.swift */; };
+		B22F0001AABBCCDD00000031 /* CarPlayBirdArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000030 /* CarPlayBirdArtwork.swift */; };
 		B22F0001AABBCCDD00000029 /* CarPlay.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD00000028 /* CarPlay.xcstrings */; };
 		B22F0001AABBCCDD0000002B /* CarSessionContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000002A /* CarSessionContract.swift */; };
 		B22F0001AABBCCDD0000002D /* CarAPIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22F0001AABBCCDD0000002C /* CarAPIModels.swift */; };
@@ -88,6 +89,7 @@
 		B22F0001AABBCCDD00000022 /* CarPlayStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayStrings.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000026 /* CarPlayRootController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayRootController.swift; sourceTree = "<group>"; };
+		B22F0001AABBCCDD00000030 /* CarPlayBirdArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayBirdArtwork.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD00000028 /* CarPlay.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = CarPlay.xcstrings; sourceTree = "<group>"; };
 		B22F0001AABBCCDD0000002A /* CarSessionContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarSessionContract.swift; sourceTree = "<group>"; };
 		B22F0001AABBCCDD0000002C /* CarAPIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarAPIModels.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 			children = (
 				B22F0001AABBCCDD00000024 /* CarPlaySceneDelegate.swift */,
 				B22F0001AABBCCDD00000026 /* CarPlayRootController.swift */,
+				B22F0001AABBCCDD00000030 /* CarPlayBirdArtwork.swift */,
 				B22F0001AABBCCDD00000020 /* VoiceConversationEngine.swift */,
 				D44F0001AABBCCDD00000001 /* LiveVoiceCarPlan.swift */,
 				D44F0001AABBCCDD00000003 /* LiveVoiceSession.swift */,
@@ -304,6 +307,7 @@
 				B22F0001AABBCCDD00000023 /* CarPlayStrings.swift in Sources */,
 				B22F0001AABBCCDD00000025 /* CarPlaySceneDelegate.swift in Sources */,
 				B22F0001AABBCCDD00000027 /* CarPlayRootController.swift in Sources */,
+				B22F0001AABBCCDD00000031 /* CarPlayBirdArtwork.swift in Sources */,
 				B22F0001AABBCCDD0000002B /* CarSessionContract.swift in Sources */,
 				B22F0001AABBCCDD0000002D /* CarAPIModels.swift in Sources */,
 			);
