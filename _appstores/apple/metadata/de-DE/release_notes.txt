@@ -1,3 +1,2 @@
-Die Tastatur schiebt den Chat nicht mehr doppelt nach oben, das Eingabefeld sitzt auf der Tastatur.
-Die Anmeldung klappt beim ersten Öffnen nach einer Neuinstallation.
-Assistenten heißen jetzt Agenten. Die Telefoneinstellungen sind an einem Ort, und KI-Antworten sowie erzeugte Medien sind als solche gekennzeichnet.
+Das Live-Gespräch in CarPlay verbindet sich wieder, statt in den langsameren Modus mit einzelnen Sprachnachrichten zu wechseln.
+Der Synaplan-Vogel auf dem CarPlay-Sprachbildschirm ist jetzt animiert.
