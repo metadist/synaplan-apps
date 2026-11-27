@@ -1,3 +1,2 @@
-The keyboard no longer pushes the chat up twice, and the composer sits on the keyboard.
-Signing in works on the first open after a new install.
-Assistants are now called agents. Phone settings are in one place, and AI replies and generated media are marked as such.
+Live conversation in CarPlay connects again instead of falling back to the slower turn-by-turn mode.
+The Synaplan bird on the CarPlay voice screen is now animated.
